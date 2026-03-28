@@ -2,13 +2,13 @@
 
 A programming language to interact with WebAssembly components deployed in runtimes like Wasmtime, Golem, etc.
 
-### Wasmtime integration
+## Wasmtime integration
 
 `wasmtime` can make use of the `rib-repl` crate to interact with WASM components. The `rib-repl` crate provides a REPL interface 
 to call functions and manipulate data in WASM components running in a Wasmtime environment.
 This work is on it's way.
 
-### Golem Integration
+## Golem Integration
 
 While `rib-repl` crate is primarily designed for use with runtimes such as wasmtime,
 it is also compatible with other runtimes, including golem. This is proved through `rib-repl-golem`, a binary that can interact with Golem agents.
