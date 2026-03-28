@@ -3,18 +3,20 @@ resolver = "2"
 
 members = [
     "rib-core",
+    "rib-repl",
     "rib-repl-golem",
 ]
 
 [workspace.dependencies]
 golem-wasm = { version = "=0.0.0", path = "../golem/golem-wasm", default-features = false }
-golem-rib = { version = "=0.0.0", path = "rib-core" }
+rib-core = { version = "=0.0.0", path = "rib-core" }
+rib-repl = { version = "=0.0.0", path = "rib-repl" }
 
 anyhow = "1.0.97"
 async-trait = "0.1.87"
 bigdecimal = { version = "0.4.7", features = ["serde", "string-only"] }
 cargo_metadata = "0.21.0"
-clap = { version = "4.5.32", features = ["derive", "suggestions", "color", "help"] }
+clap = { version = "4.5.32", features = ["derive", "suggestions", "color", "help", "env"] }
 colored = "3.0.0"
 combine = "4.6.7"
 convert_case = "0.8.0"
@@ -25,6 +27,7 @@ lazy_static = "1.5.0"
 miette = { version = "7.6.0", features = ["fancy"] }
 poem-openapi = { version = "=5.1.16", features = ["chrono", "cookie", "humantime", "swagger-ui", "time", "url", "uuid", "websocket"] }
 prometheus = { version = "0.14.0", features = ["process"] }
+reqwest = { version = "0.12.13", features = ["json"] }
 prost = "0.14.1"
 prost-types = "0.14.1"
 protox = "0.9.0"
