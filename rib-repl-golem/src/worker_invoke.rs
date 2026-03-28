@@ -18,7 +18,12 @@ pub struct GolemWorkerFunctionInvoke {
 const LOCAL_WELL_KNOWN_TOKEN: &str = "5c832d93-ff85-4a8f-9803-513950fdfdb1";
 
 impl GolemWorkerFunctionInvoke {
-    pub fn new(base_url: String, app_name: String, env_name: String, token: Option<String>) -> Self {
+    pub fn new(
+        base_url: String,
+        app_name: String,
+        env_name: String,
+        token: Option<String>,
+    ) -> Self {
         Self {
             client: Client::new(),
             base_url,
@@ -105,9 +110,7 @@ fn parse_agent_id(worker_name: &str) -> anyhow::Result<(String, UntypedJsonDataV
 
     if let Some(paren_pos) = worker_name.find('(') {
         let agent_type = worker_name[..paren_pos].trim().to_string();
-        let params_str = worker_name[paren_pos + 1..]
-            .trim_end_matches(')')
-            .trim();
+        let params_str = worker_name[paren_pos + 1..].trim_end_matches(')').trim();
 
         let params = if params_str.is_empty() {
             vec![]
@@ -116,8 +119,7 @@ fn parse_agent_id(worker_name: &str) -> anyhow::Result<(String, UntypedJsonDataV
                 .split(',')
                 .map(|s| {
                     let s = s.trim();
-                    serde_json::from_str(s)
-                        .unwrap_or(serde_json::Value::String(s.to_string()))
+                    serde_json::from_str(s).unwrap_or(serde_json::Value::String(s.to_string()))
                 })
                 .collect()
         };
@@ -220,10 +222,14 @@ impl WorkerFunctionInvoke for GolemWorkerFunctionInvoke {
 
         let result: AgentInvocationResult = response.json().await?;
 
-        match (result.result.and_then(|r| r.into_first_value()), return_type) {
+        match (
+            result.result.and_then(|r| r.into_first_value()),
+            return_type,
+        ) {
             (Some(json_val), Some(typ)) => {
-                let vat = ValueAndType::parse_with_type(&json_val, &typ)
-                    .map_err(|errs| anyhow::anyhow!("Failed to parse result: {}", errs.join(", ")))?;
+                let vat = ValueAndType::parse_with_type(&json_val, &typ).map_err(|errs| {
+                    anyhow::anyhow!("Failed to parse result: {}", errs.join(", "))
+                })?;
                 Ok(Some(vat))
             }
             _ => Ok(None),

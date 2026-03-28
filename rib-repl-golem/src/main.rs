@@ -84,9 +84,13 @@ struct GolemApiDependencyManager {
 #[async_trait::async_trait]
 impl RibDependencyManager for GolemApiDependencyManager {
     async fn get_dependencies(&self) -> anyhow::Result<ReplComponentDependencies> {
-        let components =
-            fetch_components(&self.base_url, &self.app_name, &self.env_name, self.token.as_deref())
-                .await?;
+        let components = fetch_components(
+            &self.base_url,
+            &self.app_name,
+            &self.env_name,
+            self.token.as_deref(),
+        )
+        .await?;
 
         let deps = components
             .into_iter()
@@ -112,9 +116,7 @@ impl RibDependencyManager for GolemApiDependencyManager {
                             .map(|at| at.to_analysed_export())
                             .collect()
                     } else {
-                        agent_types_iter
-                            .map(|at| at.to_analysed_export())
-                            .collect()
+                        agent_types_iter.map(|at| at.to_analysed_export()).collect()
                     };
                 ComponentDependency::new(key, exports)
             })
@@ -149,28 +151,28 @@ fn load_component_exports(path: &Path) -> Result<Vec<AnalysedExport>> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let dep_manager: Arc<dyn RibDependencyManager + Send + Sync> = if let Some(ref component_path) = cli.component
-    {
-        let component_name = cli.name.unwrap_or_else(|| {
-            component_path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string()
-        });
-        Arc::new(WasmFileDependencyManager {
-            component_path: component_path.clone(),
-            component_name,
-        })
-    } else {
-        Arc::new(GolemApiDependencyManager {
-            base_url: cli.golem_url.clone(),
-            app_name: cli.app_name.clone(),
-            env_name: cli.env_name.clone(),
-            token: cli.token.clone(),
-            agent_id: cli.agent_id.clone(),
-        })
-    };
+    let dep_manager: Arc<dyn RibDependencyManager + Send + Sync> =
+        if let Some(ref component_path) = cli.component {
+            let component_name = cli.name.unwrap_or_else(|| {
+                component_path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            });
+            Arc::new(WasmFileDependencyManager {
+                component_path: component_path.clone(),
+                component_name,
+            })
+        } else {
+            Arc::new(GolemApiDependencyManager {
+                base_url: cli.golem_url.clone(),
+                app_name: cli.app_name.clone(),
+                env_name: cli.env_name.clone(),
+                token: cli.token.clone(),
+                agent_id: cli.agent_id.clone(),
+            })
+        };
 
     let invoke = Arc::new(GolemWorkerFunctionInvoke::new(
         cli.golem_url,

@@ -97,41 +97,41 @@ pub struct ComponentModelElementSchema {
 
 impl AgentTypeDto {
     pub fn to_analysed_export(&self) -> AnalysedExport {
-        let functions = self
-            .methods
-            .iter()
-            .map(|method| {
-                let parameters = method
-                    .input_schema
-                    .elements
-                    .iter()
-                    .filter_map(|elem| match &elem.schema {
-                        ElementSchema::ComponentModel(cm) => Some(AnalysedFunctionParameter {
-                            name: elem.name.clone(),
-                            typ: cm.element_type.clone(),
-                        }),
-                        _ => None,
-                    })
-                    .collect();
+        let functions =
+            self.methods
+                .iter()
+                .map(|method| {
+                    let parameters = method
+                        .input_schema
+                        .elements
+                        .iter()
+                        .filter_map(|elem| match &elem.schema {
+                            ElementSchema::ComponentModel(cm) => Some(AnalysedFunctionParameter {
+                                name: elem.name.clone(),
+                                typ: cm.element_type.clone(),
+                            }),
+                            _ => None,
+                        })
+                        .collect();
 
-                let result = method
-                    .output_schema
-                    .elements
-                    .first()
-                    .and_then(|elem| match &elem.schema {
-                        ElementSchema::ComponentModel(cm) => {
-                            Some(AnalysedFunctionResult { typ: cm.element_type.clone() })
-                        }
-                        _ => None,
-                    });
+                    let result = method
+                        .output_schema
+                        .elements
+                        .first()
+                        .and_then(|elem| match &elem.schema {
+                            ElementSchema::ComponentModel(cm) => Some(AnalysedFunctionResult {
+                                typ: cm.element_type.clone(),
+                            }),
+                            _ => None,
+                        });
 
-                AnalysedFunction {
-                    name: method.name.replace('_', "-"),
-                    parameters,
-                    result,
-                }
-            })
-            .collect();
+                    AnalysedFunction {
+                        name: method.name.replace('_', "-"),
+                        parameters,
+                        result,
+                    }
+                })
+                .collect();
 
         AnalysedExport::Instance(AnalysedInstance {
             name: format!("golem:agent/{}", self.type_name),
