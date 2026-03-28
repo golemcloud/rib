@@ -31,6 +31,10 @@ struct Cli {
     #[arg(long, default_value = "default")]
     env_name: String,
 
+    /// Agent ID, e.g. "HttpAgent(test)". Loads only this agent type's methods.
+    #[arg(long)]
+    agent_id: Option<String>,
+
     /// Auth token for the Golem API
     #[arg(long, env = "GOLEM_TOKEN")]
     token: Option<String>,
@@ -74,6 +78,7 @@ struct GolemApiDependencyManager {
     app_name: String,
     env_name: String,
     token: Option<String>,
+    agent_id: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -93,12 +98,24 @@ impl RibDependencyManager for GolemApiDependencyManager {
                     root_package_name: c.metadata.root_package_name,
                     root_package_version: c.metadata.root_package_version,
                 };
-                let exports: Vec<golem_wasm::analysis::AnalysedExport> = c
-                    .metadata
-                    .agent_types
-                    .iter()
-                    .map(|at| at.to_analysed_export())
-                    .collect();
+                let agent_type_filter = self.agent_id.as_ref().map(|id| {
+                    let id = id.trim();
+                    id.find('(')
+                        .map(|pos| id[..pos].trim().to_string())
+                        .unwrap_or_else(|| id.to_string())
+                });
+                let agent_types_iter = c.metadata.agent_types.iter();
+                let exports: Vec<golem_wasm::analysis::AnalysedExport> =
+                    if let Some(ref filter) = agent_type_filter {
+                        agent_types_iter
+                            .filter(|at| at.type_name == *filter)
+                            .map(|at| at.to_analysed_export())
+                            .collect()
+                    } else {
+                        agent_types_iter
+                            .map(|at| at.to_analysed_export())
+                            .collect()
+                    };
                 ComponentDependency::new(key, exports)
             })
             .collect();
@@ -151,6 +168,7 @@ async fn main() -> Result<()> {
             app_name: cli.app_name.clone(),
             env_name: cli.env_name.clone(),
             token: cli.token.clone(),
+            agent_id: cli.agent_id.clone(),
         })
     };
 

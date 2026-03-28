@@ -128,6 +128,14 @@ fn parse_agent_id(worker_name: &str) -> anyhow::Result<(String, UntypedJsonDataV
     }
 }
 
+/// Extracts the agent type name from the function name.
+/// e.g. `golem:agent/HttpAgent.{string-path-var}` → `HttpAgent`
+fn extract_agent_type(function_name: &str) -> Option<String> {
+    let after_slash = function_name.rsplit_once('/')?.1;
+    let interface = after_slash.split_once(".{")?.0;
+    Some(interface.to_string())
+}
+
 /// Extracts the method name from a fully qualified function name and converts
 /// from kebab-case (Rib/WIT convention) to snake_case (invoke-agent API convention).
 /// e.g. `HttpAgent.{string-path-var}` → `string_path_var`
@@ -154,6 +162,17 @@ impl WorkerFunctionInvoke for GolemWorkerFunctionInvoke {
     ) -> anyhow::Result<Option<ValueAndType>> {
         let (agent_type_name, constructor_params) = parse_agent_id(worker_name)?;
         let method_name = extract_method_name(function_name);
+
+        if let Some(fn_agent_type) = extract_agent_type(function_name) {
+            if fn_agent_type != agent_type_name {
+                anyhow::bail!(
+                    "Method '{}' belongs to agent type '{}', but this instance is '{}'",
+                    method_name,
+                    fn_agent_type,
+                    agent_type_name
+                );
+            }
+        }
 
         let method_params: Vec<serde_json::Value> = args
             .iter()
