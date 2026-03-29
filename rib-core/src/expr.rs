@@ -1154,7 +1154,7 @@ impl Expr {
         // Lower after structural passes.
         let (mut arena, mut types, root) = crate::expr_arena::lower(self);
 
-        // Arena: set_origin (skips nodes already tagged by bind_type_annotations)
+        // ── Arena: set_origin ─────────────────────────────────────────────
         ti::type_annotation_binding::arena::set_origin(root, &arena, &mut types);
 
         ti::variant_inference::arena::infer_variants(root, &mut arena, &mut types, component_dependency);
