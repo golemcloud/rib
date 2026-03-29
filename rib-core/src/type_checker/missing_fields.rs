@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::type_checker::{Path, PathElem};
 use crate::Expr;
-use golem_wasm::analysis::AnalysedType;
 
 pub fn find_missing_fields_in_record(expr: &Expr, expected: &AnalysedType) -> Vec<Path> {
     let mut missing_paths = Vec::new();

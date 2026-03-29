@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use desert_rust::BinaryCodec;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(
-    Hash, Eq, Debug, Clone, PartialEq, Ord, PartialOrd, Serialize, Deserialize, BinaryCodec,
-)]
-#[desert(evolution())]
+#[derive(Hash, Eq, Debug, Clone, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum VariableId {
     Global(String),
     Local(String, Option<Id>),
@@ -137,26 +133,17 @@ impl VariableId {
     }
 }
 
-#[derive(
-    Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, BinaryCodec, Ord, PartialOrd,
-)]
-#[desert(evolution())]
+#[derive(Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct ListComprehensionIdentifier {
     pub name: String,
 }
 
-#[derive(
-    Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, BinaryCodec, Ord, PartialOrd,
-)]
-#[desert(evolution())]
+#[derive(Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct ListAggregationIdentifier {
     pub name: String,
 }
 
-#[derive(
-    Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, BinaryCodec, Ord, PartialOrd,
-)]
-#[desert(evolution())]
+#[derive(Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct MatchIdentifier {
     pub name: String,
     pub match_arm_index: usize, // Every match arm across the program is identified by a non-sharing index value. Within a match arm the identifier names cannot be reused
@@ -182,100 +169,5 @@ impl Display for VariableId {
         }
     }
 }
-#[derive(
-    Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, BinaryCodec, Ord, PartialOrd,
-)]
-#[desert(transparent)]
+#[derive(Hash, Eq, Debug, Clone, PartialEq, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct Id(pub(crate) u32);
-
-mod protobuf {
-    use crate::proto::golem::rib::VariableId as ProtoVariableId;
-    use crate::{Id, VariableId};
-
-    impl TryFrom<ProtoVariableId> for VariableId {
-        type Error = String;
-
-        fn try_from(value: ProtoVariableId) -> Result<Self, Self::Error> {
-            let variable_id = value.variable_id.ok_or("Missing variable_id".to_string())?;
-
-            match variable_id {
-                crate::proto::golem::rib::variable_id::VariableId::Global(global) => {
-                    Ok(VariableId::Global(global.name))
-                }
-                crate::proto::golem::rib::variable_id::VariableId::Local(local) => Ok(
-                    VariableId::Local(local.name, local.id.map(|x| Id(x as u32))),
-                ),
-                crate::proto::golem::rib::variable_id::VariableId::MatchIdentifier(
-                    match_identifier,
-                ) => Ok(VariableId::MatchIdentifier(crate::MatchIdentifier {
-                    name: match_identifier.name,
-                    match_arm_index: match_identifier.match_arm_index as usize,
-                })),
-                crate::proto::golem::rib::variable_id::VariableId::ListComprehensionIdentifier(
-                    list_comprehension,
-                ) => Ok(VariableId::ListComprehension(
-                    crate::ListComprehensionIdentifier {
-                        name: list_comprehension.name,
-                    },
-                )),
-                crate::proto::golem::rib::variable_id::VariableId::ListAggregationIdentifier(
-                    list_aggregation,
-                ) => Ok(VariableId::ListReduce(crate::ListAggregationIdentifier {
-                    name: list_aggregation.name,
-                })),
-            }
-        }
-    }
-
-    impl From<VariableId> for ProtoVariableId {
-        fn from(value: VariableId) -> Self {
-            match value {
-                VariableId::Global(name) => ProtoVariableId {
-                    variable_id: Some(
-                        crate::proto::golem::rib::variable_id::VariableId::Global(
-                            crate::proto::golem::rib::Global { name },
-                        ),
-                    ),
-                },
-                VariableId::MatchIdentifier(m) => ProtoVariableId {
-                    variable_id: Some(
-                        crate::proto::golem::rib::variable_id::VariableId::MatchIdentifier(
-                            crate::proto::golem::rib::MatchIdentifier {
-                                name: m.name,
-                                match_arm_index: m.match_arm_index as u32,
-                            },
-                        ),
-                    ),
-                },
-                VariableId::Local(name, id) => ProtoVariableId {
-                    variable_id: Some(
-                        crate::proto::golem::rib::variable_id::VariableId::Local(
-                            crate::proto::golem::rib::Local {
-                                name,
-                                id: id.map(|x| x.0 as u64),
-                            },
-                        ),
-                    ),
-                },
-                VariableId::ListComprehension(l) => ProtoVariableId {
-                    variable_id: Some(
-                        crate::proto::golem::rib::variable_id::VariableId::ListComprehensionIdentifier(
-                            crate::proto::golem::rib::ListComprehensionIdentifier {
-                                name: l.name,
-                            },
-                        ),
-                    ),
-                },
-                VariableId::ListReduce(r) => ProtoVariableId {
-                    variable_id: Some(
-                        crate::proto::golem::rib::variable_id::VariableId::ListAggregationIdentifier(
-                            crate::proto::golem::rib::ListAggregationIdentifier {
-                                name: r.name,
-                            },
-                        ),
-                    ),
-                },
-            }
-        }
-    }
-}

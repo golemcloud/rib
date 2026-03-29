@@ -106,12 +106,9 @@ mod internal {
         >,
         Input::Position: GetSourcePosition,
     {
-        many1(choice((
-            escaped_char(),
-            none_of("\"\\${}".chars()),
-        )))
-        .map(LiteralTerm::Static)
-        .message("Unable to parse static part of literal")
+        many1(choice((escaped_char(), none_of("\"\\${}".chars()))))
+            .map(LiteralTerm::Static)
+            .message("Unable to parse static part of literal")
     }
 
     fn dynamic_term<Input>() -> impl Parser<Input, Output = LiteralTerm>

@@ -13,7 +13,6 @@ harness = false
 
 [dependencies]
 rib-core = { workspace = true }
-golem-wasm = { workspace = true, default-features = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

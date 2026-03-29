@@ -632,12 +632,12 @@ mod desugar_tests {
     use test_r::test;
 
     use super::*;
+    use crate::analysis::{
+        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
+    };
     use crate::compiler::desugar::desugar_tests::expectations::expected_condition_with_identifiers;
     use crate::{
         ComponentDependency, ComponentDependencyKey, Expr, RibCompiler, RibCompilerConfig,
-    };
-    use golem_wasm::analysis::{
-        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
     };
     use std::ops::Deref;
     use uuid::Uuid;

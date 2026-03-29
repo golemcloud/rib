@@ -18,12 +18,12 @@ pub use ir::*;
 pub use type_with_unit::*;
 pub use worker_functions_in_rib::*;
 
+use crate::analysis::{AnalysedExport, TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
 use crate::{
     ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr,
     GlobalVariableTypeSpec, InferredExpr, RibInputTypeInfo, RibOutputTypeInfo,
 };
-use golem_wasm::analysis::{AnalysedExport, TypeEnum, TypeVariant};
 use std::error::Error;
 use std::fmt::Display;
 
@@ -912,14 +912,14 @@ mod compiler_error_tests {
     }
 
     mod test_utils {
-        use crate::{ComponentDependency, ComponentDependencyKey};
-        use golem_wasm::analysis::analysed_type::{
+        use crate::analysis::analysed_type::{
             case, f32, field, handle, list, record, s32, str, tuple, u32, u64, variant,
         };
-        use golem_wasm::analysis::{
+        use crate::analysis::{
             AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
             AnalysedInstance, AnalysedResourceId, AnalysedResourceMode, NameTypePair,
         };
+        use crate::{ComponentDependency, ComponentDependencyKey};
         use uuid::Uuid;
 
         pub(crate) fn strip_spaces(input: &str) -> String {

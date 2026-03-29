@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
 use crate::interpreter::rib_runtime_error::{
     arithmetic_error, invalid_comparison, RibRuntimeError,
 };
 use crate::{internal_corrupted_state, CoercedNumericValue, RibInterpreterResult};
-use golem_wasm::analysis::AnalysedType;
-use golem_wasm::{IntoValueAndType, Value, ValueAndType};
+use crate::{IntoValueAndType, Value, ValueAndType};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -240,11 +240,11 @@ impl fmt::Debug for RibInterpreterStackValue {
 }
 
 mod internal {
+    use crate::analysis::{AnalysedType, TypeVariant};
     use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
     use crate::interpreter::rib_runtime_error::invalid_comparison;
     use crate::{internal_corrupted_state, RibInterpreterResult};
-    use golem_wasm::analysis::{AnalysedType, TypeVariant};
-    use golem_wasm::{IntoValueAndType, Value, ValueAndType};
+    use crate::{IntoValueAndType, Value, ValueAndType};
 
     pub(crate) fn compare_typed_value<F>(
         left: &ValueAndType,

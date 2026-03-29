@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use desert_rust::BinaryCodec;
 use std::fmt::{Display, Formatter};
 use uuid::Uuid;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub struct ComponentDependencyKey {
     pub component_name: String,
     pub component_id: Uuid,

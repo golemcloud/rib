@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::InterfaceName;
-use golem_wasm::analysis::AnalysedType;
 
 #[derive(Clone, Debug)]
 pub struct CustomInstanceSpec {

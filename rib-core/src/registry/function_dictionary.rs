@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::{AnalysedExport, AnalysedType, TypeEnum, TypeVariant};
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
 use crate::{
     CallType, DynamicParsedFunctionName, DynamicParsedFunctionReference, FunctionTypeRegistry,
     InferredType, ParsedFunctionSite, RegistryKey, RegistryValue, SemVer,
 };
-use desert_rust::BinaryCodec;
-use golem_wasm::analysis::{AnalysedExport, AnalysedType, TypeEnum, TypeVariant};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter};
@@ -29,8 +28,7 @@ use std::fmt::{Debug, Display, Formatter};
 // Unlike FunctionTypeRegistry, the function names in `FunctionDictionary` is closer to Rib grammar
 // of invoking functions. Example: A RegistryKey of `[constructor]cart` in FunctionTypeRegistry becomes
 // FunctionName::ResourceConstructor(cart) in FunctionDictionary
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, Default, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct FunctionDictionary {
     pub name_and_types: Vec<(FunctionName, FunctionType)>,
 }
@@ -102,8 +100,7 @@ impl FunctionDictionary {
 // if the instance is a resource creation.
 // Given the Dictionaries do become part of InferredType (InferredType::InstanceType::Dictionaries)
 // order of component loading into the rib context shouldn't change it's type.
-#[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct ResourceMethodDictionary {
     pub map: BTreeMap<FullyQualifiedResourceMethod, FunctionType>,
 }
@@ -341,8 +338,7 @@ fn get_resource_method_name(function_name: &str) -> Result<Option<(String, Strin
     }
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum FunctionName {
     Variant(String),
     Enum(String),
@@ -479,8 +475,7 @@ impl FunctionName {
     }
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FullyQualifiedResourceConstructor {
     pub package_name: Option<PackageName>,
     pub interface_name: Option<InterfaceName>,
@@ -513,16 +508,14 @@ impl FullyQualifiedResourceConstructor {
     }
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FullyQualifiedFunctionName {
     pub package_name: Option<PackageName>,
     pub interface_name: Option<InterfaceName>,
     pub function_name: String,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FullyQualifiedResourceMethod {
     pub package_name: Option<PackageName>,
     pub interface_name: Option<InterfaceName>,
@@ -591,8 +584,7 @@ impl Display for FullyQualifiedFunctionName {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FunctionType {
     pub parameter_types: Vec<InferredType>,
     pub return_type: Option<InferredType>,
@@ -627,63 +619,5 @@ impl FunctionType {
         self.return_type
             .clone()
             .map(|x| AnalysedType::try_from(&x).unwrap())
-    }
-}
-
-mod protobuf {
-    use crate::FunctionName;
-
-    impl TryFrom<crate::proto::golem::rib::function_name_type::FunctionName> for FunctionName {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::function_name_type::FunctionName,
-        ) -> Result<Self, Self::Error> {
-            match value {
-                crate::proto::golem::rib::function_name_type::FunctionName::VariantName(name) => {
-                    Ok(FunctionName::Variant(name))
-                }
-                crate::proto::golem::rib::function_name_type::FunctionName::EnumName(name) => {
-                    Ok(FunctionName::Enum(name))
-                }
-                crate::proto::golem::rib::function_name_type::FunctionName::Function(fqfn) => {
-                    Ok(FunctionName::Function(fqfn.try_into()?))
-                }
-                crate::proto::golem::rib::function_name_type::FunctionName::ResourceConstructor(
-                    fqrc,
-                ) => Ok(FunctionName::ResourceConstructor(fqrc.try_into()?)),
-                crate::proto::golem::rib::function_name_type::FunctionName::ResourceMethod(
-                    fqrm,
-                ) => Ok(FunctionName::ResourceMethod(fqrm.try_into()?)),
-            }
-        }
-    }
-
-    impl From<FunctionName> for crate::proto::golem::rib::function_name_type::FunctionName {
-        fn from(value: FunctionName) -> Self {
-            match value {
-                FunctionName::Variant(name) => {
-                    crate::proto::golem::rib::function_name_type::FunctionName::VariantName(name)
-                }
-                FunctionName::Enum(name) => {
-                    crate::proto::golem::rib::function_name_type::FunctionName::EnumName(name)
-                }
-                FunctionName::Function(fqfn) => {
-                    crate::proto::golem::rib::function_name_type::FunctionName::Function(
-                        fqfn.into(),
-                    )
-                }
-                FunctionName::ResourceConstructor(fqrc) => {
-                    crate::proto::golem::rib::function_name_type::FunctionName::ResourceConstructor(
-                        fqrc.into(),
-                    )
-                }
-                FunctionName::ResourceMethod(fqrm) => {
-                    crate::proto::golem::rib::function_name_type::FunctionName::ResourceMethod(
-                        fqrm.into(),
-                    )
-                }
-            }
-        }
     }
 }

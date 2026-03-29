@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
+use crate::ValueAndType;
 use crate::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
     RibComponentFunctionInvoke, RibInput, VariableId,
 };
-use golem_wasm::analysis::AnalysedType;
-use golem_wasm::ValueAndType;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -122,13 +122,13 @@ impl EnvironmentKey {
 }
 
 mod internal {
+    use crate::analysis::AnalysedType;
     use crate::interpreter::env::RibComponentFunctionInvoke;
     use crate::{
         ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
         RibFunctionInvokeResult,
     };
     use async_trait::async_trait;
-    use golem_wasm::analysis::AnalysedType;
 
     pub(crate) struct NoopRibFunctionInvoke;
 

@@ -66,6 +66,7 @@ mod worker_function_invocation;
 
 #[cfg(test)]
 mod tests {
+    use crate::analysis::analysed_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::call_type::CallType;
     use crate::type_checker::Path;
     use crate::type_inference::global_variable_type_binding::GlobalVariableTypeSpec;
@@ -82,11 +83,8 @@ mod tests {
         RibCompilerConfig, TypeName, VariableId,
     };
     use bigdecimal::BigDecimal;
-    use golem_wasm::analysis::analysed_type::{
-        case, field, list, r#enum, str, u64, unit_case, variant,
-    };
 
-    use golem_wasm::analysis::analysed_type;
+    use crate::analysis::analysed_type;
     use test_r::test;
 
     #[test]
@@ -2455,6 +2453,11 @@ mod tests {
     }
 
     mod test_utils {
+        use crate::analysis::analysed_type::u64;
+        use crate::analysis::{
+            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
+            AnalysedType, TypeU32,
+        };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
         use crate::generic_type_parameter::GenericTypeParameter;
@@ -2466,13 +2469,8 @@ mod tests {
             MatchIdentifier, Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig,
             VariableId,
         };
+        use crate::{Value, ValueAndType};
         use bigdecimal::BigDecimal;
-        use golem_wasm::analysis::analysed_type::u64;
-        use golem_wasm::analysis::{
-            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
-            AnalysedType, TypeU32,
-        };
-        use golem_wasm::{Value, ValueAndType};
         use uuid::Uuid;
 
         pub(crate) fn result(
@@ -2773,7 +2771,7 @@ mod tests {
         pub(crate) fn create_none(typ: &AnalysedType) -> ValueAndType {
             ValueAndType::new(
                 Value::Option(None),
-                golem_wasm::analysis::analysed_type::option(typ.clone()),
+                crate::analysis::analysed_type::option(typ.clone()),
             )
         }
 

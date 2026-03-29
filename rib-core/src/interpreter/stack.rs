@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::analysed_type::{list, option, record, str, tuple, variant};
+use crate::analysis::{
+    AnalysedType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
+};
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::interpreter::rib_runtime_error::{
     empty_stack, insufficient_stack_items, type_mismatch_with_value,
 };
 use crate::{internal_corrupted_state, GetLiteralValue, RibInterpreterResult, TypeHint};
-use golem_wasm::analysis::analysed_type::{list, option, record, str, tuple, variant};
-use golem_wasm::analysis::{
-    AnalysedType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
-};
-use golem_wasm::{Value, ValueAndType};
+use crate::{Value, ValueAndType};
 
 #[derive(Debug)]
 pub struct InterpreterStack {
