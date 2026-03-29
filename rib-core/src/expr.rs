@@ -1139,25 +1139,37 @@ impl Expr {
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
-        self.infer_types_initial_phase(
-            component_dependency,
-            global_variable_type_spec,
-            custom_instance_spec,
-        )?;
-        self.bind_instance_types();
-        // Lower the Expr tree into an arena + TypeTable.
+        use crate::type_inference as ti;
+
+        // ── Initial phase (Expr) ──────────────────────────────────────────
+        self.bind_global_variable_types(global_variable_type_spec);
+        self.bind_type_annotations();
+        self.bind_variables_of_list_comprehension();
+        self.bind_variables_of_list_reduce();
+        self.bind_variables_of_pattern_match();
+        self.bind_variables_of_let_assignment();
+        self.identify_instance_creation(component_dependency, custom_instance_spec)?;
+        self.ensure_stateful_instance();
+
+        // Lower after structural passes.
         let (mut arena, mut types, root) = crate::expr_arena::lower(self);
 
-        // Fix-point 1: resolve method calls (instance type binding +
-        // worker function invocation). This is the foundation for everything
-        // else — it must converge before we run function-call argument inference.
-        type_inference::arena_type_inference_fix_point(
+        // Arena: set_origin (skips nodes already tagged by bind_type_annotations)
+        ti::type_annotation_binding::arena::set_origin(root, &arena, &mut types);
+
+        ti::variant_inference::arena::infer_variants(root, &mut arena, &mut types, component_dependency);
+        ti::enum_inference::arena::infer_enums(root, &mut arena, &mut types, component_dependency);
+        ti::instance_type_binding::arena::bind_instance_types(root, &arena, &mut types);
+
+        // ── Fix-point 1: resolve instance / worker function invocations ────
+        ti::arena_type_inference_fix_point(
             |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                crate::type_inference::instance_type_binding::arena::bind_instance_types(
-                    root, arena, types,
-                );
-                crate::type_inference::worker_function_invocation::arena::infer_worker_function_invokes(
-                    root, arena, types, component_dependency,
+                ti::instance_type_binding::arena::bind_instance_types(root, arena, types);
+                ti::worker_function_invocation::arena::infer_worker_function_invokes(
+                    root,
+                    arena,
+                    types,
+                    component_dependency,
                 )
             },
             root,
@@ -1165,8 +1177,8 @@ impl Expr {
             &mut types,
         )?;
 
-        // Function call argument inference (not part of the inner scan fix-point).
-        crate::type_inference::call_arguments_inference::arena::infer_function_call_types(
+        // Function-call argument type inference (outside the scan fix-point).
+        ti::call_arguments_inference::arena::infer_function_call_types(
             root,
             &arena,
             &mut types,
@@ -1175,27 +1187,15 @@ impl Expr {
         )
         .map_err(RibTypeErrorInternal::from)?;
 
-        // Fix-point 2: the main inference scan (identifier propagation,
-        // push/pull types, global inputs, function call types).
-        type_inference::arena_type_inference_fix_point(
+        // ── Fix-point 2: main inference scan ──────────────────────────────
+        ti::arena_type_inference_fix_point(
             |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                crate::type_inference::identifier_inference::arena::infer_all_identifiers(
-                    root, arena, types,
-                );
-                crate::type_inference::type_push_down::arena::push_types_down(root, arena, types)?;
-                crate::type_inference::identifier_inference::arena::infer_all_identifiers(
-                    root, arena, types,
-                );
-                crate::type_inference::type_pull_up::arena::type_pull_up(
-                    root,
-                    arena,
-                    types,
-                    component_dependency,
-                )?;
-                crate::type_inference::global_input_inference::arena::infer_global_inputs(
-                    root, arena, types,
-                );
-                crate::type_inference::call_arguments_inference::arena::infer_function_call_types(
+                ti::identifier_inference::arena::infer_all_identifiers(root, arena, types);
+                ti::type_push_down::arena::push_types_down(root, arena, types)?;
+                ti::identifier_inference::arena::infer_all_identifiers(root, arena, types);
+                ti::type_pull_up::arena::type_pull_up(root, arena, types, component_dependency)?;
+                ti::global_input_inference::arena::infer_global_inputs(root, arena, types);
+                ti::call_arguments_inference::arena::infer_function_call_types(
                     root,
                     arena,
                     types,
@@ -1210,50 +1210,35 @@ impl Expr {
             &mut types,
         )?;
 
-        // One final arena pass: push/pull types and propagate global inputs
-        // to ensure all InstanceType worker name expressions have their types
-        // resolved before we rebuild the Expr tree.
-        crate::type_inference::type_push_down::arena::push_types_down(root, &arena, &mut types)?;
-        crate::type_inference::type_pull_up::arena::type_pull_up(
+        // ── Final arena refinement ─────────────────────────────────────────
+        // One more round after fix-point 2 converges, to ensure all types
+        // are fully propagated before we rebuild the Expr tree.
+        ti::type_push_down::arena::push_types_down(root, &arena, &mut types)?;
+        ti::type_pull_up::arena::type_pull_up(
             root,
             &mut arena,
             &mut types,
             component_dependency,
         )?;
-        crate::type_inference::global_input_inference::arena::infer_global_inputs(
-            root, &arena, &mut types,
-        );
-        crate::type_inference::identifier_inference::arena::infer_all_identifiers(
-            root, &arena, &mut types,
-        );
+        ti::global_input_inference::arena::infer_global_inputs(root, &arena, &mut types);
+        ti::identifier_inference::arena::infer_all_identifiers(root, &arena, &mut types);
 
-        // Rebuild the full Expr tree from the arena. This handles both type
-        // updates AND structural mutations (InvokeMethodLazy → Call,
-        // Identifier → EnumConstructor Call, etc.) that occurred during
-        // arena-based inference. We then replace *self with the rebuilt tree.
-        let rebuilt = crate::expr_arena::rebuild_expr(root, &arena, &types);
-        *self = rebuilt;
+        // ── Rebuild ────────────────────────────────────────────────────────
+        // Convert the arena back into a single Expr tree that carries all
+        // inferred types and structural mutations from the arena passes.
+        *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
 
-        // Final cleanup on the rebuilt Expr tree:
-        //
-        // 1. infer_all_identifiers: propagates let-bound variable types to
-        //    their use-sites. This is needed so that identifiers embedded
-        //    inside frozen InstanceType worker_name Exprs (e.g. `my_worker`
-        //    in `instance(my_worker)`) get their correct types before
-        //    unify_types inspects them.
-        //
-        // 2. bind_instance_types: propagates InstanceType from let-bindings
-        //    to identifier use-sites so that `worker.foo()` type-checks.
-        //
-        // We do NOT re-run infer_worker_function_invokes here — the arena
-        // pipeline already resolved all InvokeMethodLazy → Call conversions
-        // with correct types.
+        // ── Post-rebuild Expr passes ──────────────────────────────────────
+        // InstanceType contains embedded Box<Expr> worker_name nodes that the
+        // arena cannot track. These Expr-level passes propagate types into
+        // those embedded trees so that check_types/unify_types see correct types.
         self.push_types_down()?;
         self.pull_types_up(component_dependency)?;
         self.infer_global_inputs();
         self.infer_all_identifiers();
         self.bind_instance_types();
 
+        // ── Validation ────────────────────────────────────────────────────
         self.check_types(component_dependency)?;
         self.unify_types()?;
         Ok(())

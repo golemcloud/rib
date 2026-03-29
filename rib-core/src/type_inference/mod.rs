@@ -41,28 +41,28 @@ pub use worker_function_invocation::*;
 
 pub(crate) mod call_arguments_inference;
 mod custom_instance_spec;
-mod enum_inference;
+pub(crate) mod enum_inference;
 mod errors;
 mod expr_visitor;
 pub(crate) mod global_input_inference;
-mod global_variable_type_binding;
+pub(crate) mod global_variable_type_binding;
 pub(crate) mod identifier_inference;
-mod identify_instance_creation;
-mod index_selection_type_binding;
+pub(crate) mod identify_instance_creation;
+pub(crate) mod index_selection_type_binding;
 mod inference_fix_point;
 mod inferred_expr;
 pub(crate) mod instance_type_binding;
 mod rib_input_type;
 mod rib_output_type;
-mod stateful_instance;
-mod type_annotation_binding;
+pub(crate) mod stateful_instance;
+pub(crate) mod type_annotation_binding;
 mod type_hint;
 pub(crate) mod type_pull_up;
 pub(crate) mod type_push_down;
 mod type_reset;
 mod type_unification;
-mod variable_binding;
-mod variant_inference;
+pub(crate) mod variable_binding;
+pub(crate) mod variant_inference;
 pub(crate) mod worker_function_invocation;
 
 #[cfg(test)]

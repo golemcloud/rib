@@ -15,6 +15,69 @@
 use crate::{visit_post_order_rev_mut, Expr, InferredType};
 use std::ops::DerefMut;
 
+pub mod arena {
+    use crate::expr_arena::{ExprArena, ExprId, ExprKind, RangeKind, TypeTable};
+    use crate::type_inference::expr_visitor::arena::children_of;
+    use crate::InferredType;
+
+    /// Arena version: sets `u64` on `Number` nodes that appear directly
+    /// as the index of a `SelectIndex` or as bounds of a `Range`.
+    pub fn bind_default_types_to_index_expressions(
+        root: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+    ) {
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            let kind = arena.expr(id).kind.clone();
+            match kind {
+                ExprKind::SelectIndex { index: idx_id, .. } => {
+                    set_number_u64(idx_id, arena, types);
+                    // Also handle Range index
+                    if let ExprKind::Range { range } = &arena.expr(idx_id).kind {
+                        match range {
+                            RangeKind::Range { from, to } => {
+                                set_number_u64(*from, arena, types);
+                                set_number_u64(*to, arena, types);
+                            }
+                            RangeKind::RangeInclusive { from, to } => {
+                                set_number_u64(*from, arena, types);
+                                set_number_u64(*to, arena, types);
+                            }
+                            RangeKind::RangeFrom { from } => {
+                                set_number_u64(*from, arena, types);
+                            }
+                        }
+                    }
+                }
+                ExprKind::Range { ref range } => match range {
+                    RangeKind::Range { from, to } => {
+                        set_number_u64(*from, arena, types);
+                        set_number_u64(*to, arena, types);
+                    }
+                    RangeKind::RangeInclusive { from, to } => {
+                        set_number_u64(*from, arena, types);
+                        set_number_u64(*to, arena, types);
+                    }
+                    RangeKind::RangeFrom { from } => {
+                        set_number_u64(*from, arena, types);
+                    }
+                },
+                _ => {}
+            }
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
+        }
+    }
+
+    fn set_number_u64(id: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+        if let ExprKind::Number { .. } = arena.expr(id).kind {
+            types.set(id, InferredType::u64());
+        }
+    }
+}
+
 // All select indices with literal numbers don't need to explicit
 // type annotation to get better developer experience,
 // and all literal numbers will be automatically inferred as u64
