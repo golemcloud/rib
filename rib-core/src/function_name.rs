@@ -14,7 +14,7 @@
 
 use combine::stream::position::Stream;
 use combine::{eof, EasyParser, Parser};
-use semver::{BuildMetadata, Prerelease};
+
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
