@@ -39,6 +39,7 @@ mod internal {
     use combine::parser::char::char as char_;
     use combine::parser::char::spaces;
     use combine::parser::repeat::many;
+    use combine::parser::token::any;
     use combine::{between, choice, many1, none_of, ParseError, Parser};
 
     pub fn literal_<Input>() -> impl Parser<Input, Output = Expr>
@@ -76,6 +77,27 @@ mod internal {
         )
     }
 
+    fn escaped_char<Input>() -> impl Parser<Input, Output = char>
+    where
+        Input: combine::Stream<Token = char>,
+        RibParseError: Into<
+            <Input::Error as ParseError<Input::Token, Input::Range, Input::Position>>::StreamError,
+        >,
+        Input::Position: GetSourcePosition,
+    {
+        char_('\\').with(any()).map(|c| match c {
+            'n' => '\n',
+            't' => '\t',
+            'r' => '\r',
+            '\\' => '\\',
+            '"' => '"',
+            '$' => '$',
+            '{' => '{',
+            '}' => '}',
+            other => other,
+        })
+    }
+
     fn static_term<Input>() -> impl Parser<Input, Output = LiteralTerm>
     where
         Input: combine::Stream<Token = char>,
@@ -84,9 +106,12 @@ mod internal {
         >,
         Input::Position: GetSourcePosition,
     {
-        many1(none_of("\"${}".chars()))
-            .map(LiteralTerm::Static)
-            .message("Unable to parse static part of literal")
+        many1(choice((
+            escaped_char(),
+            none_of("\"\\${}".chars()),
+        )))
+        .map(LiteralTerm::Static)
+        .message("Unable to parse static part of literal")
     }
 
     fn dynamic_term<Input>() -> impl Parser<Input, Output = LiteralTerm>
@@ -173,6 +198,20 @@ mod literal_parse_tests {
                 Expr::literal("baz"),
             )
         );
+    }
+
+    #[test]
+    fn test_literal_with_escaped_quotes() {
+        let input = r#""HttpAgent(\"test\")" "#;
+        let result = Expr::from_text(input);
+        assert_eq!(result, Ok(Expr::literal("HttpAgent(\"test\")")));
+    }
+
+    #[test]
+    fn test_literal_with_escaped_backslash() {
+        let input = r#""foo\\bar""#;
+        let result = Expr::from_text(input);
+        assert_eq!(result, Ok(Expr::literal("foo\\bar")));
     }
 
     #[test]
