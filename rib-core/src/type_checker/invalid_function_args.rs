@@ -15,8 +15,8 @@
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::type_checker::missing_fields::find_missing_fields_in_record;
+use crate::{try_visit_post_order_mut, Expr, FunctionCallError};
 use crate::{type_checker, ComponentDependencies, FunctionName};
-use crate::{Expr, ExprVisitor, FunctionCallError};
 
 // While we have a dedicated generic phases (refer submodules) within type_checker module,
 // we have this special phase to grab errors in the context function calls.
@@ -27,21 +27,18 @@ pub fn check_invalid_function_args(
     expr: &mut Expr,
     component_dependency: &ComponentDependencies,
 ) -> Result<(), FunctionCallError> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    try_visit_post_order_mut(expr, &mut |expr| {
         if let Expr::Call {
             call_type, args, ..
-        } = &expr
+        } = &*expr
         {
             match call_type {
                 CallType::InstanceCreation(_) => {}
                 call_type => get_missing_record_keys(call_type, args, component_dependency, expr)?,
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 #[allow(clippy::result_large_err)]

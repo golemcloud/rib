@@ -12,34 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Expr, ExprVisitor, InferredType};
+use crate::{visit_post_order_rev_mut, Expr, InferredType};
 use std::ops::DerefMut;
 
 // All select indices with literal numbers don't need to explicit
 // type annotation to get better developer experience,
 // and all literal numbers will be automatically inferred as u64
 pub fn bind_default_types_to_index_expressions(expr: &mut Expr) {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
-        match expr {
-            Expr::SelectIndex { index, .. } => {
-                if let Expr::Number { inferred_type, .. } = index.deref_mut() {
-                    *inferred_type = InferredType::u64()
-                }
-
-                if let Expr::Range { range, .. } = index.deref_mut() {
-                    let exprs = range.get_exprs_mut();
-
-                    for expr in exprs {
-                        if let Expr::Number { inferred_type, .. } = expr.deref_mut() {
-                            *inferred_type = InferredType::u64()
-                        }
-                    }
-                }
+    visit_post_order_rev_mut(expr, &mut |expr| match expr {
+        Expr::SelectIndex { index, .. } => {
+            if let Expr::Number { inferred_type, .. } = index.deref_mut() {
+                *inferred_type = InferredType::u64()
             }
 
-            Expr::Range { range, .. } => {
+            if let Expr::Range { range, .. } = index.deref_mut() {
                 let exprs = range.get_exprs_mut();
 
                 for expr in exprs {
@@ -48,8 +34,18 @@ pub fn bind_default_types_to_index_expressions(expr: &mut Expr) {
                     }
                 }
             }
-
-            _ => {}
         }
-    }
+
+        Expr::Range { range, .. } => {
+            let exprs = range.get_exprs_mut();
+
+            for expr in exprs {
+                if let Expr::Number { inferred_type, .. } = expr.deref_mut() {
+                    *inferred_type = InferredType::u64()
+                }
+            }
+        }
+
+        _ => {}
+    });
 }

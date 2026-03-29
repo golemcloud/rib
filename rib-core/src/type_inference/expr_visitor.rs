@@ -1,508 +1,93 @@
 use crate::{Expr, TypeInternal};
 use std::collections::VecDeque;
 
-// A structure that allows to visit expressions in a bottom-up or top-down order.
-// All other functionalities are to be replaced with the usage of `ExprVisitor`
-// https://github.com/golemcloud/golem/issues/1428
-pub struct ExprVisitor<'a> {
-    queue: VecDeque<&'a mut Expr>,
+// Post-order (bottom-up): children first, then parent. Left-to-right.
+pub fn visit_post_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
+    visit_children_mut(expr, |child| visit_post_order_mut(child, f));
+    f(expr);
 }
 
-impl Default for ExprVisitor<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
+// Pre-order reversed: parent first, then children right-to-left.
+// This matches the old ExprVisitor::bottom_up + pop_back() semantics.
+pub fn visit_post_order_rev_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
+    f(expr);
+    visit_children_rev_mut(expr, |child| visit_post_order_rev_mut(child, f));
 }
 
-impl<'a> ExprVisitor<'a> {
-    pub fn new() -> Self {
-        ExprVisitor {
-            queue: VecDeque::new(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-
-    // Enqueue expressions in a bottom-up order,
-    // but in the natural order of rib program
-    // Given
-    //   `Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))`
-    // Expr::Num(1)
-    // Expr::Let(Variable(x), Expr::Num(1))
-    // Expr::Identifier(x)
-    // Expr::Call(func, Expr::Identifier(x))
-    // Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))
-    pub fn bottom_up(expr: &'a mut Expr) -> Self {
-        let mut queue: VecDeque<&'a mut Expr> = VecDeque::new();
-
-        enqueue_expr_bottom_up(expr, &mut queue);
-
-        ExprVisitor { queue }
-    }
-
-    // Enqueue expressions in a top-down order,
-    // while processing the expressions in the natural order within the block (Expr::Block).
-    // Given
-    //  `Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))`
-    // Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))
-    // Expr::Let(Variable(x), Expr::Num(1, U64))
-    // Expr::Num(1, U64)
-    // Expr::Call(func, Expr::Identifier(x))
-    // Expr::Identifier(x)
-    pub fn top_down(expr: &'a mut Expr) -> Self {
-        let mut queue: VecDeque<&'a mut Expr> = VecDeque::new();
-
-        enqueue_expr_top_down(expr, &mut queue);
-
-        ExprVisitor { queue }
-    }
-
-    pub fn pop_front(&mut self) -> Option<&mut Expr> {
-        self.queue.pop_front()
-    }
-
-    pub fn pop_back(&mut self) -> Option<&mut Expr> {
-        self.queue.pop_back()
-    }
-
-    pub fn pop_all(&mut self) -> Vec<&mut Expr> {
-        self.queue.drain(..).collect()
-    }
+// Pre-order (top-down): parent first, then children left-to-right.
+pub fn visit_pre_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
+    f(expr);
+    visit_children_mut(expr, |child| visit_pre_order_mut(child, f));
 }
 
-fn enqueue_expr_top_down(expr: &mut Expr, queue: &mut VecDeque<&mut Expr>) {
-    let mut stack: VecDeque<*mut Expr> = VecDeque::new();
-
-    stack.push_back(expr);
-
-    while let Some(current_ptr) = stack.pop_front() {
-        queue.push_back(unsafe { &mut *current_ptr });
-
-        let current = unsafe { &mut *current_ptr };
-
-        match current {
-            Expr::Let { expr, .. } => stack.push_front(&mut **expr),
-            Expr::SelectField { expr, .. } => stack.push_front(&mut **expr),
-            Expr::SelectIndex { expr, index, .. } => {
-                stack.push_front(&mut **expr);
-                stack.push_front(&mut **index);
-            }
-            Expr::Sequence { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Record { exprs, .. } => {
-                stack.extend(exprs.iter_mut().map(|(_, expr)| &mut **expr as *mut Expr))
-            }
-            Expr::Tuple { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Concat { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::ExprBlock { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Not { expr, .. } => stack.push_front(&mut **expr),
-            Expr::Length { expr, .. } => stack.push_front(&mut **expr),
-            Expr::GreaterThan { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::GreaterThanOrEqualTo { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::LessThanOrEqualTo { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::EqualTo { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::Plus { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::Minus { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::Divide { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::Multiply { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::LessThan { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::Cond { cond, lhs, rhs, .. } => {
-                stack.push_front(&mut **cond);
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs);
-            }
-            Expr::PatternMatch {
-                predicate,
-                match_arms,
-                ..
-            } => {
-                stack.push_front(&mut **predicate);
-                for arm in match_arms {
-                    let arm_literal_expressions = arm.arm_pattern.get_expr_literals_mut();
-
-                    for x in arm_literal_expressions {
-                        let x = x.as_mut();
-                        stack.push_front(x);
-                    }
-
-                    stack.push_front(&mut *arm.arm_resolution_expr);
-                }
-            }
-
-            Expr::Range { range, .. } => {
-                for expr in range.get_exprs_mut() {
-                    stack.push_front(&mut **expr);
-                }
-            }
-
-            Expr::Option {
-                expr: Some(expr), ..
-            } => stack.push_front(&mut **expr),
-            Expr::Result { expr: Ok(expr), .. } => stack.push_front(&mut **expr),
-            Expr::Result {
-                expr: Err(expr), ..
-            } => stack.push_front(&mut **expr),
-            Expr::Call {
-                call_type,
-                args,
-                inferred_type,
-                ..
-            } => {
-                let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
-                if let Some(exprs) = exprs {
-                    for x in exprs {
-                        stack.push_front(x);
-                    }
-                }
-
-                if let Some(worker) = worker {
-                    stack.push_front(&mut **worker);
-                }
-
-                // The expr existing in the inferred type should be visited
-                if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
-                    if let Some(worker_expr) = instance_type.worker_mut() {
-                        stack.push_front(&mut **worker_expr);
-                    }
-                }
-
-                for x in args {
-                    stack.push_front(x);
-                }
-            }
-            Expr::Unwrap { expr, .. } => stack.push_front(&mut **expr), // not yet needed
-            Expr::And { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs)
-            }
-
-            Expr::Or { lhs, rhs, .. } => {
-                stack.push_front(&mut **lhs);
-                stack.push_front(&mut **rhs)
-            }
-
-            Expr::ListComprehension {
-                iterable_expr,
-                yield_expr,
-                ..
-            } => {
-                stack.push_front(&mut **iterable_expr);
-                stack.push_front(&mut **yield_expr);
-            }
-
-            Expr::ListReduce {
-                iterable_expr,
-                init_value_expr,
-                yield_expr,
-                ..
-            } => {
-                stack.push_front(&mut **iterable_expr);
-                stack.push_front(&mut **init_value_expr);
-                stack.push_front(&mut **yield_expr);
-            }
-
-            Expr::InvokeMethodLazy {
-                lhs,
-                args,
-                inferred_type,
-                ..
-            } => {
-                if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
-                    if let Some(worker_expr) = instance_type.worker_mut() {
-                        stack.push_front(&mut **worker_expr);
-                    }
-                }
-
-                stack.push_front(&mut **lhs);
-                stack.extend(args.iter_mut().map(|x| x as *mut Expr));
-            }
-
-            Expr::GetTag { expr, .. } => {
-                stack.push_front(&mut **expr);
-            }
-
-            Expr::Literal { .. } => {}
-            Expr::Number { .. } => {}
-            Expr::Flags { .. } => {}
-            Expr::Identifier { .. } => {}
-            Expr::Boolean { .. } => {}
-            Expr::Option { expr: None, .. } => {}
-            Expr::Throw { .. } => {}
-            Expr::GenerateWorkerName { .. } => {}
-        }
-    }
+// Fallible post-order: children first, then parent. Stops on first error.
+pub fn try_visit_post_order_mut<E>(
+    expr: &mut Expr,
+    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    try_visit_children_mut(expr, |child| try_visit_post_order_mut(child, f))?;
+    f(expr)
 }
 
-fn enqueue_expr_bottom_up(expr: &mut Expr, queue: &mut VecDeque<&mut Expr>) {
-    let mut stack: VecDeque<*mut Expr> = VecDeque::new();
-
-    stack.push_back(expr);
-
-    while let Some(current) = stack.pop_back() {
-        queue.push_front(unsafe { &mut *current });
-
-        let current = unsafe { &mut *current };
-
-        match &mut *current {
-            Expr::Let { expr, .. } => stack.push_back(&mut **expr),
-            Expr::SelectField { expr, .. } => stack.push_back(&mut **expr),
-            Expr::SelectIndex { expr, index, .. } => {
-                stack.push_back(&mut **expr);
-                stack.push_back(&mut **index);
-            }
-            Expr::Sequence { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Record { exprs, .. } => {
-                stack.extend(exprs.iter_mut().map(|(_, expr)| &mut **expr as *mut Expr))
-            }
-            Expr::Tuple { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Concat { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::ExprBlock { exprs, .. } => stack.extend(exprs.iter_mut().map(|x| x as *mut Expr)),
-            Expr::Not { expr, .. } => stack.push_back(&mut **expr),
-            Expr::Length { expr, .. } => stack.push_back(&mut **expr),
-            Expr::GreaterThan { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::GreaterThanOrEqualTo { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::LessThanOrEqualTo { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::EqualTo { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::Plus { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::Minus { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::Divide { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::Multiply { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::LessThan { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::Cond { cond, lhs, rhs, .. } => {
-                stack.push_back(&mut **cond);
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs);
-            }
-            Expr::PatternMatch {
-                predicate,
-                match_arms,
-                ..
-            } => {
-                stack.push_back(&mut **predicate);
-                for arm in match_arms {
-                    let arm_literal_expressions = arm.arm_pattern.get_expr_literals_mut();
-                    stack.extend(arm_literal_expressions.into_iter().map(|x| {
-                        let x = x.as_mut();
-                        x as *mut Expr
-                    }));
-                    stack.push_back(&mut *arm.arm_resolution_expr);
-                }
-            }
-
-            Expr::Range { range, .. } => {
-                for expr in range.get_exprs_mut() {
-                    stack.push_back(&mut **expr);
-                }
-            }
-
-            Expr::Option {
-                expr: Some(expr), ..
-            } => stack.push_back(&mut **expr),
-            Expr::Result { expr: Ok(expr), .. } => stack.push_back(&mut **expr),
-            Expr::Result {
-                expr: Err(expr), ..
-            } => stack.push_back(&mut **expr),
-            Expr::Call {
-                call_type,
-                args,
-                inferred_type,
-                ..
-            } => {
-                let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
-                if let Some(exprs) = exprs {
-                    stack.extend(exprs.iter_mut().map(|x| x as *mut Expr))
-                }
-
-                if let Some(worker) = worker {
-                    stack.push_back(&mut **worker);
-                }
-
-                // The expr existing in the inferred type should be visited
-                if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
-                    if let Some(worker_expr) = instance_type.worker_mut() {
-                        stack.push_back(&mut **worker_expr);
-                    }
-                }
-
-                stack.extend(args.iter_mut().map(|x| x as *mut Expr))
-            }
-            Expr::Unwrap { expr, .. } => stack.push_back(&mut **expr),
-            Expr::And { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs)
-            }
-
-            Expr::Or { lhs, rhs, .. } => {
-                stack.push_back(&mut **lhs);
-                stack.push_back(&mut **rhs)
-            }
-
-            Expr::ListComprehension {
-                iterable_expr,
-                yield_expr,
-                ..
-            } => {
-                stack.push_back(&mut **iterable_expr);
-                stack.push_back(&mut **yield_expr);
-            }
-
-            Expr::ListReduce {
-                iterable_expr,
-                init_value_expr,
-                yield_expr,
-                ..
-            } => {
-                stack.push_back(&mut **iterable_expr);
-                stack.push_back(&mut **init_value_expr);
-                stack.push_back(&mut **yield_expr);
-            }
-
-            Expr::InvokeMethodLazy {
-                lhs,
-                args,
-                inferred_type,
-                ..
-            } => {
-                if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
-                    if let Some(worker_expr) = instance_type.worker_mut() {
-                        stack.push_back(&mut **worker_expr);
-                    }
-                }
-
-                stack.push_back(&mut **lhs);
-                stack.extend(args.iter_mut().map(|x| x as *mut Expr));
-            }
-
-            Expr::GetTag { expr, .. } => {
-                stack.push_back(&mut **expr);
-            }
-
-            Expr::Literal { .. } => {}
-            Expr::Number { .. } => {}
-            Expr::Flags { .. } => {}
-            Expr::Identifier { .. } => {}
-            Expr::Boolean { .. } => {}
-            Expr::Option { expr: None, .. } => {}
-            Expr::Throw { .. } => {}
-            Expr::GenerateWorkerName { .. } => {}
-        }
-    }
+// Fallible pre-order reversed: parent first, then children right-to-left.
+pub fn try_visit_post_order_rev_mut<E>(
+    expr: &mut Expr,
+    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    f(expr)?;
+    try_visit_children_rev_mut(expr, |child| try_visit_post_order_rev_mut(child, f))
 }
 
-// This is almost a lazy visit, that we don't put the expr into the queue
-// unless it is needed. To a great extent both ExprVisitor and this function
-// can be used instead of each other, but depending on situations one can perform better
-// over the other.
-pub fn visit_expr_nodes_lazy<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut Expr>) {
+// Fallible pre-order: parent first, then children left-to-right.
+pub fn try_visit_pre_order_mut<E>(
+    expr: &mut Expr,
+    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    f(expr)?;
+    try_visit_children_mut(expr, |child| try_visit_pre_order_mut(child, f))
+}
+
+// Immutable post-order traversal.
+pub fn visit_post_order<'a>(expr: &'a Expr, f: &mut impl FnMut(&'a Expr)) {
+    visit_children(expr, |child| visit_post_order(child, f));
+    f(expr);
+}
+
+// Collect immediate children into a queue (used by visit_expr_nodes_lazy).
+pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut Expr>) {
     match expr {
-        Expr::Let { expr, .. } => queue.push_back(&mut *expr),
-        Expr::SelectField { expr, .. } => queue.push_back(&mut *expr),
+        Expr::Let { expr, .. } => queue.push_back(expr),
+        Expr::SelectField { expr, .. } => queue.push_back(expr),
         Expr::SelectIndex { expr, index, .. } => {
             queue.push_back(&mut *expr);
             queue.push_back(&mut *index);
         }
-        Expr::Sequence { exprs, .. } => queue.extend(exprs.iter_mut()),
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => queue.extend(exprs.iter_mut()),
         Expr::Record { exprs, .. } => queue.extend(exprs.iter_mut().map(|(_, expr)| &mut **expr)),
-        Expr::Tuple { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::Concat { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::ExprBlock { exprs, .. } => queue.extend(exprs.iter_mut()), // let x = 1, y = call(x);
-        Expr::Not { expr, .. } => queue.push_back(&mut *expr),
-        Expr::Length { expr, .. } => queue.push_back(&mut *expr),
-        Expr::GreaterThan { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            queue.push_back(expr)
         }
-        Expr::GreaterThanOrEqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::LessThanOrEqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::EqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Plus { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Minus { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Divide { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Multiply { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::LessThan { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            queue.push_back(lhs);
+            queue.push_back(rhs);
         }
         Expr::Cond { cond, lhs, rhs, .. } => {
-            queue.push_back(&mut *cond);
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
+            queue.push_back(cond);
+            queue.push_back(lhs);
+            queue.push_back(rhs);
         }
         Expr::PatternMatch {
             predicate,
@@ -511,25 +96,24 @@ pub fn visit_expr_nodes_lazy<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mu
         } => {
             queue.push_back(&mut *predicate);
             for arm in match_arms {
-                let arm_literal_expressions = arm.arm_pattern.get_expr_literals_mut();
-                queue.extend(arm_literal_expressions.into_iter().map(|x| x.as_mut()));
-                queue.push_back(&mut *arm.arm_resolution_expr);
+                for lit in arm.arm_pattern.get_expr_literals_mut() {
+                    queue.push_back(lit.as_mut());
+                }
+                queue.push_back(&mut arm.arm_resolution_expr);
             }
         }
-
         Expr::Range { range, .. } => {
-            for expr in range.get_exprs_mut() {
-                queue.push_back(&mut *expr);
+            for e in range.get_exprs_mut() {
+                queue.push_back(&mut *e);
             }
         }
-
         Expr::Option {
             expr: Some(expr), ..
-        } => queue.push_back(&mut *expr),
-        Expr::Result { expr: Ok(expr), .. } => queue.push_back(&mut *expr),
+        } => queue.push_back(expr),
+        Expr::Result { expr: Ok(expr), .. } => queue.push_back(expr),
         Expr::Result {
             expr: Err(expr), ..
-        } => queue.push_back(&mut *expr),
+        } => queue.push_back(expr),
         Expr::Call {
             call_type,
             args,
@@ -540,40 +124,24 @@ pub fn visit_expr_nodes_lazy<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mu
             if let Some(exprs) = exprs {
                 queue.extend(exprs.iter_mut())
             }
-
             if let Some(worker) = worker {
                 queue.push_back(worker);
             }
-
-            // The expr existing in the inferred type should be visited
             if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
                 if let Some(worker_expr) = instance_type.worker_mut() {
                     queue.push_back(worker_expr);
                 }
             }
-
             queue.extend(args.iter_mut())
         }
-        Expr::Unwrap { expr, .. } => queue.push_back(&mut *expr), // not yet needed
-        Expr::And { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs)
-        }
-
-        Expr::Or { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs)
-        }
-
         Expr::ListComprehension {
             iterable_expr,
             yield_expr,
             ..
         } => {
-            queue.push_back(&mut *iterable_expr);
-            queue.push_back(&mut *yield_expr);
+            queue.push_back(iterable_expr);
+            queue.push_back(yield_expr);
         }
-
         Expr::ListReduce {
             iterable_expr,
             init_value_expr,
@@ -584,7 +152,6 @@ pub fn visit_expr_nodes_lazy<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mu
             queue.push_back(init_value_expr);
             queue.push_back(yield_expr);
         }
-
         Expr::InvokeMethodLazy {
             lhs,
             args,
@@ -596,23 +163,445 @@ pub fn visit_expr_nodes_lazy<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mu
                     queue.push_back(worker_expr);
                 }
             }
-
             queue.push_back(lhs);
             queue.extend(args.iter_mut());
         }
+        Expr::GetTag { expr, .. } => queue.push_back(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
 
-        Expr::GetTag { expr, .. } => {
-            queue.push_back(&mut *expr);
+// --- Core child iteration ---
+
+fn visit_children_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(expr);
+            each(index);
         }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(lhs);
+            each(rhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(cond);
+            each(lhs);
+            each(rhs);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            each(predicate);
+            for arm in match_arms {
+                for lit in arm.arm_pattern.get_expr_literals_mut() {
+                    each(lit.as_mut());
+                }
+                each(&mut arm.arm_resolution_expr);
+            }
+        }
+        Expr::Range { range, .. } => {
+            for e in range.get_exprs_mut() {
+                each(&mut *e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call {
+            call_type,
+            args,
+            inferred_type,
+            ..
+        } => {
+            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            if let Some(exprs) = exprs {
+                for e in exprs {
+                    each(e);
+                }
+            }
+            if let Some(worker) = worker {
+                each(worker);
+            }
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(yield_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(init_value_expr);
+            each(yield_expr);
+        }
+        Expr::InvokeMethodLazy {
+            lhs,
+            args,
+            inferred_type,
+            ..
+        } => {
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            each(lhs);
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
 
-        Expr::Literal { .. } => {}
-        Expr::Number { .. } => {}
-        Expr::Flags { .. } => {}
-        Expr::Identifier { .. } => {}
-        Expr::Boolean { .. } => {}
-        Expr::Option { expr: None, .. } => {}
-        Expr::Throw { .. } => {}
-        Expr::GenerateWorkerName { .. } => {}
+fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(index);
+            each(expr);
+        }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs.iter_mut().rev() {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs.iter_mut().rev() {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(rhs);
+            each(lhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(rhs);
+            each(lhs);
+            each(cond);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            for arm in match_arms.iter_mut().rev() {
+                each(&mut arm.arm_resolution_expr);
+                for lit in arm.arm_pattern.get_expr_literals_mut().into_iter().rev() {
+                    each(lit.as_mut());
+                }
+            }
+            each(predicate);
+        }
+        Expr::Range { range, .. } => {
+            let mut exprs = range.get_exprs_mut();
+            exprs.reverse();
+            for e in exprs {
+                each(&mut *e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call {
+            call_type,
+            args,
+            inferred_type,
+            ..
+        } => {
+            for arg in args.iter_mut().rev() {
+                each(arg);
+            }
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            if let Some(worker) = worker {
+                each(worker);
+            }
+            if let Some(exprs) = exprs {
+                for e in exprs.iter_mut().rev() {
+                    each(e);
+                }
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(yield_expr);
+            each(iterable_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(yield_expr);
+            each(init_value_expr);
+            each(iterable_expr);
+        }
+        Expr::InvokeMethodLazy {
+            lhs,
+            args,
+            inferred_type,
+            ..
+        } => {
+            for arg in args.iter_mut().rev() {
+                each(arg);
+            }
+            each(lhs);
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
+
+fn try_visit_children_mut<E>(
+    expr: &mut Expr,
+    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    // We need to propagate errors properly. Use a Cell to smuggle the
+    // error out of the infallible closure interface.
+    let mut err: Option<E> = None;
+    visit_children_mut(expr, |child| {
+        if err.is_none() {
+            if let Err(e) = each(child) {
+                err = Some(e);
+            }
+        }
+    });
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+fn try_visit_children_rev_mut<E>(
+    expr: &mut Expr,
+    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    let mut err: Option<E> = None;
+    visit_children_rev_mut(expr, |child| {
+        if err.is_none() {
+            if let Err(e) = each(child) {
+                err = Some(e);
+            }
+        }
+    });
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+fn visit_children<'a>(expr: &'a Expr, mut each: impl FnMut(&'a Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(expr);
+            each(index);
+        }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(lhs);
+            each(rhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(cond);
+            each(lhs);
+            each(rhs);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            each(predicate);
+            for arm in match_arms {
+                for lit in arm.arm_pattern.get_expr_literals() {
+                    each(lit);
+                }
+                each(&arm.arm_resolution_expr);
+            }
+        }
+        Expr::Range { range, .. } => {
+            for e in range.get_exprs() {
+                each(e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call { args, .. } => {
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(yield_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(init_value_expr);
+            each(yield_expr);
+        }
+        Expr::InvokeMethodLazy { lhs, args, .. } => {
+            each(lhs);
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
     }
 }
 
@@ -620,7 +609,6 @@ mod internal {
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::Expr;
 
-    // (args, worker in calls, worker in inferred type)
     pub(crate) fn get_expressions_in_call_type_mut(
         call_type: &mut CallType,
     ) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {

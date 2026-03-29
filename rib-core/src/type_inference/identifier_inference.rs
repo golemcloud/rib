@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{ArmPattern, Expr, ExprVisitor, InferredType, MatchArm, VariableId};
+use crate::{
+    visit_post_order_rev_mut, visit_pre_order_mut, ArmPattern, Expr, InferredType, MatchArm,
+    VariableId,
+};
 use std::collections::HashMap;
 
 pub fn infer_all_identifiers(expr: &mut Expr) {
@@ -34,11 +37,10 @@ fn infer_all_identifiers_bottom_up(expr: &mut Expr) {
     // Expr::Identifier(x)
     // Expr::Call(func, Expr::Identifier(x))
     // Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))
-    let mut visitor = ExprVisitor::bottom_up(expr);
 
     // Popping it from the back results in `Expr::Identifier(x)` to be processed first
     // in the above example.
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         match expr {
             // If identifier is inferred (probably because it was part of a function call befre),
             // make sure to update the identifier inference lookup table.
@@ -69,52 +71,47 @@ fn infer_all_identifiers_bottom_up(expr: &mut Expr) {
 
             _ => {}
         }
-    }
+    });
 }
 
 // This is more of an optional stage, as bottom-up type propagation would be enough
 // but helps with reaching early fix point later down the line of compilation phases
 fn infer_all_identifiers_top_down(expr: &mut Expr) {
     let mut identifier_lookup = IdentifierTypeState::new();
-    let mut visitor = ExprVisitor::top_down(expr);
-    while let Some(expr) = visitor.pop_front() {
-        match expr {
-            Expr::Let {
-                variable_id, expr, ..
-            } => {
-                if let Some(inferred_type) = identifier_lookup.lookup(variable_id) {
-                    expr.add_infer_type_mut(inferred_type);
-                }
-
-                identifier_lookup.update(variable_id.clone(), expr.inferred_type());
-            }
-            Expr::Identifier {
-                variable_id,
-                inferred_type,
-                ..
-            } => {
-                if let Some(new_inferred_type) = identifier_lookup.lookup(variable_id) {
-                    *inferred_type = inferred_type.merge(new_inferred_type)
-                }
-
-                identifier_lookup.update(variable_id.clone(), inferred_type.clone());
+    visit_pre_order_mut(expr, &mut |expr| match expr {
+        Expr::Let {
+            variable_id, expr, ..
+        } => {
+            if let Some(inferred_type) = identifier_lookup.lookup(variable_id) {
+                expr.add_infer_type_mut(inferred_type);
             }
 
-            _ => {}
+            identifier_lookup.update(variable_id.clone(), expr.inferred_type());
         }
-    }
+        Expr::Identifier {
+            variable_id,
+            inferred_type,
+            ..
+        } => {
+            if let Some(new_inferred_type) = identifier_lookup.lookup(variable_id) {
+                *inferred_type = inferred_type.merge(new_inferred_type)
+            }
+
+            identifier_lookup.update(variable_id.clone(), inferred_type.clone());
+        }
+
+        _ => {}
+    });
 }
 
 fn infer_match_binding_variables(expr: &mut Expr) {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::PatternMatch { match_arms, .. } = expr {
             for arm in match_arms {
                 process_arm(arm)
             }
         }
-    }
+    });
 }
 
 // A state that maps from the identifiers to the types inferred
@@ -176,9 +173,7 @@ fn collect_all_identifiers(pattern: &mut ArmPattern, state: &mut IdentifierTypeS
 }
 
 fn accumulate_types_of_identifiers(expr: &mut Expr, state: &mut IdentifierTypeState) {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Identifier {
             variable_id,
             inferred_type,
@@ -189,27 +184,23 @@ fn accumulate_types_of_identifiers(expr: &mut Expr, state: &mut IdentifierTypeSt
                 state.update(variable_id.clone(), inferred_type.clone())
             }
         }
-    }
+    });
 }
 
 fn update_arm_resolution_expr_with_identifiers(
     arm_resolution: &mut Expr,
     state: &IdentifierTypeState,
 ) {
-    let mut visitor = ExprVisitor::bottom_up(arm_resolution);
-
-    while let Some(expr) = visitor.pop_back() {
-        match expr {
-            Expr::Identifier {
-                variable_id,
-                inferred_type,
-                ..
-            } if variable_id.is_match_binding() => {
-                if let Some(new_inferred_type) = state.lookup(variable_id) {
-                    *inferred_type = inferred_type.merge(new_inferred_type)
-                }
+    visit_post_order_rev_mut(arm_resolution, &mut |expr| match expr {
+        Expr::Identifier {
+            variable_id,
+            inferred_type,
+            ..
+        } if variable_id.is_match_binding() => {
+            if let Some(new_inferred_type) = state.lookup(variable_id) {
+                *inferred_type = inferred_type.merge(new_inferred_type)
             }
-            _ => {}
         }
-    }
+        _ => {}
+    });
 }

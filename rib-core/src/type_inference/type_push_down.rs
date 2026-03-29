@@ -16,13 +16,11 @@ use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference::type_push_down::internal::{
     handle_list_comprehension, handle_list_reduce,
 };
-use crate::{Expr, ExprVisitor, InferredType, MatchArm, TypeInternal};
+use crate::{try_visit_post_order_rev_mut, Expr, InferredType, MatchArm, TypeInternal};
 use std::ops::Deref;
 
 pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(outer_expr) = visitor.pop_back() {
+    try_visit_post_order_rev_mut(expr, &mut |outer_expr| {
         let source_span = outer_expr.source_span();
 
         match outer_expr {
@@ -241,9 +239,8 @@ pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
 
             _ => {}
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 mod internal {

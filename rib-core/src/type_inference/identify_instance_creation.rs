@@ -17,11 +17,11 @@ use crate::call_type::{CallType, InstanceCreationType};
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_parameter::TypeParameter;
-use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
 use crate::{
-    CustomError, ExprVisitor, FunctionCallError, InferredType, ParsedFunctionReference,
-    TypeInternal, TypeOrigin,
+    try_visit_post_order_mut, try_visit_post_order_rev_mut, CustomError, FunctionCallError,
+    InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
 };
+use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
 
 // Handling the following and making sure the types are inferred fully at this stage.
 // The expr `Call` will still be expr `Call` itself but CallType will be worker instance creation
@@ -42,9 +42,7 @@ pub fn identify_instance_creation(
 pub fn search_for_invalid_instance_declarations(
     expr: &mut Expr,
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    try_visit_post_order_mut(expr, &mut |expr| {
         match expr {
             Expr::Let {
                 variable_id, expr, ..
@@ -74,9 +72,8 @@ pub fn search_for_invalid_instance_declarations(
 
             _ => {}
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 // Identifying instance creations out of all parsed function calls.
@@ -87,9 +84,7 @@ pub fn identify_instance_creation_with_worker(
     component_dependency: &ComponentDependencies,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    try_visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Call {
             call_type,
             generic_type_parameter,
@@ -151,9 +146,8 @@ pub fn identify_instance_creation_with_worker(
                 );
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 // Returns a new type parameter in certain cases

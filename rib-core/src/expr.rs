@@ -22,8 +22,8 @@ use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{
     from_string, text, type_checker, type_inference, ComponentDependencies, ComponentDependencyKey,
-    CustomInstanceSpec, DynamicParsedFunctionName, ExprVisitor, GlobalVariableTypeSpec,
-    InferredType, InstanceIdentifier, VariableId,
+    CustomInstanceSpec, DynamicParsedFunctionName, GlobalVariableTypeSpec, InferredType,
+    InstanceIdentifier, VariableId,
 };
 use crate::{IntoValueAndType, ValueAndType};
 use bigdecimal::{BigDecimal, ToPrimitive};
@@ -1187,15 +1187,13 @@ impl Expr {
     }
 
     pub fn set_origin(&mut self) {
-        let mut visitor = ExprVisitor::bottom_up(self);
-
-        while let Some(expr) = visitor.pop_front() {
+        type_inference::visit_post_order_mut(self, &mut |expr| {
             let source_location = expr.source_span();
             let origin = TypeOrigin::OriginatedAt(source_location.clone());
             let inferred_type = expr.inferred_type();
             let origin = inferred_type.add_origin(origin);
             expr.with_inferred_type_mut(origin);
-        }
+        });
     }
 
     // An inference is a single cycle of to-and-fro scanning of Rib expression, that it takes part in fix point of inference.
@@ -1780,7 +1778,7 @@ impl Expr {
     }
 
     pub fn visit_expr_nodes_lazy<'a>(&'a mut self, queue: &mut VecDeque<&'a mut Expr>) {
-        type_inference::visit_expr_nodes_lazy(self, queue);
+        type_inference::collect_children_mut(self, queue);
     }
 
     pub fn number_inferred(
@@ -2112,16 +2110,16 @@ impl Serialize for Expr {
 
 fn find_expr(expr: &mut Expr, source_span: &SourceSpan) -> Option<Expr> {
     let mut expr = expr.clone();
+    let mut found = None;
 
-    let mut visitor = ExprVisitor::bottom_up(&mut expr);
-
-    while let Some(current) = visitor.pop_back() {
-        let span = current.source_span();
-
-        if source_span.eq(&span) {
-            return Some(current.clone());
+    type_inference::visit_post_order_rev_mut(&mut expr, &mut |current| {
+        if found.is_none() {
+            let span = current.source_span();
+            if source_span.eq(&span) {
+                found = Some(current.clone());
+            }
         }
-    }
+    });
 
-    None
+    found
 }
