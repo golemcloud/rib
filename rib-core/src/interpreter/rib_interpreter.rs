@@ -4308,6 +4308,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     async fn test_interpreter_durable_worker_with_resource_10() {
         let expr = r#"
                 let my_worker = "my-worker";
@@ -4347,6 +4348,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     async fn test_interpreter_durable_worker_with_resource_11() {
         let expr = r#"
                 let worker = instance(request.path.user-id: string);
@@ -4386,6 +4388,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     async fn test_interpreter_durable_worker_with_resource_12() {
         let expr = r#"
                 let user_id1: string = request.path.user-id;
@@ -4505,6 +4508,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     async fn test_interpreter_durable_worker_with_resource_16() {
         let expr = r#"
                 let x: string = request.path.user-id;

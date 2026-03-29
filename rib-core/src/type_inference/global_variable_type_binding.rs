@@ -141,6 +141,116 @@ fn override_type(expr: &mut Expr, type_spec: &GlobalVariableTypeSpec) {
     });
 }
 
+pub mod arena {
+    use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
+    use crate::type_checker::PathElem;
+    use crate::type_inference::expr_visitor::arena::children_of;
+
+    use super::GlobalVariableTypeSpec;
+
+    /// Arena version of `bind_global_variable_types`.
+    pub fn bind_global_variable_types(
+        root: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+        type_specs: &[GlobalVariableTypeSpec],
+    ) {
+        for spec in type_specs {
+            override_type_arena(root, arena, types, spec);
+        }
+    }
+
+    fn override_type_arena(
+        root: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+        spec: &GlobalVariableTypeSpec,
+    ) {
+        let full_path = {
+            let mut p = spec.path.clone();
+            p.push_front(PathElem::Field(spec.variable_id.to_string()));
+            p
+        };
+
+        // Post-order traversal: children before parents.
+        // We track (current_id, previous_id, current_path) in a state struct
+        // updated as we visit. Because post-order means children come first,
+        // when we see a SelectField its inner child has already been processed.
+        //
+        // We use an iterative post-order traversal that processes parent nodes
+        // *after* their children, then inspects parent-child ExprId relationships.
+        let mut order = Vec::new();
+        collect_post_order(root, arena, &mut order);
+
+        let mut current_path = full_path.clone();
+        let mut previous_id: Option<ExprId> = None;
+
+        for id in order {
+            let node = arena.expr(id);
+            match &node.kind {
+                ExprKind::Identifier { variable_id } => {
+                    if variable_id == &spec.variable_id {
+                        current_path.progress();
+                        if spec.path.is_empty() {
+                            types.set(id, spec.inferred_type.clone());
+                            previous_id = None;
+                            current_path = full_path.clone();
+                        } else {
+                            previous_id = Some(id);
+                        }
+                    } else {
+                        previous_id = None;
+                        current_path = full_path.clone();
+                    }
+                }
+                ExprKind::SelectField {
+                    expr: inner_id,
+                    field,
+                } => {
+                    if let Some(prev_id) = previous_id {
+                        if *inner_id == prev_id {
+                            if current_path.is_empty() {
+                                types.set(id, spec.inferred_type.clone());
+                                previous_id = None;
+                                current_path = full_path.clone();
+                            } else if current_path.current()
+                                == Some(&PathElem::Field(field.to_string()))
+                            {
+                                current_path.progress();
+                                previous_id = Some(id);
+                            } else {
+                                previous_id = None;
+                                current_path = full_path.clone();
+                            }
+                        } else {
+                            previous_id = None;
+                            current_path = full_path.clone();
+                        }
+                    }
+                }
+                _ => {
+                    previous_id = None;
+                    current_path = full_path.clone();
+                }
+            }
+        }
+    }
+
+    fn collect_post_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
+        let mut stack = vec![(root, false)];
+        while let Some((id, visited)) = stack.pop() {
+            if visited {
+                out.push(id);
+            } else {
+                stack.push((id, true));
+                for child in children_of(id, arena).into_iter().rev() {
+                    stack.push((child, false));
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

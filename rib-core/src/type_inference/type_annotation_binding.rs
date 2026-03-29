@@ -54,6 +54,43 @@ pub fn bind_type_annotations(expr: &mut Expr) {
     }
 }
 
+pub mod arena {
+    use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
+    use crate::type_inference::expr_visitor::arena::visit_pre_order_mut;
+    use crate::InferredType;
+
+    /// Arena version of `bind_type_annotations`.
+    ///
+    /// For every node that has a `type_annotation`, derives an `InferredType`
+    /// from that annotation and writes it into `TypeTable`.  For `Let` nodes the
+    /// type annotation applies to the *rhs* child, not the `Let` node itself
+    /// (mirrors the existing behaviour exactly).
+    pub fn bind_type_annotations(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+        visit_pre_order_mut(root, arena, types, &mut |id, arena, types| {
+            let node = arena.expr(id);
+            match &node.kind {
+                ExprKind::Let { expr: rhs_id, .. } => {
+                    if let Some(annotation) = &node.type_annotation {
+                        let new_type =
+                            InferredType::from(annotation).declared_at(node.source_span.clone());
+                        let rhs_id = *rhs_id;
+                        let existing = types.get(rhs_id).clone();
+                        types.set(rhs_id, existing.merge(new_type));
+                    }
+                }
+                _ => {
+                    if let Some(annotation) = &node.type_annotation {
+                        let new_type =
+                            InferredType::from(annotation).declared_at(node.source_span.clone());
+                        let existing = types.get(id).clone();
+                        types.set(id, existing.merge(new_type));
+                    }
+                }
+            }
+        });
+    }
+}
+
 #[cfg(test)]
 mod type_binding_tests {
     use bigdecimal::BigDecimal;

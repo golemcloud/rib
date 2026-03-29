@@ -90,3 +90,80 @@ mod internal {
         cases: Vec<String>,
     }
 }
+
+pub mod arena {
+    use crate::analysis::AnalysedType;
+    use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
+    use crate::type_inference::expr_visitor::arena::children_of;
+    use crate::ComponentDependencies;
+
+    /// Arena version of `infer_enums`.
+    ///
+    /// Two passes:
+    /// 1. Walk all `Identifier` nodes; if the name is a known enum case, update
+    ///    its type in `TypeTable` and record its id.
+    /// 2. Replace those nodes' `ExprKind` with `Call { EnumConstructor }`.
+    ///    This is an in-place structural mutation — the `ExprId` stays the same.
+    pub fn infer_enums(
+        root: ExprId,
+        arena: &mut ExprArena,
+        types: &mut TypeTable,
+        component_dependencies: &ComponentDependencies,
+    ) {
+        // Collect enum cases and update types.
+        let enum_ids = collect_enum_identifiers(root, arena, types, component_dependencies);
+
+        // Structurally replace Identifier nodes with Call { EnumConstructor }.
+        for id in enum_ids {
+            let node = arena.expr(id);
+            if let ExprKind::Identifier { variable_id } = &node.kind {
+                let name = variable_id.name();
+                let annotation = node.type_annotation.clone();
+                let span = node.source_span.clone();
+                let node_mut = arena.expr_mut(id);
+                node_mut.kind = ExprKind::Call {
+                    call_type: CallTypeNode::EnumConstructor(name),
+                    generic_type_parameter: None,
+                    args: vec![],
+                };
+                node_mut.type_annotation = annotation;
+                node_mut.source_span = span;
+            }
+        }
+    }
+
+    fn collect_enum_identifiers(
+        root: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+        component_dependencies: &ComponentDependencies,
+    ) -> Vec<ExprId> {
+        let mut enum_ids = Vec::new();
+        let mut stack = vec![root];
+
+        while let Some(id) = stack.pop() {
+            let node = arena.expr(id);
+            if let ExprKind::Identifier { variable_id } = &node.kind {
+                if !variable_id.is_local() {
+                    let result = component_dependencies
+                        .function_dictionary()
+                        .iter()
+                        .find_map(|x| x.get_enum_info(variable_id.name().as_str()));
+
+                    if let Some(typed_enum) = result {
+                        let new_type: crate::InferredType =
+                            (&AnalysedType::Enum(typed_enum.clone())).into();
+                        let current = types.get(id).clone();
+                        types.set(id, current.merge(new_type));
+                        enum_ids.push(id);
+                    }
+                }
+            }
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
+        }
+
+        enum_ids
+    }
+}

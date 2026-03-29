@@ -14,6 +14,95 @@
 
 use crate::{visit_post_order_rev_mut, CallType, Expr, InstanceCreationType, TypeInternal};
 
+pub mod arena {
+    use crate::expr_arena::{
+        CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
+    };
+    use crate::type_inference::expr_visitor::arena::children_of;
+    use crate::{InferredType, TypeInternal, TypeOrigin};
+
+    /// Arena version of `ensure_stateful_instance`.
+    ///
+    /// For every `Call { InstanceCreation(WitWorker) }` node where `worker_name`
+    /// is `None`, synthesises a `GenerateWorkerName` child node, wires it in,
+    /// and updates the `InstanceType` in `TypeTable`.
+    pub fn ensure_stateful_instance(root: ExprId, arena: &mut ExprArena, types: &mut TypeTable) {
+        let mut ids_to_patch = Vec::new();
+
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            let kind = arena.expr(id).kind.clone();
+            if let ExprKind::Call {
+                call_type:
+                    CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                        worker_name: None,
+                        ..
+                    }),
+                ..
+            } = kind
+            {
+                ids_to_patch.push(id);
+            } else {
+                for child in children_of(id, arena).into_iter().rev() {
+                    stack.push(child);
+                }
+            }
+        }
+
+        for id in ids_to_patch {
+            // Allocate a GenerateWorkerName node
+            let gen_worker_node = crate::expr_arena::ExprNode {
+                kind: ExprKind::GenerateWorkerName { variable_id: None },
+                source_span: crate::rib_source_span::SourceSpan::default(),
+                type_annotation: None,
+            };
+            let gen_id = arena.alloc_expr(gen_worker_node);
+            types.set(gen_id, InferredType::string());
+
+            // Patch the Call node
+            let call_kind = arena.expr(id).kind.clone();
+            if let ExprKind::Call {
+                call_type:
+                    CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                        ref component_info,
+                        ..
+                    }),
+                ref args,
+                ..
+            } = call_kind
+            {
+                let ci = component_info.clone();
+                let new_args = vec![gen_id];
+
+                let node_mut = arena.expr_mut(id);
+                node_mut.kind = ExprKind::Call {
+                    call_type: CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                        component_info: ci,
+                        worker_name: Some(gen_id),
+                    }),
+                    generic_type_parameter: None,
+                    args: new_args,
+                };
+
+                // Update InstanceType in TypeTable if present
+                let current_type = types.get(id).clone();
+                if let TypeInternal::Instance { mut instance_type } =
+                    current_type.internal_type().clone()
+                {
+                    instance_type.set_worker_name(crate::Expr::generate_worker_name(None));
+                    let new_type = InferredType::new(
+                        TypeInternal::Instance {
+                            instance_type: Box::new(*instance_type),
+                        },
+                        TypeOrigin::NoOrigin,
+                    );
+                    types.set(id, new_type);
+                }
+            }
+        }
+    }
+}
+
 pub fn ensure_stateful_instance(expr: &mut Expr) {
     visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Call {

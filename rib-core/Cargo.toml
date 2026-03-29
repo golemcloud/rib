@@ -14,6 +14,7 @@ json_in_errors = []
 [dependencies]
 async-trait = { workspace = true }
 bigdecimal = { workspace = true }
+la-arena = { workspace = true }
 combine = { workspace = true }
 lazy_static = { workspace = true }
 semver = { workspace = true }

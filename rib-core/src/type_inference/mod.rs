@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[allow(ambiguous_glob_reexports)]
 pub use call_arguments_inference::*;
 pub use custom_instance_spec::*;
 pub use enum_inference::*;
@@ -38,31 +39,31 @@ pub use variable_binding::*;
 pub use variant_inference::*;
 pub use worker_function_invocation::*;
 
-mod call_arguments_inference;
+pub(crate) mod call_arguments_inference;
 mod custom_instance_spec;
 mod enum_inference;
 mod errors;
 mod expr_visitor;
-mod global_input_inference;
+pub(crate) mod global_input_inference;
 mod global_variable_type_binding;
-mod identifier_inference;
+pub(crate) mod identifier_inference;
 mod identify_instance_creation;
 mod index_selection_type_binding;
 mod inference_fix_point;
 mod inferred_expr;
-mod instance_type_binding;
+pub(crate) mod instance_type_binding;
 mod rib_input_type;
 mod rib_output_type;
 mod stateful_instance;
 mod type_annotation_binding;
 mod type_hint;
-mod type_pull_up;
-mod type_push_down;
+pub(crate) mod type_pull_up;
+pub(crate) mod type_push_down;
 mod type_reset;
 mod type_unification;
 mod variable_binding;
 mod variant_inference;
-mod worker_function_invocation;
+pub(crate) mod worker_function_invocation;
 
 #[cfg(test)]
 mod tests {

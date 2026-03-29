@@ -11,6 +11,7 @@ rib-core = { version = "=0.0.0", path = "rib-core" }
 rib-repl = { version = "=0.0.0", path = "rib-repl" }
 
 anyhow = "1.0.97"
+la-arena = "0.3.1"
 async-trait = "0.1.87"
 bigdecimal = { version = "0.4.7", features = ["serde", "string-only"] }
 clap = { version = "4.5.32", features = ["derive", "suggestions", "color", "help", "env"] }

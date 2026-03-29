@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::expr_arena::{ExprArena, ExprId, TypeTable};
 use crate::{visit_post_order, Expr, InferredType, TypeInternal};
 
 // Given `f` executes inference, find expr where `f(expr) = expr`
@@ -25,6 +26,33 @@ where
         scan_and_infer(expr)?;
 
         if compare_expr_types(&mut original, expr) {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+// Arena-based fix-point: no tree clone.
+//
+// The pass `scan_and_infer` receives `(root, &arena, &mut type_table)` and
+// updates `type_table` in place.  Convergence is detected by comparing a
+// cheap snapshot of the type table before and after each iteration.
+pub fn arena_type_inference_fix_point<F, E>(
+    mut scan_and_infer: F,
+    root: ExprId,
+    arena: &mut ExprArena,
+    type_table: &mut TypeTable,
+) -> Result<(), E>
+where
+    F: FnMut(ExprId, &mut ExprArena, &mut TypeTable) -> Result<(), E>,
+{
+    loop {
+        let before = type_table.snapshot();
+
+        scan_and_infer(root, arena, type_table)?;
+
+        if type_table.same_as_snapshot(&before) {
             break;
         }
     }
