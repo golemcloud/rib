@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
+use crate::ValueAndType;
 use crate::{ComponentDependencyKey, InstructionId};
 use async_trait::async_trait;
-use golem_wasm::analysis::AnalysedType;
-use golem_wasm::ValueAndType;
 
 #[async_trait]
 pub trait RibComponentFunctionInvoke {

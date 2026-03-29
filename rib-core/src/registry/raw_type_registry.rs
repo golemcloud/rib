@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::{AnalysedExport, TypeVariant};
+use crate::analysis::{AnalysedType, TypeResult};
 use crate::DynamicParsedFunctionName;
-use golem_wasm::analysis::{AnalysedExport, TypeVariant};
-use golem_wasm::analysis::{AnalysedType, TypeResult};
 use std::fmt::{Display, Formatter};
 
 // A `FunctionTypeRegistry` is a mapping from a function/variant/enum to the `arguments` and `return types` of that function/variant/enum.

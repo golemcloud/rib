@@ -7,29 +7,21 @@ members = [
 ]
 
 [workspace.dependencies]
-golem-wasm = { version = "=0.0.0", path = "../golem/golem-wasm", default-features = false }
 rib-core = { version = "=0.0.0", path = "rib-core" }
 rib-repl = { version = "=0.0.0", path = "rib-repl" }
 
 anyhow = "1.0.97"
 async-trait = "0.1.87"
 bigdecimal = { version = "0.4.7", features = ["serde", "string-only"] }
-cargo_metadata = "0.21.0"
 clap = { version = "4.5.32", features = ["derive", "suggestions", "color", "help", "env"] }
 colored = "3.0.0"
 combine = "4.6.7"
 convert_case = "0.8.0"
 crossterm = "0.28.1"
-desert_rust = { version = "0.1.6", features = ["bigdecimal", "uuid", "chrono", "nonempty-collections", "serde-json", "bit-vec", "url", "mac_address"] }
 dirs = "4.0.0"
 lazy_static = "1.5.0"
 miette = { version = "7.6.0", features = ["fancy"] }
-poem-openapi = { version = "=5.1.16", features = ["chrono", "cookie", "humantime", "swagger-ui", "time", "url", "uuid", "websocket"] }
-prometheus = { version = "0.14.0", features = ["process"] }
 reqwest = { version = "0.12.13", features = ["json"] }
-prost = "0.14.1"
-prost-types = "0.14.1"
-protox = "0.9.0"
 rustyline = "15.0.0"
 semver = "1.0.26"
 serde = { version = "1.0", features = ["derive"] }
@@ -37,13 +29,6 @@ serde_json = { version = "1.0", features = ["raw_value"] }
 shell-words = "1.1.0"
 test-r = { version = "3.0.3", default-features = true }
 tokio = { version = "1.44", features = ["macros", "rt-multi-thread", "sync", "io-std", "net", "tracing", "process"] }
-tonic = { version = "0.14.2", features = ["gzip"] }
-tonic-prost = "0.14.2"
-tonic-prost-build = "0.14.2"
 tracing = { version = "0.1.41", features = ["log"] }
 uuid = { version = "1.15.1", features = ["serde", "v4", "v5", "v7"] }
 wasm-wave = "0.244"
-
-[patch.crates-io]
-wasmtime = { git = "https://github.com/golemcloud/wasmtime.git", branch = "golem-wasmtime-v42.0.1" }
-wasmtime-wasi = { git = "https://github.com/golemcloud/wasmtime.git", branch = "golem-wasmtime-v42.0.1" }

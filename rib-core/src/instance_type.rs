@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::parser::{PackageName, TypeParameter};
-use crate::proto::golem::rib::{
-    FullyQualifiedResourceConstructor as ProtoFullyQualifiedResourceConstructor,
-    FunctionType as ProtoFunctionType, InterfaceName as ProtoInterfaceName,
-    PackageName as ProtoPackageName,
-};
 use crate::type_parameter::InterfaceName;
 use crate::FunctionName;
 use crate::{
     ComponentDependencies, ComponentDependencyKey, Expr, FullyQualifiedResourceConstructor,
     FunctionDictionary, FunctionType, InferredType, ResourceMethodDictionary,
 };
-use desert_rust::BinaryCodec;
-use golem_wasm::analysis::AnalysedType;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -38,8 +32,7 @@ use std::ops::Deref;
 //
 // Please look at `InstanceCreationType`
 // for a tangible view on the fact that an instance can be either worker or a resource.
-#[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InstanceType {
     // Holds functions across every package and interface in every component
     Global {
@@ -698,149 +691,4 @@ fn search_function_in_multiple_packages(
 
     error_msg.push_str(&package_interface_list.join(", "));
     Err(error_msg)
-}
-
-mod protobuf {
-    use crate::proto::golem::rib::FullyQualifiedFunctionName as ProtoFullyQualifiedFunctionName;
-    use crate::proto::golem::rib::FullyQualifiedResourceConstructor as ProtoFullyQualifiedResourceConstructor;
-    use crate::proto::golem::rib::FullyQualifiedResourceMethod as ProtoFullyQualifiedResourceMethod;
-    use crate::proto::golem::rib::InterfaceName as ProtoInterfaceName;
-    use crate::proto::golem::rib::PackageName as ProtoPackageName;
-    use crate::{
-        FullyQualifiedFunctionName, FullyQualifiedResourceConstructor,
-        FullyQualifiedResourceMethod, InterfaceName, PackageName,
-    };
-
-    impl TryFrom<ProtoPackageName> for PackageName {
-        type Error = String;
-
-        fn try_from(proto: ProtoPackageName) -> Result<Self, Self::Error> {
-            Ok(PackageName {
-                namespace: proto.namespace,
-                package_name: proto.package_name,
-                version: proto.version,
-            })
-        }
-    }
-
-    impl TryFrom<ProtoInterfaceName> for InterfaceName {
-        type Error = String;
-
-        fn try_from(value: ProtoInterfaceName) -> Result<Self, Self::Error> {
-            Ok(InterfaceName {
-                name: value.name,
-                version: value.version,
-            })
-        }
-    }
-
-    impl TryFrom<ProtoFullyQualifiedFunctionName> for FullyQualifiedFunctionName {
-        type Error = String;
-
-        fn try_from(proto: ProtoFullyQualifiedFunctionName) -> Result<Self, Self::Error> {
-            Ok(FullyQualifiedFunctionName {
-                package_name: proto.package_name.map(TryFrom::try_from).transpose()?,
-                interface_name: proto.interface_name.map(TryFrom::try_from).transpose()?,
-                function_name: proto.function_name,
-            })
-        }
-    }
-
-    impl From<FullyQualifiedFunctionName> for ProtoFullyQualifiedFunctionName {
-        fn from(value: FullyQualifiedFunctionName) -> Self {
-            ProtoFullyQualifiedFunctionName {
-                package_name: value.package_name.map(ProtoPackageName::from),
-                interface_name: value.interface_name.map(ProtoInterfaceName::from),
-                function_name: value.function_name,
-            }
-        }
-    }
-
-    impl TryFrom<ProtoFullyQualifiedResourceMethod> for FullyQualifiedResourceMethod {
-        type Error = String;
-
-        fn try_from(proto: ProtoFullyQualifiedResourceMethod) -> Result<Self, Self::Error> {
-            Ok(FullyQualifiedResourceMethod {
-                resource_name: proto.resource_name,
-                method_name: proto.method_name,
-                package_name: proto.package_name.map(TryFrom::try_from).transpose()?,
-                interface_name: proto.interface_name.map(TryFrom::try_from).transpose()?,
-                static_function: false, //FIXME
-            })
-        }
-    }
-
-    impl From<FullyQualifiedResourceMethod> for ProtoFullyQualifiedResourceMethod {
-        fn from(value: FullyQualifiedResourceMethod) -> Self {
-            ProtoFullyQualifiedResourceMethod {
-                resource_name: value.resource_name,
-                method_name: value.method_name,
-                package_name: value.package_name.map(ProtoPackageName::from),
-                interface_name: value.interface_name.map(ProtoInterfaceName::from),
-            }
-        }
-    }
-
-    impl TryFrom<ProtoFullyQualifiedResourceConstructor> for FullyQualifiedResourceConstructor {
-        type Error = String;
-
-        fn try_from(proto: ProtoFullyQualifiedResourceConstructor) -> Result<Self, Self::Error> {
-            Ok(FullyQualifiedResourceConstructor {
-                package_name: proto.package_name.map(TryFrom::try_from).transpose()?,
-                interface_name: proto.interface_name.map(TryFrom::try_from).transpose()?,
-                resource_name: proto.resource_name,
-            })
-        }
-    }
-}
-
-impl TryFrom<ProtoFunctionType> for FunctionType {
-    type Error = String;
-
-    fn try_from(proto: ProtoFunctionType) -> Result<Self, Self::Error> {
-        let mut parameter_types = Vec::new();
-        for param in proto.parameter_types {
-            parameter_types.push(InferredType::from(&AnalysedType::try_from(&param)?));
-        }
-
-        let return_type = proto
-            .return_type
-            .as_ref()
-            .map(|ret| AnalysedType::try_from(ret).map(|ret| InferredType::from(&ret)))
-            .transpose()?;
-
-        Ok(Self {
-            parameter_types,
-            return_type,
-        })
-    }
-}
-
-impl From<PackageName> for ProtoPackageName {
-    fn from(value: PackageName) -> Self {
-        ProtoPackageName {
-            namespace: value.namespace,
-            package_name: value.package_name,
-            version: value.version,
-        }
-    }
-}
-
-impl From<InterfaceName> for ProtoInterfaceName {
-    fn from(value: InterfaceName) -> Self {
-        ProtoInterfaceName {
-            name: value.name,
-            version: value.version,
-        }
-    }
-}
-
-impl From<FullyQualifiedResourceConstructor> for ProtoFullyQualifiedResourceConstructor {
-    fn from(value: FullyQualifiedResourceConstructor) -> Self {
-        ProtoFullyQualifiedResourceConstructor {
-            package_name: value.package_name.map(ProtoPackageName::from),
-            interface_name: value.interface_name.map(ProtoInterfaceName::from),
-            resource_name: value.resource_name,
-        }
-    }
 }

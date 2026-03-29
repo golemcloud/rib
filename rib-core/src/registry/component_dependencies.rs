@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::TypeEnum;
+use crate::analysis::{AnalysedExport, TypeVariant};
 use crate::{
     ComponentDependencyKey, Expr, FullyQualifiedInterfaceName, FunctionDictionary, FunctionName,
     FunctionType, FunctionTypeRegistry, InstanceCreationType, InterfaceName, PackageName,
     TypeParameter,
 };
-use desert_rust::BinaryCodec;
-use golem_wasm::analysis::TypeEnum;
-use golem_wasm::analysis::{AnalysedExport, TypeVariant};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Default, Hash, Clone, Eq, PartialEq, PartialOrd, Ord, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Default, Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct ComponentDependencies {
     pub dependencies: BTreeMap<ComponentDependencyKey, FunctionDictionary>,
 }

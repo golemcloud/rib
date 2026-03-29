@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::call_type::{CallType, InstanceCreationType};
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
@@ -21,7 +22,6 @@ use crate::{
     CustomError, ExprVisitor, FunctionCallError, InferredType, ParsedFunctionReference,
     TypeInternal, TypeOrigin,
 };
-use golem_wasm::analysis::AnalysedType;
 
 // Handling the following and making sure the types are inferred fully at this stage.
 // The expr `Call` will still be expr `Call` itself but CallType will be worker instance creation

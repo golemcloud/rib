@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::{InferredType, Path, PathElem};
-use golem_wasm::analysis::AnalysedType;
 
 #[derive(Debug, Clone)]
 pub struct AmbiguousTypeError {

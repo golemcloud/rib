@@ -16,11 +16,9 @@ use crate::compiler::byte_code::internal::ExprState;
 use crate::compiler::ir::RibIR;
 use crate::type_inference::TypeHint;
 use crate::{Expr, InferredExpr, InstructionId};
-use desert_rust::BinaryCodec;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Default, PartialEq, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct RibByteCode {
     pub instructions: Vec<RibIR>,
 }
@@ -120,54 +118,20 @@ impl RibByteCode {
         })
     }
 }
-
-mod protobuf {
-    use crate::proto::golem::rib::RibByteCode as ProtoRibByteCode;
-    use crate::RibByteCode;
-
-    impl TryFrom<ProtoRibByteCode> for RibByteCode {
-        type Error = String;
-
-        fn try_from(value: ProtoRibByteCode) -> Result<Self, Self::Error> {
-            let proto_instructions = value.instructions;
-            let mut instructions = Vec::new();
-
-            for proto_instruction in proto_instructions {
-                instructions.push(proto_instruction.try_into()?);
-            }
-
-            Ok(RibByteCode { instructions })
-        }
-    }
-
-    impl TryFrom<RibByteCode> for ProtoRibByteCode {
-        type Error = String;
-
-        fn try_from(value: RibByteCode) -> Result<Self, Self::Error> {
-            let mut instructions = Vec::new();
-            for instruction in value.instructions {
-                instructions.push(instruction.try_into()?);
-            }
-
-            Ok(ProtoRibByteCode { instructions })
-        }
-    }
-}
-
 mod internal {
+    use crate::analysis::{AnalysedType, TypeFlags};
     use crate::compiler::desugar::{desugar_pattern_match, desugar_range_selection};
     use crate::{
         AnalysedTypeWithUnit, DynamicParsedFunctionReference, Expr, FunctionReferenceType,
         InferredType, InstanceIdentifier, InstanceVariable, InstructionId, Range,
         RibByteCodeGenerationError, RibIR, TypeInternal, VariableId,
     };
-    use golem_wasm::analysis::{AnalysedType, TypeFlags};
     use std::collections::HashSet;
 
+    use crate::analysis::analysed_type::bool;
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::type_inference::{GetTypeHint, TypeHint};
-    use golem_wasm::analysis::analysed_type::bool;
-    use golem_wasm::{IntoValueAndType, Value, ValueAndType};
+    use crate::{IntoValueAndType, Value, ValueAndType};
     use std::ops::Deref;
 
     pub(crate) fn process_expr(
@@ -958,10 +922,10 @@ mod compiler_tests {
     use test_r::test;
 
     use super::*;
+    use crate::analysis::analysed_type;
+    use crate::analysis::analysed_type::{field, list, record, s32, str};
     use crate::{ArmPattern, InferredType, MatchArm, RibCompiler, VariableId};
-    use golem_wasm::analysis::analysed_type;
-    use golem_wasm::analysis::analysed_type::{field, list, record, s32, str};
-    use golem_wasm::{IntoValueAndType, Value, ValueAndType};
+    use crate::{IntoValueAndType, Value, ValueAndType};
 
     #[test]
     fn test_instructions_for_literal() {
@@ -1463,9 +1427,9 @@ mod compiler_tests {
     mod invalid_function_invoke_tests {
         use test_r::test;
 
+        use crate::analysis::analysed_type::str;
         use crate::compiler::byte_code::compiler_tests::internal;
         use crate::{Expr, RibCompiler, RibCompilerConfig};
-        use golem_wasm::analysis::analysed_type::str;
 
         #[test]
         fn test_unknown_function() {
@@ -1555,12 +1519,12 @@ mod compiler_tests {
     mod global_input_tests {
         use test_r::test;
 
-        use crate::compiler::byte_code::compiler_tests::internal;
-        use crate::{Expr, RibCompiler, RibCompilerConfig};
-        use golem_wasm::analysis::analysed_type::{
+        use crate::analysis::analysed_type::{
             case, field, list, option, r#enum, record, result, str, tuple, u32, u64, unit_case,
             variant,
         };
+        use crate::compiler::byte_code::compiler_tests::internal;
+        use crate::{Expr, RibCompiler, RibCompilerConfig};
 
         #[test]
         async fn test_str_global_input() {
@@ -1894,9 +1858,9 @@ mod compiler_tests {
     }
 
     mod internal {
+        use crate::analysis::analysed_type::{case, str, u64, unit_case, variant};
+        use crate::analysis::*;
         use crate::{ComponentDependency, ComponentDependencyKey, RibInputTypeInfo};
-        use golem_wasm::analysis::analysed_type::{case, str, u64, unit_case, variant};
-        use golem_wasm::analysis::*;
         use std::collections::HashMap;
         use uuid::Uuid;
 

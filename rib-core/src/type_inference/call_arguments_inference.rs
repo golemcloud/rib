@@ -54,6 +54,7 @@ pub fn infer_function_call_types(
 }
 
 mod internal {
+    use crate::analysis::AnalysedType;
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::inferred_type::TypeOrigin;
     use crate::rib_source_span::SourceSpan;
@@ -63,7 +64,6 @@ mod internal {
         ExpectedType, Expr, FullyQualifiedResourceConstructor, FullyQualifiedResourceMethod,
         FunctionCallError, FunctionName, InferredType, TypeInternal, TypeMismatchError,
     };
-    use golem_wasm::analysis::AnalysedType;
     use std::fmt::Display;
 
     pub(crate) fn resolve_call_argument_types(
@@ -456,15 +456,15 @@ mod internal {
 mod function_parameters_inference_tests {
     use test_r::test;
 
+    use crate::analysis::{
+        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
+    };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
     use crate::{
         ComponentDependencies, ComponentDependencyKey, Expr, InferredType, ParsedFunctionSite,
     };
     use bigdecimal::BigDecimal;
-    use golem_wasm::analysis::{
-        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
-    };
     use uuid::Uuid;
 
     fn get_component_dependencies() -> ComponentDependencies {

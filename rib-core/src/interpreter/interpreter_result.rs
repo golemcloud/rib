@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::analysed_type::tuple;
+use crate::analysis::AnalysedType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::{GetLiteralValue, LiteralValue};
-use golem_wasm::analysis::analysed_type::tuple;
-use golem_wasm::analysis::AnalysedType;
-use golem_wasm::{Value, ValueAndType};
+use crate::{Value, ValueAndType};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq)]

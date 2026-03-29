@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analysis::AnalysedType;
 use crate::{InferredType, TypeInternal};
-use golem_wasm::analysis::AnalysedType;
 use std::fmt;
 use std::ops::Deref;
 

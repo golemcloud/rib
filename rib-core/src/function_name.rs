@@ -14,10 +14,6 @@
 
 use combine::stream::position::Stream;
 use combine::{eof, EasyParser, Parser};
-use desert_rust::{
-    BinaryCodec, BinaryDeserializer, BinaryOutput, BinarySerializer, DeserializationContext,
-    SerializationContext,
-};
 use semver::{BuildMetadata, Prerelease};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -39,45 +35,7 @@ impl std::fmt::Debug for SemVer {
     }
 }
 
-impl BinarySerializer for SemVer {
-    fn serialize<Output: BinaryOutput>(
-        &self,
-        context: &mut SerializationContext<Output>,
-    ) -> desert_rust::Result<()> {
-        BinarySerializer::serialize(&self.0.major, context)?;
-        BinarySerializer::serialize(&self.0.minor, context)?;
-        BinarySerializer::serialize(&self.0.patch, context)?;
-        BinarySerializer::serialize(&self.0.pre.as_str(), context)?;
-        BinarySerializer::serialize(&self.0.build.as_str(), context)?;
-        Ok(())
-    }
-}
-
-impl BinaryDeserializer for SemVer {
-    fn deserialize(context: &mut DeserializationContext<'_>) -> desert_rust::Result<Self> {
-        let major = <u64 as BinaryDeserializer>::deserialize(context)?;
-        let minor = <u64 as BinaryDeserializer>::deserialize(context)?;
-        let patch = <u64 as BinaryDeserializer>::deserialize(context)?;
-        let pre_str = <std::string::String as BinaryDeserializer>::deserialize(context)?;
-        let build_str = <std::string::String as BinaryDeserializer>::deserialize(context)?;
-        let pre = Prerelease::new(&pre_str)
-            .map_err(|_| desert_rust::Error::DeserializationFailure("Invalid prerelease".into()))?;
-        let build = BuildMetadata::new(&build_str).map_err(|_| {
-            desert_rust::Error::DeserializationFailure("Invalid build metadata".into())
-        })?;
-
-        Ok(SemVer(semver::Version {
-            major,
-            minor,
-            patch,
-            pre,
-            build,
-        }))
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, BinaryCodec, Ord, PartialOrd)]
-#[desert(evolution())]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum ParsedFunctionSite {
     Global,
     Interface {
@@ -137,8 +95,7 @@ impl ParsedFunctionSite {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum DynamicParsedFunctionReference {
     Function { function: String },
     RawResourceConstructor { resource: String },
@@ -191,8 +148,7 @@ impl DynamicParsedFunctionReference {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ParsedFunctionReference {
     Function { function: String },
     RawResourceConstructor { resource: String },
@@ -270,8 +226,7 @@ impl ParsedFunctionReference {
 // `Examples`:
 // `DynamicParsedFunctionName` : ns:name/interface.{resource1(identifier1, { field-a: some(identifier2) }).new}
 // `ParsedFunctionName` : ns:name/interface.{resource1("foo", { field-a: some("bar") }).new}
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub struct DynamicParsedFunctionName {
     pub site: ParsedFunctionSite,
     pub function: DynamicParsedFunctionReference,
@@ -330,8 +285,7 @@ impl Display for DynamicParsedFunctionName {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, BinaryCodec)]
-#[desert(evolution())]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ParsedFunctionName {
     pub site: ParsedFunctionSite,
     pub function: ParsedFunctionReference,
@@ -442,319 +396,6 @@ impl ParsedFunctionName {
         Self {
             site,
             function: self.function.clone(),
-        }
-    }
-}
-
-mod protobuf {
-    use crate::proto::golem::rib::dynamic_parsed_function_reference::FunctionReference as ProtoDynamicFunctionReference;
-    use crate::{
-        DynamicParsedFunctionName, DynamicParsedFunctionReference, ParsedFunctionName,
-        ParsedFunctionReference, ParsedFunctionSite, SemVer,
-    };
-    use semver::{BuildMetadata, Prerelease};
-
-    impl TryFrom<crate::proto::golem::rib::SemVersion> for SemVer {
-        type Error = String;
-
-        fn try_from(value: crate::proto::golem::rib::SemVersion) -> Result<Self, Self::Error> {
-            Ok(SemVer(semver::Version {
-                major: value.major,
-                minor: value.minor,
-                patch: value.patch,
-                pre: Prerelease::new(&value.pre).map_err(|_| "Invalid prerelease".to_string())?,
-                build: BuildMetadata::new(&value.build)
-                    .map_err(|_| "Invalid build metadata".to_string())?,
-            }))
-        }
-    }
-
-    impl From<SemVer> for crate::proto::golem::rib::SemVersion {
-        fn from(value: SemVer) -> Self {
-            crate::proto::golem::rib::SemVersion {
-                major: value.0.major,
-                minor: value.0.minor,
-                patch: value.0.patch,
-                pre: value.0.pre.to_string(),
-                build: value.0.build.to_string(),
-            }
-        }
-    }
-
-    impl TryFrom<crate::proto::golem::rib::ParsedFunctionSite> for ParsedFunctionSite {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::ParsedFunctionSite,
-        ) -> Result<Self, Self::Error> {
-            let site = value.site.ok_or("Missing site".to_string())?;
-            match site {
-                crate::proto::golem::rib::parsed_function_site::Site::Global(_) => Ok(Self::Global),
-                crate::proto::golem::rib::parsed_function_site::Site::Interface(
-                    crate::proto::golem::rib::InterfaceFunctionSite { name },
-                ) => Ok(Self::Interface { name }),
-                crate::proto::golem::rib::parsed_function_site::Site::PackageInterface(
-                    crate::proto::golem::rib::PackageInterfaceFunctionSite {
-                        namespace,
-                        package,
-                        interface,
-                        version,
-                    },
-                ) => {
-                    let version = match version {
-                        Some(version) => Some(version.try_into()?),
-                        None => None,
-                    };
-
-                    Ok(Self::PackagedInterface {
-                        namespace,
-                        package,
-                        interface,
-                        version,
-                    })
-                }
-            }
-        }
-    }
-
-    impl From<ParsedFunctionSite> for crate::proto::golem::rib::ParsedFunctionSite {
-        fn from(value: ParsedFunctionSite) -> Self {
-            let site = match value {
-                ParsedFunctionSite::Global => {
-                    crate::proto::golem::rib::parsed_function_site::Site::Global(
-                        crate::proto::golem::rib::GlobalFunctionSite {},
-                    )
-                }
-                ParsedFunctionSite::Interface { name } => {
-                    crate::proto::golem::rib::parsed_function_site::Site::Interface(
-                        crate::proto::golem::rib::InterfaceFunctionSite { name },
-                    )
-                }
-                ParsedFunctionSite::PackagedInterface {
-                    namespace,
-                    package,
-                    interface,
-                    version,
-                } => crate::proto::golem::rib::parsed_function_site::Site::PackageInterface(
-                    crate::proto::golem::rib::PackageInterfaceFunctionSite {
-                        namespace,
-                        package,
-                        interface,
-                        version: version.map(|v| v.into()),
-                    },
-                ),
-            };
-            crate::proto::golem::rib::ParsedFunctionSite { site: Some(site) }
-        }
-    }
-
-    impl From<DynamicParsedFunctionReference>
-        for crate::proto::golem::rib::DynamicParsedFunctionReference
-    {
-        fn from(value: DynamicParsedFunctionReference) -> Self {
-            let function = match value {
-                DynamicParsedFunctionReference::Function { function } => {
-                    ProtoDynamicFunctionReference::Function(
-                        crate::proto::golem::rib::FunctionFunctionReference { function },
-                    )
-                }
-                DynamicParsedFunctionReference::RawResourceConstructor { resource } => {
-                    ProtoDynamicFunctionReference::RawResourceConstructor(
-                        crate::proto::golem::rib::RawResourceConstructorFunctionReference {
-                            resource,
-                        },
-                    )
-                }
-                DynamicParsedFunctionReference::RawResourceMethod { resource, method } => {
-                    ProtoDynamicFunctionReference::RawResourceMethod(
-                        crate::proto::golem::rib::RawResourceMethodFunctionReference {
-                            resource,
-                            method,
-                        },
-                    )
-                }
-                DynamicParsedFunctionReference::RawResourceStaticMethod { resource, method } => {
-                    ProtoDynamicFunctionReference::RawResourceStaticMethod(
-                        crate::proto::golem::rib::RawResourceStaticMethodFunctionReference {
-                            resource,
-                            method,
-                        },
-                    )
-                }
-                DynamicParsedFunctionReference::RawResourceDrop { resource } => {
-                    ProtoDynamicFunctionReference::RawResourceDrop(
-                        crate::proto::golem::rib::RawResourceDropFunctionReference { resource },
-                    )
-                }
-            };
-
-            crate::proto::golem::rib::DynamicParsedFunctionReference {
-                function_reference: Some(function),
-            }
-        }
-    }
-
-    impl TryFrom<crate::proto::golem::rib::DynamicParsedFunctionReference>
-        for DynamicParsedFunctionReference
-    {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::DynamicParsedFunctionReference,
-        ) -> Result<Self, Self::Error> {
-            let function = value
-                .function_reference
-                .ok_or("Missing function reference".to_string())?;
-
-            match function {
-                ProtoDynamicFunctionReference::Function(
-                    crate::proto::golem::rib::FunctionFunctionReference { function },
-                ) => Ok(Self::Function { function }),
-                ProtoDynamicFunctionReference::RawResourceConstructor(
-                    crate::proto::golem::rib::RawResourceConstructorFunctionReference { resource },
-                ) => Ok(Self::RawResourceConstructor { resource }),
-                ProtoDynamicFunctionReference::RawResourceMethod(
-                    crate::proto::golem::rib::RawResourceMethodFunctionReference {
-                        resource,
-                        method,
-                    },
-                ) => Ok(Self::RawResourceMethod { resource, method }),
-                ProtoDynamicFunctionReference::RawResourceStaticMethod(
-                    crate::proto::golem::rib::RawResourceStaticMethodFunctionReference {
-                        resource,
-                        method,
-                    },
-                ) => Ok(Self::RawResourceStaticMethod { resource, method }),
-                ProtoDynamicFunctionReference::RawResourceDrop(
-                    crate::proto::golem::rib::RawResourceDropFunctionReference { resource },
-                ) => Ok(Self::RawResourceDrop { resource }),
-            }
-        }
-    }
-
-    impl TryFrom<crate::proto::golem::rib::ParsedFunctionReference> for ParsedFunctionReference {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::ParsedFunctionReference,
-        ) -> Result<Self, Self::Error> {
-            let function = value
-                .function_reference
-                .ok_or("Missing function".to_string())?;
-            match function {
-                crate::proto::golem::rib::parsed_function_reference::FunctionReference::Function(crate::proto::golem::rib::FunctionFunctionReference {
-                                                                                                              function
-                                                                                                          }) => {
-                    Ok(Self::Function { function })
-                }
-                crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceConstructor(crate::proto::golem::rib::RawResourceConstructorFunctionReference {
-                                                                                                                            resource
-                                                                                                                        }) => {
-                    Ok(Self::RawResourceConstructor { resource })
-                }
-                crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceMethod(crate::proto::golem::rib::RawResourceMethodFunctionReference {
-                                                                                                                       resource,
-                                                                                                                       method
-                                                                                                                   }) => {
-                    Ok(Self::RawResourceMethod { resource, method })
-                }
-                crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceStaticMethod(crate::proto::golem::rib::RawResourceStaticMethodFunctionReference {
-                                                                                                                             resource,
-                                                                                                                             method
-                                                                                                                         }) => {
-                    Ok(Self::RawResourceStaticMethod { resource, method })
-                }
-                crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceDrop(crate::proto::golem::rib::RawResourceDropFunctionReference {
-                                                                                                                     resource
-                                                                                                                 }) => {
-                    Ok(Self::RawResourceDrop { resource })
-                }
-            }
-        }
-    }
-
-    impl From<ParsedFunctionReference> for crate::proto::golem::rib::ParsedFunctionReference {
-        fn from(value: ParsedFunctionReference) -> Self {
-            let function = match value {
-                ParsedFunctionReference::Function { function } => crate::proto::golem::rib::parsed_function_reference::FunctionReference::Function(
-                    crate::proto::golem::rib::FunctionFunctionReference { function },
-                ),
-                ParsedFunctionReference::RawResourceConstructor { resource } => {
-                    crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceConstructor(
-                        crate::proto::golem::rib::RawResourceConstructorFunctionReference {
-                            resource,
-                        },
-                    )
-                }
-                ParsedFunctionReference::RawResourceMethod { resource, method } => {
-                    crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceMethod(
-                        crate::proto::golem::rib::RawResourceMethodFunctionReference {
-                            resource,
-                            method,
-                        },
-                    )
-                }
-                ParsedFunctionReference::RawResourceStaticMethod { resource, method } => {
-                    crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceStaticMethod(
-                        crate::proto::golem::rib::RawResourceStaticMethodFunctionReference {
-                            resource,
-                            method,
-                        },
-                    )
-                }
-                ParsedFunctionReference::RawResourceDrop { resource } => crate::proto::golem::rib::parsed_function_reference::FunctionReference::RawResourceDrop(
-                    crate::proto::golem::rib::RawResourceDropFunctionReference { resource },
-                ),
-            };
-            crate::proto::golem::rib::ParsedFunctionReference {
-                function_reference: Some(function),
-            }
-        }
-    }
-
-    impl TryFrom<crate::proto::golem::rib::DynamicParsedFunctionName> for DynamicParsedFunctionName {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::DynamicParsedFunctionName,
-        ) -> Result<Self, Self::Error> {
-            let site = ParsedFunctionSite::try_from(value.site.ok_or("Missing site".to_string())?)?;
-            let function = DynamicParsedFunctionReference::try_from(
-                value.function.ok_or("Missing function".to_string())?,
-            )?;
-            Ok(Self { site, function })
-        }
-    }
-
-    impl TryFrom<crate::proto::golem::rib::ParsedFunctionName> for ParsedFunctionName {
-        type Error = String;
-
-        fn try_from(
-            value: crate::proto::golem::rib::ParsedFunctionName,
-        ) -> Result<Self, Self::Error> {
-            let site = ParsedFunctionSite::try_from(value.site.ok_or("Missing site".to_string())?)?;
-            let function = ParsedFunctionReference::try_from(
-                value.function.ok_or("Missing function".to_string())?,
-            )?;
-            Ok(Self { site, function })
-        }
-    }
-
-    impl From<ParsedFunctionName> for crate::proto::golem::rib::ParsedFunctionName {
-        fn from(value: ParsedFunctionName) -> Self {
-            crate::proto::golem::rib::ParsedFunctionName {
-                site: Some(value.site.into()),
-                function: Some(value.function.into()),
-            }
-        }
-    }
-
-    impl From<DynamicParsedFunctionName> for crate::proto::golem::rib::DynamicParsedFunctionName {
-        fn from(value: DynamicParsedFunctionName) -> Self {
-            crate::proto::golem::rib::DynamicParsedFunctionName {
-                site: Some(value.site.into()),
-                function: Some(value.function.into()),
-            }
         }
     }
 }

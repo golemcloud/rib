@@ -14,8 +14,8 @@
 
 use crate::repl_state::ReplState;
 use async_trait::async_trait;
-use golem_wasm::analysis::AnalysedType;
-use golem_wasm::ValueAndType;
+use rib::analysis::AnalysedType;
+use rib::ValueAndType;
 use rib::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
     RibComponentFunctionInvoke, RibFunctionInvokeResult,

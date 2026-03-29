@@ -247,6 +247,7 @@ pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
 }
 
 mod internal {
+    use crate::analysis::AnalysedType;
     use crate::call_type::CallType;
     use crate::rib_source_span::SourceSpan;
     use crate::rib_type_error::RibTypeErrorInternal;
@@ -257,7 +258,6 @@ mod internal {
         ActualType, AmbiguousTypeError, ArmPattern, ExpectedType, Expr, InferredType,
         InvalidPatternMatchError, Path, TypeInternal, TypeMismatchError, VariableId,
     };
-    use golem_wasm::analysis::AnalysedType;
     use std::collections::VecDeque;
     use std::ops::Deref;
 

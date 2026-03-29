@@ -52,9 +52,9 @@ pub enum ExhaustivePatternMatchError {
 }
 
 mod internal {
+    use crate::analysis::TypeVariant;
     use crate::type_checker::exhaustive_pattern_match::ExhaustivePatternMatchError;
     use crate::{ArmPattern, ComponentDependencies, Expr};
-    use golem_wasm::analysis::TypeVariant;
     use std::collections::HashMap;
 
     use std::ops::Deref;
