@@ -1,6 +1,6 @@
 ## Rib
 
-A programming language to interact with WebAssembly components deployed in web assembly runtimes
+A programming language to interact with WebAssembly components
 
 ## Wasmtime integration
 
