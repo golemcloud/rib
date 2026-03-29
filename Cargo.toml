@@ -4,7 +4,6 @@ resolver = "2"
 members = [
     "rib-core",
     "rib-repl",
-    "rib-repl-golem",
 ]
 
 [workspace.dependencies]
