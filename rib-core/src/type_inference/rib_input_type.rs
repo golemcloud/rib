@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::{Expr, ExprVisitor, InferredExpr, RibCompilationError};
+use crate::{try_visit_post_order_rev_mut, Expr, InferredExpr, RibCompilationError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -39,16 +39,15 @@ impl RibInputTypeInfo {
         inferred_expr: &InferredExpr,
     ) -> Result<RibInputTypeInfo, RibCompilationError> {
         let mut expr = inferred_expr.get_expr().clone();
-        let mut queue = ExprVisitor::bottom_up(&mut expr);
 
         let mut global_variables = HashMap::new();
 
-        while let Some(expr) = queue.pop_back() {
+        try_visit_post_order_rev_mut(&mut expr, &mut |expr| {
             if let Expr::Identifier {
                 variable_id,
                 inferred_type,
                 ..
-            } = &expr
+            } = &*expr
             {
                 if variable_id.is_global() {
                     let analysed_type = AnalysedType::try_from(inferred_type).map_err(|e| {
@@ -60,7 +59,8 @@ impl RibInputTypeInfo {
                     global_variables.insert(variable_id.name(), analysed_type);
                 }
             }
-        }
+            Ok::<(), RibCompilationError>(())
+        })?;
 
         Ok(RibInputTypeInfo {
             types: global_variables,

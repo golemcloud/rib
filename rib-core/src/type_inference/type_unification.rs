@@ -14,16 +14,14 @@
 
 use crate::inferred_type::UnificationFailureInternal;
 use crate::rib_source_span::SourceSpan;
-use crate::{Expr, ExprVisitor, InferredType, TypeUnificationError};
+use crate::{try_visit_post_order_mut, Expr, InferredType, TypeUnificationError};
 
 pub fn unify_types(expr: &mut Expr) -> Result<(), TypeUnificationError> {
     // keeping the original expression to lookup source span
     let original_expr = expr.clone();
 
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    // Pop front to get the innermost expression first that may have caused the type mismatch.
-    while let Some(sub_expr) = visitor.pop_front() {
+    // Visit innermost expressions first (post-order) to find the root cause of type mismatch.
+    try_visit_post_order_mut(expr, &mut |sub_expr| {
         match sub_expr {
             Expr::Let { .. } => {}
             Expr::Boolean { .. } => {}
@@ -40,9 +38,8 @@ pub fn unify_types(expr: &mut Expr) -> Result<(), TypeUnificationError> {
                 unify_inferred_type(&original_expr, sub_expr)?;
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 fn unify_inferred_type(

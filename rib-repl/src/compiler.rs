@@ -124,36 +124,32 @@ impl InstanceVariables {
 
 pub fn get_identifiers(inferred_expr: &InferredExpr) -> Vec<VariableId> {
     let mut expr = inferred_expr.get_expr().clone();
-    let mut visitor = ExprVisitor::bottom_up(&mut expr);
 
     let mut identifiers = Vec::new();
 
-    while let Some(expr) = visitor.pop_back() {
-        match expr {
-            Expr::Let { variable_id, .. } => {
-                if !identifiers.contains(variable_id) {
-                    identifiers.push(variable_id.clone());
-                }
+    visit_post_order_rev_mut(&mut expr, &mut |expr| match expr {
+        Expr::Let { variable_id, .. } => {
+            if !identifiers.contains(variable_id) {
+                identifiers.push(variable_id.clone());
             }
-            Expr::Identifier { variable_id, .. } => {
-                if !identifiers.contains(variable_id) {
-                    identifiers.push(variable_id.clone());
-                }
-            }
-            _ => {}
         }
-    }
+        Expr::Identifier { variable_id, .. } => {
+            if !identifiers.contains(variable_id) {
+                identifiers.push(variable_id.clone());
+            }
+        }
+        _ => {}
+    });
 
     identifiers
 }
 
 pub fn fetch_instance_variables(inferred_expr: &InferredExpr) -> InstanceVariables {
     let mut expr = inferred_expr.get_expr().clone();
-    let mut queue = ExprVisitor::bottom_up(&mut expr);
 
     let mut instance_variables = HashMap::new();
 
-    while let Some(expr) = queue.pop_front() {
+    visit_post_order_mut(&mut expr, &mut |expr| {
         if let Expr::Let {
             variable_id, expr, ..
         } = expr
@@ -172,7 +168,7 @@ pub fn fetch_instance_variables(inferred_expr: &InferredExpr) -> InstanceVariabl
                 };
             }
         }
-    }
+    });
 
     InstanceVariables { instance_variables }
 }

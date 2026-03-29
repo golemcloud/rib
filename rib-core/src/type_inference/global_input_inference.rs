@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Expr, ExprVisitor, InferredType};
+use crate::{visit_post_order_rev_mut, Expr, InferredType};
 use std::collections::HashMap;
 
 // request.path.user is used as a string in one place
@@ -21,9 +21,7 @@ use std::collections::HashMap;
 pub fn infer_global_inputs(expr: &mut Expr) {
     let global_variables_dictionary = collect_all_global_variables_type(expr);
     // Updating the collected types in all positions of input
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Identifier {
             variable_id,
             inferred_type,
@@ -37,14 +35,12 @@ pub fn infer_global_inputs(expr: &mut Expr) {
                 }
             }
         }
-    }
+    });
 }
 
 fn collect_all_global_variables_type(expr: &mut Expr) -> HashMap<String, Vec<InferredType>> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
     let mut all_types_of_global_variables = HashMap::new();
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Identifier {
             variable_id,
             inferred_type,
@@ -66,7 +62,7 @@ fn collect_all_global_variables_type(expr: &mut Expr) -> HashMap<String, Vec<Inf
                 }
             }
         }
-    }
+    });
 
     all_types_of_global_variables
 }

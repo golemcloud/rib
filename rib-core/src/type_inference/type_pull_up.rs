@@ -18,20 +18,18 @@ use crate::type_inference::type_hint::TypeHint;
 use crate::type_refinement::precise_types::{ListType, RecordType};
 use crate::type_refinement::TypeRefinement;
 use crate::FunctionName;
+use crate::{try_visit_post_order_mut, CustomError, Expr};
 use crate::{
     ActualType, ComponentDependencies, ExpectedType, FullyQualifiedResourceMethod, GetTypeHint,
     InferredType, InstanceIdentifier, InterfaceName, MatchArm, PackageName, Path, Range,
     TypeInternal, TypeMismatchError,
 };
-use crate::{CustomError, Expr, ExprVisitor};
 
 pub fn type_pull_up(
     expr: &mut Expr,
     component_dependencies: &ComponentDependencies,
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    try_visit_post_order_mut(expr, &mut |expr| {
         match expr {
             Expr::Tuple {
                 exprs,
@@ -248,9 +246,8 @@ pub fn type_pull_up(
                 handle_range(range, inferred_type);
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 fn handle_list_comprehension(

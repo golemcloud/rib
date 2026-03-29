@@ -13,13 +13,11 @@
 // limitations under the License.
 
 use crate::call_type::CallType;
-use crate::{Expr, ExprVisitor, FunctionCallError};
+use crate::{try_visit_post_order_mut, Expr, FunctionCallError};
 
 #[allow(clippy::result_large_err)]
 pub fn check_invalid_function_calls(expr: &mut Expr) -> Result<(), FunctionCallError> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    try_visit_post_order_mut(expr, &mut |expr| {
         if let Expr::Call {
             call_type:
                 CallType::Function {
@@ -28,7 +26,7 @@ pub fn check_invalid_function_calls(expr: &mut Expr) -> Result<(), FunctionCallE
                     ..
                 },
             ..
-        } = &expr
+        } = &*expr
         {
             if component_info.is_none() {
                 return Err(FunctionCallError::InvalidFunctionCall {
@@ -38,7 +36,6 @@ pub fn check_invalid_function_calls(expr: &mut Expr) -> Result<(), FunctionCallE
                     });
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }

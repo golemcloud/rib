@@ -13,13 +13,11 @@
 // limitations under the License.
 
 use crate::call_type::{CallType, InstanceCreationType};
-use crate::{Expr, ExprVisitor, InvalidWorkerName};
+use crate::{try_visit_post_order_rev_mut, Expr, InvalidWorkerName};
 
 // Capture all worker name and see if they are resolved to a string type
 pub fn check_invalid_worker_name(expr: &mut Expr) -> Result<(), InvalidWorkerName> {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    try_visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Call { call_type, .. } = expr {
             match call_type {
                 CallType::InstanceCreation(InstanceCreationType::WitWorker {
@@ -46,9 +44,8 @@ pub fn check_invalid_worker_name(expr: &mut Expr) -> Result<(), InvalidWorkerNam
                 }
             }
         }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }
 
 mod internal {

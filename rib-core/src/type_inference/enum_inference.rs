@@ -23,7 +23,7 @@ pub fn infer_enums(expr: &mut Expr, component_dependencies: &ComponentDependenci
 mod internal {
     use crate::analysis::AnalysedType;
     use crate::call_type::CallType;
-    use crate::{ComponentDependencies, Expr, ExprVisitor};
+    use crate::{visit_post_order_rev_mut, ComponentDependencies, Expr};
 
     pub(crate) fn convert_identifiers_to_enum_function_calls(
         expr: &mut Expr,
@@ -31,9 +31,7 @@ mod internal {
     ) {
         let enum_cases = enum_info.clone();
 
-        let mut visitor = ExprVisitor::bottom_up(expr);
-
-        while let Some(expr) = visitor.pop_back() {
+        visit_post_order_rev_mut(expr, &mut |expr| {
             if let Expr::Identifier {
                 variable_id,
                 inferred_type,
@@ -52,7 +50,7 @@ mod internal {
                     };
                 }
             }
-        }
+        });
     }
 
     pub(crate) fn get_enum_info(
@@ -60,9 +58,7 @@ mod internal {
         component_dependency: &ComponentDependencies,
     ) -> EnumInfo {
         let mut enum_cases = vec![];
-        let mut visitor = ExprVisitor::bottom_up(expr);
-
-        while let Some(expr) = visitor.pop_back() {
+        visit_post_order_rev_mut(expr, &mut |expr| {
             if let Expr::Identifier {
                 variable_id,
                 inferred_type,
@@ -84,7 +80,7 @@ mod internal {
                     }
                 }
             }
-        }
+        });
 
         EnumInfo { cases: enum_cases }
     }

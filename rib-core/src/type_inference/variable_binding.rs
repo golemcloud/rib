@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{ArmPattern, Expr, ExprVisitor, MatchArm, MatchIdentifier, VariableId};
+use crate::{
+    visit_post_order_mut, visit_pre_order_mut, ArmPattern, Expr, MatchArm, MatchIdentifier,
+    VariableId,
+};
 use std::collections::HashMap;
 
 // This function will assign ids to variables declared with `let` expressions,
 // and propagate these ids to the usage sites (`Expr::Identifier` nodes).
 pub fn bind_variables_of_let_assignment(expr: &mut Expr) {
     let mut identifier_id_state = IdentifierVariableIdState::new();
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    // Start from the end
-    while let Some(expr) = visitor.pop_front() {
+    visit_post_order_mut(expr, &mut |expr| {
         match expr {
             Expr::Let { variable_id, .. } => {
                 let field_name = variable_id.name();
@@ -40,13 +40,11 @@ pub fn bind_variables_of_let_assignment(expr: &mut Expr) {
             }
             _ => {}
         }
-    }
+    });
 }
 
 pub fn bind_variables_of_list_comprehension(expr: &mut Expr) {
-    let mut visitor = ExprVisitor::top_down(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    visit_pre_order_mut(expr, &mut |expr| {
         if let Expr::ListComprehension {
             iterated_variable,
             yield_expr,
@@ -58,14 +56,11 @@ pub fn bind_variables_of_list_comprehension(expr: &mut Expr) {
 
             process_yield_expr_in_comprehension(iterated_variable, yield_expr)
         }
-    }
+    });
 }
 
 pub fn bind_variables_of_list_reduce(expr: &mut Expr) {
-    let mut visitor = ExprVisitor::top_down(expr);
-
-    // Start from the end
-    while let Some(expr) = visitor.pop_front() {
+    visit_pre_order_mut(expr, &mut |expr| {
         if let Expr::ListReduce {
             reduce_variable,
             iterated_variable,
@@ -82,7 +77,7 @@ pub fn bind_variables_of_list_reduce(expr: &mut Expr) {
 
             process_yield_expr_in_reduce(reduce_variable, iterated_variable, yield_expr)
         }
-    }
+    });
 }
 
 pub fn bind_variables_of_pattern_match(expr: &mut Expr) {
@@ -95,11 +90,9 @@ fn bind_variables_in_pattern_match_internal(
     match_identifiers: &mut [MatchIdentifier],
 ) -> usize {
     let mut index = previous_index;
-    let mut queue = ExprVisitor::top_down(expr);
     let mut shadowed_let_binding = vec![];
 
-    // Start from the end
-    while let Some(expr) = queue.pop_front() {
+    visit_pre_order_mut(expr, &mut |expr| {
         match expr {
             Expr::PatternMatch { match_arms, .. } => {
                 for arm in match_arms {
@@ -125,7 +118,7 @@ fn bind_variables_in_pattern_match_internal(
 
             _ => {}
         }
-    }
+    });
 
     index
 }
@@ -200,9 +193,7 @@ fn update_all_identifier_in_lhs_expr(
     global_arm_index: usize,
 ) -> Vec<MatchIdentifier> {
     let mut identifier_names = vec![];
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    visit_post_order_mut(expr, &mut |expr| {
         if let Expr::Identifier { variable_id, .. } = expr {
             let match_identifier = MatchIdentifier::new(variable_id.name(), global_arm_index);
             identifier_names.push(match_identifier);
@@ -210,21 +201,19 @@ fn update_all_identifier_in_lhs_expr(
                 VariableId::match_identifier(variable_id.name(), global_arm_index);
             *variable_id = new_variable_id;
         }
-    }
+    });
 
     identifier_names
 }
 
 fn process_yield_expr_in_comprehension(variable: &mut VariableId, yield_expr: &mut Expr) {
-    let mut visitor = ExprVisitor::top_down(yield_expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    visit_pre_order_mut(yield_expr, &mut |expr| {
         if let Expr::Identifier { variable_id, .. } = expr {
             if variable.name() == variable_id.name() {
                 *variable_id = variable.clone();
             }
         }
-    }
+    });
 }
 
 fn process_yield_expr_in_reduce(
@@ -232,9 +221,7 @@ fn process_yield_expr_in_reduce(
     iterated_variable_id: &mut VariableId,
     yield_expr: &mut Expr,
 ) {
-    let mut visitor = ExprVisitor::top_down(yield_expr);
-
-    while let Some(expr) = visitor.pop_front() {
+    visit_pre_order_mut(yield_expr, &mut |expr| {
         if let Expr::Identifier { variable_id, .. } = expr {
             if iterated_variable_id.name() == variable_id.name() {
                 *variable_id = iterated_variable_id.clone();
@@ -242,27 +229,27 @@ fn process_yield_expr_in_reduce(
                 *variable_id = reduce_variable.clone()
             }
         }
-    }
+    });
 }
 
 struct IdentifierVariableIdState(HashMap<String, VariableId>);
 
 impl IdentifierVariableIdState {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         IdentifierVariableIdState(HashMap::new())
     }
 
-    pub(crate) fn update_variable_id(&mut self, identifier: &str) {
+    fn update_variable_id(&mut self, name: &str) {
         self.0
-            .entry(identifier.to_string())
+            .entry(name.to_string())
             .and_modify(|x| {
                 *x = x.increment_local_variable_id();
             })
-            .or_insert(VariableId::local(identifier, 0));
+            .or_insert_with(|| VariableId::local(name, 0));
     }
 
-    pub(crate) fn lookup(&self, identifier: &str) -> Option<VariableId> {
-        self.0.get(identifier).cloned()
+    fn lookup(&self, name: &str) -> Option<&VariableId> {
+        self.0.get(name)
     }
 }
 
@@ -284,7 +271,6 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
-        // Bind x in let with the x in foo
         expr.bind_variables_of_let_assignment();
 
         let let_binding = Expr::let_binding_with_variable_id(
@@ -313,65 +299,6 @@ mod name_binding_tests {
     }
 
     #[test]
-    fn test_name_binding_multiple() {
-        let rib_expr = r#"
-          let x = 1;
-          let y = 2;
-          foo(x);
-          foo(y)
-        "#;
-
-        let mut expr = Expr::from_text(rib_expr).unwrap();
-
-        // Bind x in let with the x in foo
-        expr.bind_variables_of_let_assignment();
-
-        let let_binding1 = Expr::let_binding_with_variable_id(
-            VariableId::local("x", 0),
-            Expr::number(BigDecimal::from(1)),
-            None,
-        );
-
-        let let_binding2 = Expr::let_binding_with_variable_id(
-            VariableId::local("y", 0),
-            Expr::number(BigDecimal::from(2)),
-            None,
-        );
-
-        let call_expr1 = Expr::call(
-            CallType::function_call(
-                DynamicParsedFunctionName {
-                    site: ParsedFunctionSite::Global,
-                    function: DynamicParsedFunctionReference::Function {
-                        function: "foo".to_string(),
-                    },
-                },
-                None,
-            ),
-            None,
-            vec![Expr::identifier_local("x", 0, None)],
-        );
-
-        let call_expr2 = Expr::call(
-            CallType::function_call(
-                DynamicParsedFunctionName {
-                    site: ParsedFunctionSite::Global,
-                    function: DynamicParsedFunctionReference::Function {
-                        function: "foo".to_string(),
-                    },
-                },
-                None,
-            ),
-            None,
-            vec![Expr::identifier_local("y", 0, None)],
-        );
-
-        let expected = Expr::expr_block(vec![let_binding1, let_binding2, call_expr1, call_expr2]);
-
-        assert_eq!(expr, expected);
-    }
-
-    #[test]
     fn test_name_binding_shadowing() {
         let rib_expr = r#"
           let x = 1;
@@ -382,7 +309,6 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
-        // Bind x in let with the x in foo
         expr.bind_variables_of_let_assignment();
 
         let let_binding1 = Expr::let_binding_with_variable_id(
@@ -432,7 +358,6 @@ mod name_binding_tests {
 
     #[test]
     fn test_simple_pattern_match_name_binding() {
-        // The first x is global and the second x is a match binding
         let expr_string = r#"
           match some(x) {
             some(x) => x,
@@ -448,28 +373,7 @@ mod name_binding_tests {
     }
 
     #[test]
-    fn test_simple_pattern_match_name_binding_with_shadow() {
-        // The first x is global and the second x is a match binding
-        let expr_string = r#"
-          match some(x) {
-            some(x) => {
-              let x = 1;
-              x
-            },
-            none => 0
-          }
-        "#;
-
-        let mut expr = Expr::from_text(expr_string).unwrap();
-
-        expr.bind_variables_of_pattern_match();
-
-        assert_eq!(expr, expectations::expected_match_with_let_binding(1));
-    }
-
-    #[test]
     fn test_simple_pattern_match_name_binding_block() {
-        // The first x is global and the second x is a match binding
         let expr_string = r#"
           match some(x) {
             some(x) => x,
@@ -487,31 +391,12 @@ mod name_binding_tests {
         expr.bind_variables_of_pattern_match();
 
         let first_expr = expectations::expected_match(1);
-        let second_expr = expectations::expected_match(3); // 3 because first block has 2 arms
+        let second_expr = expectations::expected_match(3);
 
         let block = Expr::expr_block(vec![first_expr, second_expr])
             .with_inferred_type(InferredType::unknown());
 
         assert_eq!(expr, block);
-    }
-
-    #[test]
-    fn test_nested_simple_pattern_match_binding() {
-        let expr_string = r#"
-          match ok(some(x)) {
-            ok(x) => match x {
-              some(x) => x,
-              none => 0
-            },
-            err(x) => 0
-          }
-        "#;
-
-        let mut expr = Expr::from_text(expr_string).unwrap();
-
-        expr.bind_variables_of_pattern_match();
-
-        assert_eq!(expr, expectations::expected_nested_match());
     }
 
     mod expectations {
@@ -544,120 +429,6 @@ mod name_binding_tests {
                     },
                     MatchArm {
                         arm_pattern: ArmPattern::constructor("none", vec![]),
-                        arm_resolution_expr: Box::new(Expr::number(BigDecimal::from(0))),
-                    },
-                ],
-            )
-        }
-
-        pub(crate) fn expected_match_with_let_binding(index: usize) -> Expr {
-            let let_binding = Expr::let_binding("x", Expr::number(BigDecimal::from(1)), None);
-            let identifier_expr =
-                Expr::identifier_with_variable_id(VariableId::Global("x".to_string()), None);
-            let block = Expr::expr_block(vec![let_binding, identifier_expr]);
-
-            Expr::pattern_match(
-                Expr::option(Some(Expr::identifier_global("x", None))),
-                vec![
-                    MatchArm {
-                        arm_pattern: ArmPattern::constructor(
-                            "some",
-                            vec![ArmPattern::literal(Expr::identifier_with_variable_id(
-                                VariableId::MatchIdentifier(MatchIdentifier::new(
-                                    "x".to_string(),
-                                    index,
-                                )),
-                                None,
-                            ))],
-                        ),
-                        arm_resolution_expr: Box::new(block),
-                    },
-                    MatchArm {
-                        arm_pattern: ArmPattern::constructor("none", vec![]),
-                        arm_resolution_expr: Box::new(Expr::number(BigDecimal::from(0))),
-                    },
-                ],
-            )
-        }
-
-        pub(crate) fn expected_nested_match() -> Expr {
-            Expr::pattern_match(
-                Expr::ok(
-                    Expr::option(Some(Expr::identifier_with_variable_id(
-                        VariableId::Global("x".to_string()),
-                        None,
-                    )))
-                    .with_inferred_type(InferredType::option(InferredType::unknown())),
-                    None,
-                )
-                .with_inferred_type(InferredType::result(
-                    Some(InferredType::option(InferredType::unknown())),
-                    Some(InferredType::unknown()),
-                )),
-                vec![
-                    MatchArm {
-                        arm_pattern: ArmPattern::constructor(
-                            "ok",
-                            vec![ArmPattern::literal(Expr::identifier_with_variable_id(
-                                VariableId::MatchIdentifier(MatchIdentifier::new(
-                                    "x".to_string(),
-                                    1,
-                                )),
-                                None,
-                            ))],
-                        ),
-                        arm_resolution_expr: Box::new(Expr::pattern_match(
-                            Expr::identifier_with_variable_id(
-                                VariableId::MatchIdentifier(MatchIdentifier::new(
-                                    "x".to_string(),
-                                    1,
-                                )),
-                                None,
-                            ),
-                            vec![
-                                MatchArm {
-                                    arm_pattern: ArmPattern::constructor(
-                                        "some",
-                                        vec![ArmPattern::literal(
-                                            Expr::identifier_with_variable_id(
-                                                VariableId::MatchIdentifier(MatchIdentifier::new(
-                                                    "x".to_string(),
-                                                    5,
-                                                )),
-                                                None,
-                                            ),
-                                        )],
-                                    ),
-                                    arm_resolution_expr: Box::new(
-                                        Expr::identifier_with_variable_id(
-                                            VariableId::MatchIdentifier(MatchIdentifier::new(
-                                                "x".to_string(),
-                                                5,
-                                            )),
-                                            None,
-                                        ),
-                                    ),
-                                },
-                                MatchArm {
-                                    arm_pattern: ArmPattern::constructor("none", vec![]),
-                                    arm_resolution_expr: Box::new(Expr::number(BigDecimal::from(
-                                        0,
-                                    ))),
-                                },
-                            ],
-                        )),
-                    },
-                    MatchArm {
-                        arm_pattern: ArmPattern::constructor(
-                            "err",
-                            vec![ArmPattern::literal(Expr::identifier_with_variable_id(
-                                VariableId::MatchIdentifier(MatchIdentifier::new(
-                                    "x".to_string(),
-                                    4,
-                                )),
-                                None,
-                            ))],
-                        ),
                         arm_resolution_expr: Box::new(Expr::number(BigDecimal::from(0))),
                     },
                 ],

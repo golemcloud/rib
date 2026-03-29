@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{CallType, Expr, ExprVisitor, InstanceCreationType, TypeInternal};
+use crate::{visit_post_order_rev_mut, CallType, Expr, InstanceCreationType, TypeInternal};
 
 pub fn ensure_stateful_instance(expr: &mut Expr) {
-    let mut visitor = ExprVisitor::bottom_up(expr);
-
-    while let Some(expr) = visitor.pop_back() {
+    visit_post_order_rev_mut(expr, &mut |expr| {
         if let Expr::Call {
             call_type:
                 CallType::InstanceCreation(InstanceCreationType::WitWorker { worker_name, .. }),
@@ -38,5 +36,5 @@ pub fn ensure_stateful_instance(expr: &mut Expr) {
                 }
             }
         }
-    }
+    });
 }

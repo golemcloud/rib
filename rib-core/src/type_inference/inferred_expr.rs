@@ -15,8 +15,8 @@
 use crate::call_type::CallType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{
-    ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName, Expr, ExprVisitor,
-    FunctionName, GlobalVariableTypeSpec,
+    visit_post_order_rev_mut, ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName,
+    Expr, FunctionName, GlobalVariableTypeSpec,
 };
 use std::collections::HashSet;
 
@@ -50,9 +50,7 @@ impl InferredExpr {
     pub fn worker_invoke_calls(&self) -> Vec<DynamicParsedFunctionName> {
         let mut expr = self.0.clone();
         let mut worker_calls = vec![];
-        let mut visitor = ExprVisitor::bottom_up(&mut expr);
-
-        while let Some(expr) = visitor.pop_back() {
+        visit_post_order_rev_mut(&mut expr, &mut |expr| {
             if let Expr::Call {
                 call_type: CallType::Function { function_name, .. },
                 ..
@@ -60,7 +58,7 @@ impl InferredExpr {
             {
                 worker_calls.push(function_name.clone());
             }
-        }
+        });
 
         worker_calls
     }

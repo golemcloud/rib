@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Expr, ExprVisitor, InferredType, TypeInternal};
+use crate::{visit_post_order, Expr, InferredType, TypeInternal};
 
 // Given `f` executes inference, find expr where `f(expr) = expr`
 pub fn type_inference_fix_point<F, E>(mut scan_and_infer: F, expr: &mut Expr) -> Result<(), E>
@@ -33,16 +33,24 @@ where
 }
 
 fn compare_expr_types(left: &mut Expr, right: &mut Expr) -> bool {
-    let mut left_stack = ExprVisitor::bottom_up(left);
-    let mut right_stack = ExprVisitor::bottom_up(right);
+    let mut left_types = Vec::new();
+    let mut right_types = Vec::new();
 
-    while let (Some(left), Some(right)) = (left_stack.pop_front(), right_stack.pop_front()) {
-        if !compare_inferred_types(&left.inferred_type(), &right.inferred_type()) {
-            return false;
-        }
+    visit_post_order(left, &mut |expr| {
+        left_types.push(expr.inferred_type());
+    });
+    visit_post_order(right, &mut |expr| {
+        right_types.push(expr.inferred_type());
+    });
+
+    if left_types.len() != right_types.len() {
+        return false;
     }
 
-    left_stack.is_empty() && right_stack.is_empty()
+    left_types
+        .iter()
+        .zip(right_types.iter())
+        .all(|(l, r)| compare_inferred_types(l, r))
 }
 
 fn compare_inferred_types(left: &InferredType, right: &InferredType) -> bool {

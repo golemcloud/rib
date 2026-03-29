@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Expr, ExprVisitor, InferredType, TypeInternal, TypeOrigin};
+use crate::{visit_pre_order_mut, Expr, InferredType, TypeInternal, TypeOrigin};
 use std::collections::HashMap;
 
 // This is about binding the `InstanceType` to the corresponding identifiers.
@@ -32,37 +32,31 @@ use std::collections::HashMap;
 //
 // In this case `foo` in `foo` should have inferred type of `String` and not `InstanceType`
 pub fn bind_instance_types(expr: &mut Expr) {
-    let mut queue = ExprVisitor::top_down(expr);
-
     let mut instance_variables = HashMap::new();
 
-    while let Some(expr) = queue.pop_front() {
-        match expr {
-            Expr::Let {
-                variable_id, expr, ..
-            } => {
-                if let TypeInternal::Instance { instance_type } =
-                    expr.inferred_type().internal_type()
-                {
-                    instance_variables.insert(variable_id.clone(), instance_type.clone());
-                }
+    visit_pre_order_mut(expr, &mut |expr| match expr {
+        Expr::Let {
+            variable_id, expr, ..
+        } => {
+            if let TypeInternal::Instance { instance_type } = expr.inferred_type().internal_type() {
+                instance_variables.insert(variable_id.clone(), instance_type.clone());
             }
-            Expr::Identifier {
-                variable_id,
-                inferred_type,
-                ..
-            } => {
-                if let Some(new_inferred_type) = instance_variables.get(variable_id) {
-                    *inferred_type = InferredType::new(
-                        TypeInternal::Instance {
-                            instance_type: new_inferred_type.clone(),
-                        },
-                        TypeOrigin::NoOrigin,
-                    );
-                }
-            }
-
-            _ => {}
         }
-    }
+        Expr::Identifier {
+            variable_id,
+            inferred_type,
+            ..
+        } => {
+            if let Some(new_inferred_type) = instance_variables.get(variable_id) {
+                *inferred_type = InferredType::new(
+                    TypeInternal::Instance {
+                        instance_type: new_inferred_type.clone(),
+                    },
+                    TypeOrigin::NoOrigin,
+                );
+            }
+        }
+
+        _ => {}
+    });
 }
