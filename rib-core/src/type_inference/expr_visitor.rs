@@ -1,135 +1,75 @@
 use crate::{Expr, TypeInternal};
 use std::collections::VecDeque;
 
-// Safe post-order (bottom-up) traversal visiting children before parent.
-// Visits in natural program order (left-to-right).
-// Equivalent to old: ExprVisitor::bottom_up(expr) + pop_front()
+// Post-order (bottom-up): children first, then parent. Left-to-right.
 pub fn visit_post_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_front() {
-            visit_post_order_mut(child, f);
-        }
-    }
+    visit_children_mut(expr, |child| visit_post_order_mut(child, f));
     f(expr);
 }
 
-// Safe post-order (bottom-up) traversal visiting children before parent.
-// Visits in reversed order (right-to-left, parent last).
-// Equivalent to old: ExprVisitor::bottom_up(expr) + pop_back()
+// Pre-order reversed: parent first, then children right-to-left.
+// This matches the old ExprVisitor::bottom_up + pop_back() semantics.
 pub fn visit_post_order_rev_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
     f(expr);
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_back() {
-            visit_post_order_rev_mut(child, f);
-        }
-    }
+    visit_children_rev_mut(expr, |child| visit_post_order_rev_mut(child, f));
 }
 
-// Safe pre-order (top-down) traversal visiting parent before children.
-// Visits in natural program order (left-to-right).
-// Equivalent to old: ExprVisitor::top_down(expr) + pop_front()
+// Pre-order (top-down): parent first, then children left-to-right.
 pub fn visit_pre_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
     f(expr);
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_front() {
-            visit_pre_order_mut(child, f);
-        }
-    }
+    visit_children_mut(expr, |child| visit_pre_order_mut(child, f));
 }
 
-// Fallible post-order (bottom-up) traversal. Stops on first error.
-// Visits in natural program order (left-to-right).
-// Equivalent to old: ExprVisitor::bottom_up(expr) + pop_front()
+// Fallible post-order: children first, then parent. Stops on first error.
 pub fn try_visit_post_order_mut<E>(
     expr: &mut Expr,
     f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
 ) -> Result<(), E> {
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_front() {
-            try_visit_post_order_mut(child, f)?;
-        }
-    }
+    try_visit_children_mut(expr, |child| try_visit_post_order_mut(child, f))?;
     f(expr)
 }
 
-// Fallible post-order (bottom-up) traversal in reversed order.
-// Equivalent to old: ExprVisitor::bottom_up(expr) + pop_back()
+// Fallible pre-order reversed: parent first, then children right-to-left.
 pub fn try_visit_post_order_rev_mut<E>(
     expr: &mut Expr,
     f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
 ) -> Result<(), E> {
     f(expr)?;
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_back() {
-            try_visit_post_order_rev_mut(child, f)?;
-        }
-    }
-    Ok(())
+    try_visit_children_rev_mut(expr, |child| try_visit_post_order_rev_mut(child, f))
 }
 
-// Fallible pre-order (top-down) traversal. Stops on first error.
-// Equivalent to old: ExprVisitor::top_down(expr) + pop_front()
+// Fallible pre-order: parent first, then children left-to-right.
 pub fn try_visit_pre_order_mut<E>(
     expr: &mut Expr,
     f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
 ) -> Result<(), E> {
     f(expr)?;
-    {
-        let mut children = VecDeque::new();
-        collect_children_mut(expr, &mut children);
-        while let Some(child) = children.pop_front() {
-            try_visit_pre_order_mut(child, f)?;
-        }
-    }
-    Ok(())
+    try_visit_children_mut(expr, |child| try_visit_pre_order_mut(child, f))
 }
 
-// Immutable post-order traversal for read-only inspection.
+// Immutable post-order traversal.
 pub fn visit_post_order<'a>(expr: &'a Expr, f: &mut impl FnMut(&'a Expr)) {
+    visit_children(expr, |child| visit_post_order(child, f));
+    f(expr);
+}
+
+// Collect immediate children into a queue (used by visit_expr_nodes_lazy).
+pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut Expr>) {
     match expr {
-        Expr::Let { expr, .. } => visit_post_order(expr, f),
-        Expr::SelectField { expr, .. } => visit_post_order(expr, f),
+        Expr::Let { expr, .. } => queue.push_back(expr),
+        Expr::SelectField { expr, .. } => queue.push_back(expr),
         Expr::SelectIndex { expr, index, .. } => {
-            visit_post_order(expr, f);
-            visit_post_order(index, f);
+            queue.push_back(&mut *expr);
+            queue.push_back(&mut *index);
         }
-        Expr::Sequence { exprs, .. } => {
-            for e in exprs {
-                visit_post_order(e, f);
-            }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => queue.extend(exprs.iter_mut()),
+        Expr::Record { exprs, .. } => queue.extend(exprs.iter_mut().map(|(_, expr)| &mut **expr)),
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            queue.push_back(expr)
         }
-        Expr::Record { exprs, .. } => {
-            for (_, e) in exprs {
-                visit_post_order(e, f);
-            }
-        }
-        Expr::Tuple { exprs, .. } => {
-            for e in exprs {
-                visit_post_order(e, f);
-            }
-        }
-        Expr::Concat { exprs, .. } => {
-            for e in exprs {
-                visit_post_order(e, f);
-            }
-        }
-        Expr::ExprBlock { exprs, .. } => {
-            for e in exprs {
-                visit_post_order(e, f);
-            }
-        }
-        Expr::Not { expr, .. } => visit_post_order(expr, f),
-        Expr::Length { expr, .. } => visit_post_order(expr, f),
         Expr::GreaterThan { lhs, rhs, .. }
         | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
         | Expr::LessThanOrEqualTo { lhs, rhs, .. }
@@ -141,139 +81,13 @@ pub fn visit_post_order<'a>(expr: &'a Expr, f: &mut impl FnMut(&'a Expr)) {
         | Expr::LessThan { lhs, rhs, .. }
         | Expr::And { lhs, rhs, .. }
         | Expr::Or { lhs, rhs, .. } => {
-            visit_post_order(lhs, f);
-            visit_post_order(rhs, f);
+            queue.push_back(lhs);
+            queue.push_back(rhs);
         }
         Expr::Cond { cond, lhs, rhs, .. } => {
-            visit_post_order(cond, f);
-            visit_post_order(lhs, f);
-            visit_post_order(rhs, f);
-        }
-        Expr::PatternMatch {
-            predicate,
-            match_arms,
-            ..
-        } => {
-            visit_post_order(predicate, f);
-            for arm in match_arms {
-                for lit in arm.arm_pattern.get_expr_literals() {
-                    visit_post_order(lit, f);
-                }
-                visit_post_order(&arm.arm_resolution_expr, f);
-            }
-        }
-        Expr::Range { range, .. } => {
-            for e in range.get_exprs() {
-                visit_post_order(e, f);
-            }
-        }
-        Expr::Option {
-            expr: Some(expr), ..
-        } => visit_post_order(expr, f),
-        Expr::Result { expr: Ok(expr), .. } => visit_post_order(expr, f),
-        Expr::Result {
-            expr: Err(expr), ..
-        } => visit_post_order(expr, f),
-        Expr::Call { args, .. } => {
-            for arg in args {
-                visit_post_order(arg, f);
-            }
-        }
-        Expr::Unwrap { expr, .. } => visit_post_order(expr, f),
-        Expr::ListComprehension {
-            iterable_expr,
-            yield_expr,
-            ..
-        } => {
-            visit_post_order(iterable_expr, f);
-            visit_post_order(yield_expr, f);
-        }
-        Expr::ListReduce {
-            iterable_expr,
-            init_value_expr,
-            yield_expr,
-            ..
-        } => {
-            visit_post_order(iterable_expr, f);
-            visit_post_order(init_value_expr, f);
-            visit_post_order(yield_expr, f);
-        }
-        Expr::InvokeMethodLazy { lhs, args, .. } => {
-            visit_post_order(lhs, f);
-            for arg in args {
-                visit_post_order(arg, f);
-            }
-        }
-        Expr::GetTag { expr, .. } => visit_post_order(expr, f),
-        Expr::Literal { .. }
-        | Expr::Number { .. }
-        | Expr::Flags { .. }
-        | Expr::Identifier { .. }
-        | Expr::Boolean { .. }
-        | Expr::Option { expr: None, .. }
-        | Expr::Throw { .. }
-        | Expr::GenerateWorkerName { .. } => {}
-    }
-    f(expr);
-}
-
-// Collect only the immediate children of an expression into the queue.
-// This is safe because siblings are disjoint borrows.
-pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut Expr>) {
-    match expr {
-        Expr::Let { expr, .. } => queue.push_back(&mut *expr),
-        Expr::SelectField { expr, .. } => queue.push_back(&mut *expr),
-        Expr::SelectIndex { expr, index, .. } => {
-            queue.push_back(&mut *expr);
-            queue.push_back(&mut *index);
-        }
-        Expr::Sequence { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::Record { exprs, .. } => queue.extend(exprs.iter_mut().map(|(_, expr)| &mut **expr)),
-        Expr::Tuple { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::Concat { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::ExprBlock { exprs, .. } => queue.extend(exprs.iter_mut()),
-        Expr::Not { expr, .. } => queue.push_back(&mut *expr),
-        Expr::Length { expr, .. } => queue.push_back(&mut *expr),
-        Expr::GreaterThan { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::GreaterThanOrEqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::LessThanOrEqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::EqualTo { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Plus { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Minus { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Divide { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Multiply { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::LessThan { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
-        }
-        Expr::Cond { cond, lhs, rhs, .. } => {
-            queue.push_back(&mut *cond);
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs);
+            queue.push_back(cond);
+            queue.push_back(lhs);
+            queue.push_back(rhs);
         }
         Expr::PatternMatch {
             predicate,
@@ -282,25 +96,24 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
         } => {
             queue.push_back(&mut *predicate);
             for arm in match_arms {
-                let arm_literal_expressions = arm.arm_pattern.get_expr_literals_mut();
-                queue.extend(arm_literal_expressions.into_iter().map(|x| x.as_mut()));
-                queue.push_back(&mut *arm.arm_resolution_expr);
+                for lit in arm.arm_pattern.get_expr_literals_mut() {
+                    queue.push_back(lit.as_mut());
+                }
+                queue.push_back(&mut arm.arm_resolution_expr);
             }
         }
-
         Expr::Range { range, .. } => {
-            for expr in range.get_exprs_mut() {
-                queue.push_back(&mut *expr);
+            for e in range.get_exprs_mut() {
+                queue.push_back(&mut *e);
             }
         }
-
         Expr::Option {
             expr: Some(expr), ..
-        } => queue.push_back(&mut *expr),
-        Expr::Result { expr: Ok(expr), .. } => queue.push_back(&mut *expr),
+        } => queue.push_back(expr),
+        Expr::Result { expr: Ok(expr), .. } => queue.push_back(expr),
         Expr::Result {
             expr: Err(expr), ..
-        } => queue.push_back(&mut *expr),
+        } => queue.push_back(expr),
         Expr::Call {
             call_type,
             args,
@@ -311,39 +124,24 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
             if let Some(exprs) = exprs {
                 queue.extend(exprs.iter_mut())
             }
-
             if let Some(worker) = worker {
                 queue.push_back(worker);
             }
-
             if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
                 if let Some(worker_expr) = instance_type.worker_mut() {
                     queue.push_back(worker_expr);
                 }
             }
-
             queue.extend(args.iter_mut())
         }
-        Expr::Unwrap { expr, .. } => queue.push_back(&mut *expr),
-        Expr::And { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs)
-        }
-
-        Expr::Or { lhs, rhs, .. } => {
-            queue.push_back(&mut *lhs);
-            queue.push_back(&mut *rhs)
-        }
-
         Expr::ListComprehension {
             iterable_expr,
             yield_expr,
             ..
         } => {
-            queue.push_back(&mut *iterable_expr);
-            queue.push_back(&mut *yield_expr);
+            queue.push_back(iterable_expr);
+            queue.push_back(yield_expr);
         }
-
         Expr::ListReduce {
             iterable_expr,
             init_value_expr,
@@ -354,7 +152,6 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
             queue.push_back(init_value_expr);
             queue.push_back(yield_expr);
         }
-
         Expr::InvokeMethodLazy {
             lhs,
             args,
@@ -366,23 +163,445 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
                     queue.push_back(worker_expr);
                 }
             }
-
             queue.push_back(lhs);
             queue.extend(args.iter_mut());
         }
+        Expr::GetTag { expr, .. } => queue.push_back(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
 
-        Expr::GetTag { expr, .. } => {
-            queue.push_back(&mut *expr);
+// --- Core child iteration ---
+
+fn visit_children_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(expr);
+            each(index);
         }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(lhs);
+            each(rhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(cond);
+            each(lhs);
+            each(rhs);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            each(predicate);
+            for arm in match_arms {
+                for lit in arm.arm_pattern.get_expr_literals_mut() {
+                    each(lit.as_mut());
+                }
+                each(&mut arm.arm_resolution_expr);
+            }
+        }
+        Expr::Range { range, .. } => {
+            for e in range.get_exprs_mut() {
+                each(&mut *e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call {
+            call_type,
+            args,
+            inferred_type,
+            ..
+        } => {
+            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            if let Some(exprs) = exprs {
+                for e in exprs {
+                    each(e);
+                }
+            }
+            if let Some(worker) = worker {
+                each(worker);
+            }
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(yield_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(init_value_expr);
+            each(yield_expr);
+        }
+        Expr::InvokeMethodLazy {
+            lhs,
+            args,
+            inferred_type,
+            ..
+        } => {
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            each(lhs);
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
 
-        Expr::Literal { .. } => {}
-        Expr::Number { .. } => {}
-        Expr::Flags { .. } => {}
-        Expr::Identifier { .. } => {}
-        Expr::Boolean { .. } => {}
-        Expr::Option { expr: None, .. } => {}
-        Expr::Throw { .. } => {}
-        Expr::GenerateWorkerName { .. } => {}
+fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(index);
+            each(expr);
+        }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs.iter_mut().rev() {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs.iter_mut().rev() {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(rhs);
+            each(lhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(rhs);
+            each(lhs);
+            each(cond);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            for arm in match_arms.iter_mut().rev() {
+                each(&mut arm.arm_resolution_expr);
+                for lit in arm.arm_pattern.get_expr_literals_mut().into_iter().rev() {
+                    each(lit.as_mut());
+                }
+            }
+            each(predicate);
+        }
+        Expr::Range { range, .. } => {
+            let mut exprs = range.get_exprs_mut();
+            exprs.reverse();
+            for e in exprs {
+                each(&mut *e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call {
+            call_type,
+            args,
+            inferred_type,
+            ..
+        } => {
+            for arg in args.iter_mut().rev() {
+                each(arg);
+            }
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            if let Some(worker) = worker {
+                each(worker);
+            }
+            if let Some(exprs) = exprs {
+                for e in exprs.iter_mut().rev() {
+                    each(e);
+                }
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(yield_expr);
+            each(iterable_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(yield_expr);
+            each(init_value_expr);
+            each(iterable_expr);
+        }
+        Expr::InvokeMethodLazy {
+            lhs,
+            args,
+            inferred_type,
+            ..
+        } => {
+            for arg in args.iter_mut().rev() {
+                each(arg);
+            }
+            each(lhs);
+            if let TypeInternal::Instance { instance_type } = inferred_type.inner.as_mut() {
+                if let Some(worker_expr) = instance_type.worker_mut() {
+                    each(worker_expr);
+                }
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
+    }
+}
+
+fn try_visit_children_mut<E>(
+    expr: &mut Expr,
+    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    // We need to propagate errors properly. Use a Cell to smuggle the
+    // error out of the infallible closure interface.
+    let mut err: Option<E> = None;
+    visit_children_mut(expr, |child| {
+        if err.is_none() {
+            if let Err(e) = each(child) {
+                err = Some(e);
+            }
+        }
+    });
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+fn try_visit_children_rev_mut<E>(
+    expr: &mut Expr,
+    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
+) -> Result<(), E> {
+    let mut err: Option<E> = None;
+    visit_children_rev_mut(expr, |child| {
+        if err.is_none() {
+            if let Err(e) = each(child) {
+                err = Some(e);
+            }
+        }
+    });
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+fn visit_children<'a>(expr: &'a Expr, mut each: impl FnMut(&'a Expr)) {
+    match expr {
+        Expr::Let { expr, .. } => each(expr),
+        Expr::SelectField { expr, .. } => each(expr),
+        Expr::SelectIndex { expr, index, .. } => {
+            each(expr);
+            each(index);
+        }
+        Expr::Sequence { exprs, .. }
+        | Expr::Tuple { exprs, .. }
+        | Expr::Concat { exprs, .. }
+        | Expr::ExprBlock { exprs, .. } => {
+            for e in exprs {
+                each(e);
+            }
+        }
+        Expr::Record { exprs, .. } => {
+            for (_, e) in exprs {
+                each(e);
+            }
+        }
+        Expr::Not { expr, .. } | Expr::Length { expr, .. } | Expr::Unwrap { expr, .. } => {
+            each(expr)
+        }
+        Expr::GreaterThan { lhs, rhs, .. }
+        | Expr::GreaterThanOrEqualTo { lhs, rhs, .. }
+        | Expr::LessThanOrEqualTo { lhs, rhs, .. }
+        | Expr::EqualTo { lhs, rhs, .. }
+        | Expr::Plus { lhs, rhs, .. }
+        | Expr::Minus { lhs, rhs, .. }
+        | Expr::Divide { lhs, rhs, .. }
+        | Expr::Multiply { lhs, rhs, .. }
+        | Expr::LessThan { lhs, rhs, .. }
+        | Expr::And { lhs, rhs, .. }
+        | Expr::Or { lhs, rhs, .. } => {
+            each(lhs);
+            each(rhs);
+        }
+        Expr::Cond { cond, lhs, rhs, .. } => {
+            each(cond);
+            each(lhs);
+            each(rhs);
+        }
+        Expr::PatternMatch {
+            predicate,
+            match_arms,
+            ..
+        } => {
+            each(predicate);
+            for arm in match_arms {
+                for lit in arm.arm_pattern.get_expr_literals() {
+                    each(lit);
+                }
+                each(&arm.arm_resolution_expr);
+            }
+        }
+        Expr::Range { range, .. } => {
+            for e in range.get_exprs() {
+                each(e);
+            }
+        }
+        Expr::Option {
+            expr: Some(expr), ..
+        } => each(expr),
+        Expr::Result { expr: Ok(expr), .. } => each(expr),
+        Expr::Result {
+            expr: Err(expr), ..
+        } => each(expr),
+        Expr::Call { args, .. } => {
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::ListComprehension {
+            iterable_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(yield_expr);
+        }
+        Expr::ListReduce {
+            iterable_expr,
+            init_value_expr,
+            yield_expr,
+            ..
+        } => {
+            each(iterable_expr);
+            each(init_value_expr);
+            each(yield_expr);
+        }
+        Expr::InvokeMethodLazy { lhs, args, .. } => {
+            each(lhs);
+            for arg in args {
+                each(arg);
+            }
+        }
+        Expr::GetTag { expr, .. } => each(expr),
+        Expr::Literal { .. }
+        | Expr::Number { .. }
+        | Expr::Flags { .. }
+        | Expr::Identifier { .. }
+        | Expr::Boolean { .. }
+        | Expr::Option { expr: None, .. }
+        | Expr::Throw { .. }
+        | Expr::GenerateWorkerName { .. } => {}
     }
 }
 
