@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
 use crate::FunctionName;
 use crate::{
     ComponentDependencies, ComponentDependencyKey, Expr, FullyQualifiedResourceConstructor,
-    FunctionDictionary, FunctionType, InferredType, ResourceMethodDictionary,
+    FunctionDictionary, FunctionType, ResourceMethodDictionary,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::TryFrom;
+
 use std::fmt::Debug;
 use std::ops::Deref;
 

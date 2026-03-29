@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::call_type::{CallType, InstanceCreationType};
+use crate::call_type::CallType;
 use crate::generic_type_parameter::GenericTypeParameter;
 use crate::inferred_type::{DefaultType, TypeOrigin};
 use crate::parser::block::block;
@@ -23,10 +23,10 @@ use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{
     from_string, text, type_checker, type_inference, ComponentDependencies, ComponentDependencyKey,
     CustomInstanceSpec, DynamicParsedFunctionName, ExprVisitor, GlobalVariableTypeSpec,
-    InferredType, InstanceIdentifier, ParsedFunctionName, VariableId,
+    InferredType, InstanceIdentifier, VariableId,
 };
 use crate::{IntoValueAndType, ValueAndType};
-use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
+use bigdecimal::{BigDecimal, ToPrimitive};
 use combine::parser::char::spaces;
 use combine::stream::position;
 use combine::Parser;
@@ -36,7 +36,6 @@ use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Deref;
-use std::str::FromStr;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {

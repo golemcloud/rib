@@ -3,8 +3,7 @@ use crate::analysis::{
     TypeResult, TypeTuple, TypeVariant,
 };
 use std::borrow::Cow;
-use std::fmt::Display;
-use wasm_wave::wasm::{DisplayType, WasmFunc, WasmType, WasmTypeKind};
+use wasm_wave::wasm::{WasmFunc, WasmType, WasmTypeKind};
 
 impl WasmType for AnalysedType {
     fn kind(&self) -> WasmTypeKind {
@@ -127,55 +126,5 @@ impl WasmFunc for AnalysedFunction {
 
     fn results(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
         Box::new(self.result.iter().map(|r| r.typ.clone()))
-    }
-}
-
-pub struct DisplayNamedFunc<T: WasmFunc> {
-    pub name: String,
-    pub func: T,
-}
-
-impl<T: WasmFunc> Display for DisplayNamedFunc<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.name)?;
-        f.write_str("(")?;
-        let mut param_names = self.func.param_names();
-        for (idx, ty) in self.func.params().enumerate() {
-            if idx != 0 {
-                f.write_str(", ")?;
-            }
-            if let Some(name) = param_names.next() {
-                write!(f, "{name}: ")?;
-            }
-            DisplayType(&ty).fmt(f)?
-        }
-        f.write_str(")")?;
-
-        let results = self.func.results().collect::<Vec<_>>();
-        if results.is_empty() {
-            return Ok(());
-        }
-
-        let mut result_names = self.func.result_names();
-        if results.len() == 1 {
-            let ty = DisplayType(&results.into_iter().next().unwrap()).to_string();
-            if let Some(name) = result_names.next() {
-                write!(f, " -> ({name}: {ty})")
-            } else {
-                write!(f, " -> {ty}")
-            }
-        } else {
-            f.write_str(" -> (")?;
-            for (idx, ty) in results.into_iter().enumerate() {
-                if idx != 0 {
-                    f.write_str(", ")?;
-                }
-                if let Some(name) = result_names.next() {
-                    write!(f, "{name}: ")?;
-                }
-                DisplayType(&ty).fmt(f)?;
-            }
-            f.write_str(")")
-        }
     }
 }
