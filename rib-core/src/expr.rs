@@ -871,14 +871,6 @@ impl Expr {
         )
     }
 
-    pub fn bind_global_variable_types(&mut self, type_spec: &Vec<GlobalVariableTypeSpec>) {
-        type_inference::bind_global_variable_types(self, type_spec)
-    }
-
-    pub fn bind_instance_types(&mut self) {
-        type_inference::bind_instance_types(self)
-    }
-
     pub fn literal(value: impl AsRef<str>) -> Self {
         let default_type = DefaultType::String;
 
@@ -1296,14 +1288,6 @@ impl Expr {
         ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
         *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
-    }
-
-    pub fn ensure_stateful_instance(&mut self) {
-        type_inference::ensure_stateful_instance(self)
-    }
-
-    pub fn infer_global_inputs(&mut self) {
-        type_inference::infer_global_inputs(self);
     }
 
     pub fn bind_type_annotations(&mut self) {
@@ -1778,14 +1762,6 @@ impl Expr {
                 *inferred_type = new_inferred_type;
             }
         }
-    }
-
-    pub fn infer_enums(&mut self, component_dependency: &ComponentDependencies) {
-        type_inference::infer_enums(self, component_dependency);
-    }
-
-    pub fn infer_variants(&mut self, component_dependency: &ComponentDependencies) {
-        type_inference::infer_variants(self, component_dependency);
     }
 
     pub fn visit_expr_nodes_lazy<'a>(&'a mut self, queue: &mut VecDeque<&'a mut Expr>) {

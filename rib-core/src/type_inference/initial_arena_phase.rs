@@ -35,18 +35,18 @@ pub fn run_initial_binding_and_instance_phases(
         global_variable_type_spec,
     );
     ti::type_annotation_binding::lowered::bind_type_annotations(root, arena, types);
-    ti::variable_binding::bind_variables_of_list_comprehension_lowered(root, arena, types);
-    ti::variable_binding::bind_variables_of_list_reduce_lowered(root, arena, types);
-    ti::variable_binding::bind_variables_of_pattern_match_lowered(root, arena, types);
-    ti::variable_binding::bind_variables_of_let_assignment_lowered(root, arena, types);
-    ti::identify_instance_creation::identify_instance_creation_lowered(
+    ti::variable_binding::bind_variables_of_list_comprehension(root, arena, types);
+    ti::variable_binding::bind_variables_of_list_reduce(root, arena, types);
+    ti::variable_binding::bind_variables_of_pattern_match(root, arena, types);
+    ti::variable_binding::bind_variables_of_let_assignment(root, arena, types);
+    ti::identify_instance_creation::identify_instance_creation(
         root,
         arena,
         types,
         component_dependency,
         custom_instance_spec,
     )?;
-    ti::stateful_instance::ensure_stateful_instance_lowered(root, arena, types);
+    ti::stateful_instance::ensure_stateful_instance(root, arena, types);
     ti::type_annotation_binding::lowered::set_origin(root, arena, types);
     Ok(())
 }

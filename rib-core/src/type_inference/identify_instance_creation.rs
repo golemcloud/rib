@@ -27,8 +27,7 @@ use crate::expr_arena::{
 };
 use crate::type_inference::expr_visitor::arena::children_of;
 
-/// Arena version of `identify_instance_creation`.
-pub fn identify_instance_creation_lowered(
+pub fn identify_instance_creation(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

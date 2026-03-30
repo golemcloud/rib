@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    visit_post_order_mut, visit_pre_order_mut, ArmPattern, Expr, MatchArm, MatchIdentifier,
-    VariableId,
-};
+use crate::{MatchIdentifier, VariableId};
 use std::collections::HashMap;
 
 use crate::expr_arena::{
@@ -23,231 +20,13 @@ use crate::expr_arena::{
 };
 use crate::type_inference::expr_visitor::arena::children_of;
 
-// This function will assign ids to variables declared with `let` expressions,
-// and propagate these ids to the usage sites (`Expr::Identifier` nodes).
-pub fn bind_variables_of_let_assignment(expr: &mut Expr) {
-    let mut identifier_id_state = IdentifierVariableIdState::new();
-    visit_post_order_mut(expr, &mut |expr| {
-        match expr {
-            Expr::Let { variable_id, .. } => {
-                let field_name = variable_id.name();
-                identifier_id_state.update_variable_id(&field_name); // Increment the variable_id
-                if let Some(latest_variable_id) = identifier_id_state.lookup(&field_name) {
-                    *variable_id = latest_variable_id.clone();
-                }
-            }
-
-            Expr::Identifier { variable_id, .. } if !variable_id.is_match_binding() => {
-                let field_name = variable_id.name();
-                if let Some(latest_variable_id) = identifier_id_state.lookup(&field_name) {
-                    *variable_id = latest_variable_id.clone();
-                }
-            }
-            _ => {}
-        }
-    });
-}
-
-pub fn bind_variables_of_list_comprehension(expr: &mut Expr) {
-    visit_pre_order_mut(expr, &mut |expr| {
-        if let Expr::ListComprehension {
-            iterated_variable,
-            yield_expr,
-            ..
-        } = expr
-        {
-            *iterated_variable =
-                VariableId::list_comprehension_identifier(iterated_variable.name());
-
-            process_yield_expr_in_comprehension(iterated_variable, yield_expr)
-        }
-    });
-}
-
-pub fn bind_variables_of_list_reduce(expr: &mut Expr) {
-    visit_pre_order_mut(expr, &mut |expr| {
-        if let Expr::ListReduce {
-            reduce_variable,
-            iterated_variable,
-            yield_expr,
-            ..
-        } = expr
-        {
-            // While parser may update this directly, type inference phase
-            // still ensures that these variables are tagged to its appropriately
-            *iterated_variable =
-                VariableId::list_comprehension_identifier(iterated_variable.name());
-
-            *reduce_variable = VariableId::list_reduce_identifier(reduce_variable.name());
-
-            process_yield_expr_in_reduce(reduce_variable, iterated_variable, yield_expr)
-        }
-    });
-}
-
-pub fn bind_variables_of_pattern_match(expr: &mut Expr) {
-    bind_variables_in_pattern_match_internal(expr, 0, &mut []);
-}
-
-fn bind_variables_in_pattern_match_internal(
-    expr: &mut Expr,
-    previous_index: usize,
-    match_identifiers: &mut [MatchIdentifier],
-) -> usize {
-    let mut index = previous_index;
-    let mut shadowed_let_binding = vec![];
-
-    visit_pre_order_mut(expr, &mut |expr| {
-        match expr {
-            Expr::PatternMatch { match_arms, .. } => {
-                for arm in match_arms {
-                    // We increment the index for each arm regardless of whether there is an identifier exist or not
-                    index += 1;
-                    let latest = process_arm(arm, index);
-                    // An arm can increment the index if there are nested pattern match arms, and therefore
-                    // set it to the latest max.
-                    index = latest
-                }
-            }
-            Expr::Let { variable_id, .. } => {
-                shadowed_let_binding.push(variable_id.name());
-            }
-            Expr::Identifier { variable_id, .. } => {
-                let identifier_name = variable_id.name();
-                if let Some(x) = match_identifiers.iter().find(|x| x.name == identifier_name) {
-                    if !shadowed_let_binding.contains(&identifier_name) {
-                        *variable_id = VariableId::MatchIdentifier(x.clone());
-                    }
-                }
-            }
-
-            _ => {}
-        }
-    });
-
-    index
-}
-
-fn process_arm(match_arm: &mut MatchArm, global_arm_index: usize) -> usize {
-    let match_arm_pattern = &mut match_arm.arm_pattern;
-
-    pub fn go(
-        arm_pattern: &mut ArmPattern,
-        global_arm_index: usize,
-        match_identifiers: &mut Vec<MatchIdentifier>,
-    ) {
-        match arm_pattern {
-            ArmPattern::Literal(expr) => {
-                let new_match_identifiers =
-                    update_all_identifier_in_lhs_expr(expr, global_arm_index);
-                match_identifiers.extend(new_match_identifiers);
-            }
-
-            ArmPattern::WildCard => {}
-            ArmPattern::As(name, arm_pattern) => {
-                let match_identifier = MatchIdentifier::new(name.clone(), global_arm_index);
-                match_identifiers.push(match_identifier);
-
-                go(arm_pattern, global_arm_index, match_identifiers);
-            }
-
-            ArmPattern::Constructor(_, arm_patterns) => {
-                for arm_pattern in arm_patterns {
-                    go(arm_pattern, global_arm_index, match_identifiers);
-                }
-            }
-
-            ArmPattern::TupleConstructor(arm_patterns) => {
-                for arm_pattern in arm_patterns {
-                    go(arm_pattern, global_arm_index, match_identifiers);
-                }
-            }
-
-            ArmPattern::ListConstructor(arm_patterns) => {
-                for arm_pattern in arm_patterns {
-                    go(arm_pattern, global_arm_index, match_identifiers);
-                }
-            }
-
-            ArmPattern::RecordConstructor(fields) => {
-                for (_, arm_pattern) in fields {
-                    go(arm_pattern, global_arm_index, match_identifiers);
-                }
-            }
-        }
-    }
-
-    let mut match_identifiers = vec![];
-
-    // Recursively identify the arm within an arm literal
-    go(match_arm_pattern, global_arm_index, &mut match_identifiers);
-
-    let resolution_expression = &mut *match_arm.arm_resolution_expr;
-
-    // Continue with original pattern_match_name_binding for resolution expressions
-    // to target nested pattern matching.
-    bind_variables_in_pattern_match_internal(
-        resolution_expression,
-        global_arm_index,
-        &mut match_identifiers,
-    )
-}
-
-fn update_all_identifier_in_lhs_expr(
-    expr: &mut Expr,
-    global_arm_index: usize,
-) -> Vec<MatchIdentifier> {
-    let mut identifier_names = vec![];
-    visit_post_order_mut(expr, &mut |expr| {
-        if let Expr::Identifier { variable_id, .. } = expr {
-            let match_identifier = MatchIdentifier::new(variable_id.name(), global_arm_index);
-            identifier_names.push(match_identifier);
-            let new_variable_id =
-                VariableId::match_identifier(variable_id.name(), global_arm_index);
-            *variable_id = new_variable_id;
-        }
-    });
-
-    identifier_names
-}
-
-fn process_yield_expr_in_comprehension(variable: &mut VariableId, yield_expr: &mut Expr) {
-    visit_pre_order_mut(yield_expr, &mut |expr| {
-        if let Expr::Identifier { variable_id, .. } = expr {
-            if variable.name() == variable_id.name() {
-                *variable_id = variable.clone();
-            }
-        }
-    });
-}
-
-fn process_yield_expr_in_reduce(
-    reduce_variable: &mut VariableId,
-    iterated_variable_id: &mut VariableId,
-    yield_expr: &mut Expr,
-) {
-    visit_pre_order_mut(yield_expr, &mut |expr| {
-        if let Expr::Identifier { variable_id, .. } = expr {
-            if iterated_variable_id.name() == variable_id.name() {
-                *variable_id = iterated_variable_id.clone();
-            } else if reduce_variable.name() == variable_id.name() {
-                *variable_id = reduce_variable.clone()
-            }
-        }
-    });
-}
-
 // -----------------------------------------------------------------------
 // bind_variables_of_let_assignment
 // -----------------------------------------------------------------------
 
 /// Arena version: assigns local `VariableId`s to `Let` nodes and propagates
 /// them to matching `Identifier` use-sites.
-pub fn bind_variables_of_let_assignment_lowered(
-    root: ExprId,
-    arena: &mut ExprArena,
-    _types: &TypeTable,
-) {
+pub fn bind_variables_of_let_assignment(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
     let mut state: HashMap<String, VariableId> = HashMap::new();
 
     // Post-order: children before parents — so identifiers inside a let's
@@ -293,7 +72,7 @@ pub fn bind_variables_of_let_assignment_lowered(
 // bind_variables_of_list_comprehension
 // -----------------------------------------------------------------------
 
-pub fn bind_variables_of_list_comprehension_lowered(
+pub fn bind_variables_of_list_comprehension(
     root: ExprId,
     arena: &mut ExprArena,
     _types: &TypeTable,
@@ -332,11 +111,7 @@ pub fn bind_variables_of_list_comprehension_lowered(
 // bind_variables_of_list_reduce
 // -----------------------------------------------------------------------
 
-pub fn bind_variables_of_list_reduce_lowered(
-    root: ExprId,
-    arena: &mut ExprArena,
-    _types: &TypeTable,
-) {
+pub fn bind_variables_of_list_reduce(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
     let mut order = Vec::new();
     collect_pre_order(root, arena, &mut order);
 
@@ -378,11 +153,7 @@ pub fn bind_variables_of_list_reduce_lowered(
 // bind_variables_of_pattern_match
 // -----------------------------------------------------------------------
 
-pub fn bind_variables_of_pattern_match_lowered(
-    root: ExprId,
-    arena: &mut ExprArena,
-    _types: &TypeTable,
-) {
+pub fn bind_variables_of_pattern_match(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
     bind_pattern_match_internal(root, arena, 0, &mut []);
 }
 
@@ -577,27 +348,6 @@ fn collect_pre_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
     }
 }
 
-struct IdentifierVariableIdState(HashMap<String, VariableId>);
-
-impl IdentifierVariableIdState {
-    fn new() -> Self {
-        IdentifierVariableIdState(HashMap::new())
-    }
-
-    fn update_variable_id(&mut self, name: &str) {
-        self.0
-            .entry(name.to_string())
-            .and_modify(|x| {
-                *x = x.increment_local_variable_id();
-            })
-            .or_insert_with(|| VariableId::local(name, 0));
-    }
-
-    fn lookup(&self, name: &str) -> Option<&VariableId> {
-        self.0.get(name)
-    }
-}
-
 #[cfg(test)]
 mod name_binding_tests {
     use bigdecimal::BigDecimal;
@@ -610,13 +360,13 @@ mod name_binding_tests {
     /// Same pipeline as [`crate::type_inference::initial_arena_phase`]: lower → arena bind → rebuild.
     fn bind_let_assignment_via_arena(expr: &mut Expr) {
         let (mut arena, types, root) = crate::expr_arena::lower(expr);
-        super::bind_variables_of_let_assignment_lowered(root, &mut arena, &types);
+        super::bind_variables_of_let_assignment(root, &mut arena, &types);
         *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
     }
 
     fn bind_pattern_match_via_arena(expr: &mut Expr) {
         let (mut arena, types, root) = crate::expr_arena::lower(expr);
-        super::bind_variables_of_pattern_match_lowered(root, &mut arena, &types);
+        super::bind_variables_of_pattern_match(root, &mut arena, &types);
         *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
     }
 
