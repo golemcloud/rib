@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{visit_pre_order_mut, Expr, InferredType, TypeInternal, TypeOrigin};
-use std::collections::HashMap;
+use crate::Expr;
 
 // This is about binding the `InstanceType` to the corresponding identifiers.
 //
@@ -32,11 +31,75 @@ use std::collections::HashMap;
 //
 // In this case `foo` in `foo` should have inferred type of `String` and not `InstanceType`
 pub mod arena {
-    use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
+    use crate::expr_arena::{
+        rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
+        InstanceIdentifierNode, TypeTable,
+    };
     use crate::instance_type::InstanceType;
     use crate::type_inference::expr_visitor::arena::children_of;
     use crate::{InferredType, TypeInternal, TypeOrigin, VariableId};
     use std::collections::HashMap;
+
+    /// Copies the worker-name expression from the arena-backed [`CallTypeNode`]
+    /// into [`InstanceType::worker_name`] for every `Call` whose type is
+    /// [`TypeInternal::Instance`].
+    ///
+    /// [`InstanceType`] stores `Option<Box<Expr>>` for worker names; during
+    /// arena inference those can diverge from the canonical subtree referenced
+    /// by [`ExprId`] in the call node (for example after
+    /// [`super::super::stateful_instance::arena::ensure_stateful_instance`]).
+    /// This pass aligns `TypeTable` with what [`rebuild_expr`] will produce.
+    pub fn sync_embedded_worker_exprs_from_calls(
+        root: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+    ) {
+        let mut order = Vec::new();
+        collect_pre_order(root, arena, &mut order);
+
+        for id in order {
+            if !matches!(types.get(id).internal_type(), TypeInternal::Instance { .. }) {
+                continue;
+            }
+            let kind = arena.expr(id).kind.clone();
+            let ExprKind::Call { call_type, .. } = kind else {
+                continue;
+            };
+            let Some(wn_id) = worker_name_expr_id_from_call_node(&call_type) else {
+                continue;
+            };
+            let worker_expr = rebuild_expr(wn_id, arena, types);
+            let mut updated = types.get(id).clone();
+            if let TypeInternal::Instance { instance_type } = updated.internal_type_mut() {
+                instance_type.set_worker_name(worker_expr);
+            }
+            types.set(id, updated);
+        }
+    }
+
+    fn worker_name_expr_id_from_call_node(ct: &CallTypeNode) -> Option<ExprId> {
+        match ct {
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                worker_name: Some(id),
+                ..
+            }) => Some(*id),
+            CallTypeNode::Function {
+                instance_identifier: Some(ii),
+                ..
+            } => match ii {
+                InstanceIdentifierNode::WitWorker {
+                    worker_name: Some(id),
+                    ..
+                }
+                | InstanceIdentifierNode::WitResource {
+                    worker_name: Some(id),
+                    ..
+                } => Some(*id),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 
     /// Arena version: propagates `InstanceType` from `Let` bindings to
     /// all matching `Identifier` use-sites.
@@ -88,31 +151,7 @@ pub mod arena {
 }
 
 pub fn bind_instance_types(expr: &mut Expr) {
-    let mut instance_variables = HashMap::new();
-
-    visit_pre_order_mut(expr, &mut |expr| match expr {
-        Expr::Let {
-            variable_id, expr, ..
-        } => {
-            if let TypeInternal::Instance { instance_type } = expr.inferred_type().internal_type() {
-                instance_variables.insert(variable_id.clone(), instance_type.clone());
-            }
-        }
-        Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } => {
-            if let Some(new_inferred_type) = instance_variables.get(variable_id) {
-                *inferred_type = InferredType::new(
-                    TypeInternal::Instance {
-                        instance_type: new_inferred_type.clone(),
-                    },
-                    TypeOrigin::NoOrigin,
-                );
-            }
-        }
-
-        _ => {}
-    });
+    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
+    arena::bind_instance_types(root, &expr_arena, &mut types);
+    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }

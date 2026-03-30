@@ -15,80 +15,14 @@
 use crate::{ComponentDependencies, Expr};
 
 pub fn infer_enums(expr: &mut Expr, component_dependencies: &ComponentDependencies) {
-    let eum_info = internal::get_enum_info(expr, component_dependencies);
-
-    internal::convert_identifiers_to_enum_function_calls(expr, &eum_info);
-}
-
-mod internal {
-    use crate::analysis::AnalysedType;
-    use crate::call_type::CallType;
-    use crate::{visit_post_order_rev_mut, ComponentDependencies, Expr};
-
-    pub(crate) fn convert_identifiers_to_enum_function_calls(
-        expr: &mut Expr,
-        enum_info: &EnumInfo,
-    ) {
-        let enum_cases = enum_info.clone();
-
-        visit_post_order_rev_mut(expr, &mut |expr| {
-            if let Expr::Identifier {
-                variable_id,
-                inferred_type,
-                source_span,
-                type_annotation,
-            } = expr
-            {
-                if enum_cases.cases.contains(&variable_id.name()) && !variable_id.is_local() {
-                    *expr = Expr::Call {
-                        call_type: CallType::EnumConstructor(variable_id.name()),
-                        generic_type_parameter: None,
-                        args: vec![],
-                        inferred_type: inferred_type.clone(),
-                        source_span: source_span.clone(),
-                        type_annotation: type_annotation.clone(),
-                    };
-                }
-            }
-        });
-    }
-
-    pub(crate) fn get_enum_info(
-        expr: &mut Expr,
-        component_dependency: &ComponentDependencies,
-    ) -> EnumInfo {
-        let mut enum_cases = vec![];
-        visit_post_order_rev_mut(expr, &mut |expr| {
-            if let Expr::Identifier {
-                variable_id,
-                inferred_type,
-                ..
-            } = expr
-            {
-                // If variable is local, it takes priority over being a global enum
-                if !variable_id.is_local() {
-                    // Retrieve the possible no-arg variant from the registry
-                    let result = component_dependency
-                        .function_dictionary()
-                        .iter()
-                        .find_map(|x| x.get_enum_info(variable_id.name().as_str()));
-
-                    if let Some(typed_enum) = result {
-                        enum_cases.push(variable_id.name());
-                        *inferred_type =
-                            inferred_type.merge((&AnalysedType::Enum(typed_enum.clone())).into());
-                    }
-                }
-            }
-        });
-
-        EnumInfo { cases: enum_cases }
-    }
-
-    #[derive(Debug, Clone)]
-    pub(crate) struct EnumInfo {
-        cases: Vec<String>,
-    }
+    let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
+    arena::infer_enums(
+        root,
+        &mut expr_arena,
+        &mut types,
+        component_dependencies,
+    );
+    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 
 pub mod arena {

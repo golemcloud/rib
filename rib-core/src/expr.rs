@@ -1223,20 +1223,17 @@ impl Expr {
         ti::global_input_inference::arena::infer_global_inputs(root, &arena, &mut types);
         ti::identifier_inference::arena::infer_all_identifiers(root, &arena, &mut types);
 
+        // Align InstanceType.worker_name with arena worker subtrees, then
+        // propagate instance types to identifiers (single implementation path).
+        ti::instance_type_binding::arena::sync_embedded_worker_exprs_from_calls(
+            root, &arena, &mut types,
+        );
+        ti::instance_type_binding::arena::bind_instance_types(root, &arena, &mut types);
+
         // ── Rebuild ────────────────────────────────────────────────────────
         // Convert the arena back into a single Expr tree that carries all
         // inferred types and structural mutations from the arena passes.
         *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
-
-        // ── Post-rebuild Expr passes ──────────────────────────────────────
-        // InstanceType contains embedded Box<Expr> worker_name nodes that the
-        // arena cannot track. These Expr-level passes propagate types into
-        // those embedded trees so that check_types/unify_types see correct types.
-        self.push_types_down()?;
-        self.pull_types_up(component_dependency)?;
-        self.infer_global_inputs();
-        self.infer_all_identifiers();
-        self.bind_instance_types();
 
         // ── Validation ────────────────────────────────────────────────────
         self.check_types(component_dependency)?;

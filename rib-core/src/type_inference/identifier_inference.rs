@@ -12,106 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    visit_post_order_rev_mut, visit_pre_order_mut, ArmPattern, Expr, InferredType, MatchArm,
-    VariableId,
-};
+use crate::{Expr, InferredType, VariableId};
 use std::collections::HashMap;
 
 pub fn infer_all_identifiers(expr: &mut Expr) {
-    // We scan top-down and bottom-up to inform the type between the identifiers
-    // It doesn't matter which order we do it in (i.e, which identifier expression has the right type isn't a problem),
-    // as we accumulate all the types in both directions
-    infer_all_identifiers_bottom_up(expr);
-    infer_all_identifiers_top_down(expr);
-    infer_match_binding_variables(expr);
-}
-
-fn infer_all_identifiers_bottom_up(expr: &mut Expr) {
-    let mut identifier_lookup = IdentifierTypeState::new();
-
-    // Given
-    //   `Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))`
-    // Expr::Num(1)
-    // Expr::Let(Variable(x), Expr::Num(1))
-    // Expr::Identifier(x)
-    // Expr::Call(func, Expr::Identifier(x))
-    // Expr::Block(Expr::Let(x, Expr::Num(1)), Expr::Call(func, x))
-
-    // Popping it from the back results in `Expr::Identifier(x)` to be processed first
-    // in the above example.
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        match expr {
-            // If identifier is inferred (probably because it was part of a function call befre),
-            // make sure to update the identifier inference lookup table.
-            // If lookup table is already updated, merge the inferred type
-            Expr::Identifier {
-                variable_id,
-                inferred_type,
-                ..
-            } => {
-                if let Some(new_inferred_type) = identifier_lookup.lookup(variable_id) {
-                    *inferred_type = inferred_type.merge(new_inferred_type)
-                }
-
-                identifier_lookup.update(variable_id.clone(), inferred_type.clone());
-            }
-
-            // In the above example `let x = 1`,
-            // since `x` is already inferred before, we propagate the type to the expression to `1`.
-            // Also if `1` is already inferred we update the identifier lookup table with x's type as 1's type
-            Expr::Let {
-                variable_id, expr, ..
-            } => {
-                if let Some(inferred_type) = identifier_lookup.lookup(variable_id) {
-                    expr.add_infer_type_mut(inferred_type);
-                }
-                identifier_lookup.update(variable_id.clone(), expr.inferred_type());
-            }
-
-            _ => {}
-        }
-    });
-}
-
-// This is more of an optional stage, as bottom-up type propagation would be enough
-// but helps with reaching early fix point later down the line of compilation phases
-fn infer_all_identifiers_top_down(expr: &mut Expr) {
-    let mut identifier_lookup = IdentifierTypeState::new();
-    visit_pre_order_mut(expr, &mut |expr| match expr {
-        Expr::Let {
-            variable_id, expr, ..
-        } => {
-            if let Some(inferred_type) = identifier_lookup.lookup(variable_id) {
-                expr.add_infer_type_mut(inferred_type);
-            }
-
-            identifier_lookup.update(variable_id.clone(), expr.inferred_type());
-        }
-        Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } => {
-            if let Some(new_inferred_type) = identifier_lookup.lookup(variable_id) {
-                *inferred_type = inferred_type.merge(new_inferred_type)
-            }
-
-            identifier_lookup.update(variable_id.clone(), inferred_type.clone());
-        }
-
-        _ => {}
-    });
-}
-
-fn infer_match_binding_variables(expr: &mut Expr) {
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::PatternMatch { match_arms, .. } = expr {
-            for arm in match_arms {
-                process_arm(arm)
-            }
-        }
-    });
+    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
+    arena::infer_all_identifiers(root, &expr_arena, &mut types);
+    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 
 // A state that maps from the identifiers to the types inferred
@@ -133,76 +40,6 @@ impl IdentifierTypeState {
     pub fn lookup(&self, id: &VariableId) -> Option<InferredType> {
         self.0.get(id).cloned()
     }
-}
-
-fn process_arm(arm: &mut MatchArm) {
-    let arm_pattern = &mut arm.arm_pattern;
-    let mut initial_set = IdentifierTypeState::new();
-    collect_all_identifiers(arm_pattern, &mut initial_set);
-    let arm_resolution = &mut arm.arm_resolution_expr;
-
-    update_arm_resolution_expr_with_identifiers(arm_resolution, &initial_set);
-}
-
-fn collect_all_identifiers(pattern: &mut ArmPattern, state: &mut IdentifierTypeState) {
-    match pattern {
-        ArmPattern::WildCard => {}
-        ArmPattern::As(_, arm_pattern) => collect_all_identifiers(arm_pattern, state),
-        ArmPattern::Constructor(_, patterns) => {
-            for pattern in patterns {
-                collect_all_identifiers(pattern, state)
-            }
-        }
-        ArmPattern::TupleConstructor(patterns) => {
-            for pattern in patterns {
-                collect_all_identifiers(pattern, state)
-            }
-        }
-        ArmPattern::ListConstructor(patterns) => {
-            for pattern in patterns {
-                collect_all_identifiers(pattern, state)
-            }
-        }
-        ArmPattern::RecordConstructor(fields) => {
-            for (_, pattern) in fields {
-                collect_all_identifiers(pattern, state)
-            }
-        }
-        ArmPattern::Literal(expr) => accumulate_types_of_identifiers(&mut *expr, state),
-    }
-}
-
-fn accumulate_types_of_identifiers(expr: &mut Expr, state: &mut IdentifierTypeState) {
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } = expr
-        {
-            if !inferred_type.is_unknown() {
-                state.update(variable_id.clone(), inferred_type.clone())
-            }
-        }
-    });
-}
-
-fn update_arm_resolution_expr_with_identifiers(
-    arm_resolution: &mut Expr,
-    state: &IdentifierTypeState,
-) {
-    visit_post_order_rev_mut(arm_resolution, &mut |expr| match expr {
-        Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } if variable_id.is_match_binding() => {
-            if let Some(new_inferred_type) = state.lookup(variable_id) {
-                *inferred_type = inferred_type.merge(new_inferred_type)
-            }
-        }
-        _ => {}
-    });
 }
 
 pub mod arena {
