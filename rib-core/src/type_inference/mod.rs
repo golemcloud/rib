@@ -49,6 +49,7 @@ pub(crate) mod global_variable_type_binding;
 pub(crate) mod identifier_inference;
 pub(crate) mod identify_instance_creation;
 pub(crate) mod index_selection_type_binding;
+pub(crate) mod initial_arena_phase;
 mod inference_fix_point;
 mod inferred_expr;
 pub(crate) mod instance_type_binding;

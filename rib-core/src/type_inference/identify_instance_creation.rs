@@ -25,9 +25,9 @@ use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
 
 pub mod arena {
     use crate::analysis::AnalysedType;
-    use crate::call_type::{CallType, InstanceCreationType};
+    use crate::call_type::InstanceCreationType;
     use crate::expr_arena::{
-        CallTypeNode, ExprArena, ExprId, ExprKind, ExprNode, InstanceCreationNode, TypeTable,
+        rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
     };
     use crate::instance_type::InstanceType;
     use crate::rib_type_error::RibTypeErrorInternal;
@@ -79,9 +79,11 @@ pub mod arena {
                     if variable_id.name() == "instance" && variable_id.is_global() {
                         return Err(CustomError::new(span, "`instance` is a reserved keyword")
                             .with_help_message(
-                                "use `instance()` to create an ephemeral worker instance.",
+                                "use `instance()` instead of `instance` to create an ephemeral worker instance.",
                             )
-                            .with_help_message("for a durable worker, use `instance(\"foo\")`")
+                            .with_help_message(
+                                "for a durable worker, use `instance(\"foo\")` where `\"foo\"` is the worker name",
+                            )
                             .into());
                     }
                 }
@@ -242,18 +244,7 @@ pub mod arena {
     /// Lower an `Expr` value into the arena, returning its new `ExprId`.
     /// Used when converting `InstanceCreationType` worker name expressions.
     fn lower_expr_into_arena(expr: Expr, arena: &mut ExprArena, types: &mut TypeTable) -> ExprId {
-        let (mut new_arena, mut new_types, root) = crate::expr_arena::lower(&expr);
-        // Migrate nodes into the target arena
-        let mut id_map: std::collections::HashMap<ExprId, ExprId> =
-            std::collections::HashMap::new();
-        for (old_id, node) in new_arena.exprs.iter() {
-            let new_id = arena.alloc_expr(node.clone());
-            id_map.insert(old_id, new_id);
-            if let Some(ty) = new_types.get_opt(old_id) {
-                types.set(new_id, ty.clone());
-            }
-        }
-        *id_map.get(&root).unwrap()
+        crate::expr_arena::lower_into(arena, types, &expr)
     }
 
     fn get_instance_creation_details_arena(
@@ -271,11 +262,9 @@ pub mod arena {
                 match fn_ref {
                     ParsedFunctionReference::Function { function } if function == "instance" => {
                         // Get the first arg as an optional worker name
-                        let worker_name_expr = args.first().map(|&id| {
-                            // We need an Expr for the registry API — reconstruct from the arena
-                            // This is a temporary bridge until the registry API is also arena-native
-                            reconstruct_simple_expr(id, arena, types)
-                        });
+                        let worker_name_expr = args
+                            .first()
+                            .map(|&id| rebuild_expr(id, arena, types));
                         let instance_creation = component_dependency
                             .get_worker_instance_type(type_parameter.clone(), worker_name_expr)?;
                         Ok(Some((instance_creation, type_parameter)))
@@ -307,7 +296,7 @@ pub mod arena {
                                     let current = types.get(arg_id).clone();
                                     types.set(arg_id, current.merge(inferred));
 
-                                    let arg_expr = reconstruct_simple_expr(arg_id, arena, types);
+                                    let arg_expr = rebuild_expr(arg_id, arena, types);
                                     match analysed_type {
                                         AnalysedType::Str(_) => {
                                             concat_parts.push(Expr::literal("\""));
@@ -342,7 +331,7 @@ pub mod arena {
                         worker_name,
                     } => {
                         let wn = worker_name
-                            .map(|wn_id| Box::new(reconstruct_simple_expr(wn_id, arena, types)));
+                            .map(|wn_id| Box::new(rebuild_expr(wn_id, arena, types)));
                         InstanceCreationType::WitWorker {
                             component_info: component_info.clone(),
                             worker_name: wn,
@@ -363,35 +352,6 @@ pub mod arena {
                 Ok(Some((ict, type_parameter)))
             }
             CallTypeNode::VariantConstructor(_) | CallTypeNode::EnumConstructor(_) => Ok(None),
-        }
-    }
-
-    /// Reconstruct a simple `Expr` from an arena node for APIs that still require `Expr`.
-    /// This is a temporary bridge — only handles leaf types needed for worker name expressions.
-    fn reconstruct_simple_expr(id: ExprId, arena: &ExprArena, types: &TypeTable) -> Expr {
-        let node = arena.expr(id);
-        let inferred = types.get(id).clone();
-        match &node.kind {
-            ExprKind::Literal { value } => Expr::Literal {
-                value: value.clone(),
-                type_annotation: node.type_annotation.clone(),
-                inferred_type: inferred,
-                source_span: node.source_span.clone(),
-            },
-            ExprKind::Identifier { variable_id } => Expr::Identifier {
-                variable_id: variable_id.clone(),
-                type_annotation: node.type_annotation.clone(),
-                inferred_type: inferred,
-                source_span: node.source_span.clone(),
-            },
-            ExprKind::GenerateWorkerName { variable_id } => Expr::GenerateWorkerName {
-                variable_id: variable_id.clone(),
-                type_annotation: node.type_annotation.clone(),
-                inferred_type: inferred,
-                source_span: node.source_span.clone(),
-            },
-            // For other kinds, fall back to a placeholder
-            _ => Expr::generate_worker_name(None),
         }
     }
 

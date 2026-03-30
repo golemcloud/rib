@@ -464,19 +464,8 @@ pub mod arena {
                 worker_name,
             } => InstanceIdentifierNode::WitWorker {
                 variable_id,
-                worker_name: worker_name.map(|wn| {
-                    let (mut sub_arena, mut sub_types, sub_root) = crate::expr_arena::lower(&wn);
-                    // Migrate nodes into the target arena
-                    let mut id_map = std::collections::HashMap::new();
-                    for (old_id, node) in sub_arena.exprs.iter() {
-                        let new_id = arena.alloc_expr(node.clone());
-                        id_map.insert(old_id, new_id);
-                        if let Some(ty) = sub_types.get_opt(old_id) {
-                            types.set(new_id, ty.clone());
-                        }
-                    }
-                    *id_map.get(&sub_root).unwrap()
-                }),
+                worker_name: worker_name
+                    .map(|wn| crate::expr_arena::lower_into(arena, types, wn.as_ref())),
             },
             InstanceIdentifier::WitResource {
                 variable_id,
@@ -484,18 +473,8 @@ pub mod arena {
                 resource_name,
             } => InstanceIdentifierNode::WitResource {
                 variable_id,
-                worker_name: worker_name.map(|wn| {
-                    let (mut sub_arena, mut sub_types, sub_root) = crate::expr_arena::lower(&wn);
-                    let mut id_map = std::collections::HashMap::new();
-                    for (old_id, node) in sub_arena.exprs.iter() {
-                        let new_id = arena.alloc_expr(node.clone());
-                        id_map.insert(old_id, new_id);
-                        if let Some(ty) = sub_types.get_opt(old_id) {
-                            types.set(new_id, ty.clone());
-                        }
-                    }
-                    *id_map.get(&sub_root).unwrap()
-                }),
+                worker_name: worker_name
+                    .map(|wn| crate::expr_arena::lower_into(arena, types, wn.as_ref())),
                 resource_name,
             },
         }

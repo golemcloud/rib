@@ -778,6 +778,13 @@ pub fn lower(expr: &Expr) -> (ExprArena, TypeTable, ExprId) {
     (arena, types, root)
 }
 
+/// Lower `expr` into an existing arena, allocating fresh [`ExprId`]s and wiring
+/// child pointers within `arena` only (unlike naïvely cloning nodes from a
+/// separate lowered arena, which would leave stale child ids).
+pub fn lower_into(arena: &mut ExprArena, types: &mut TypeTable, expr: &Expr) -> ExprId {
+    lower_expr(expr, arena, types)
+}
+
 /// Lower the `Expr` tree and return a map from each `ExprId` to a raw mutable
 /// pointer to the corresponding `InferredType` inside the original `Expr` tree.
 ///

@@ -1141,21 +1141,16 @@ impl Expr {
     ) -> Result<(), RibTypeErrorInternal> {
         use crate::type_inference as ti;
 
-        // ── Initial phase (Expr) ──────────────────────────────────────────
-        self.bind_global_variable_types(global_variable_type_spec);
-        self.bind_type_annotations();
-        self.bind_variables_of_list_comprehension();
-        self.bind_variables_of_list_reduce();
-        self.bind_variables_of_pattern_match();
-        self.bind_variables_of_let_assignment();
-        self.identify_instance_creation(component_dependency, custom_instance_spec)?;
-        self.ensure_stateful_instance();
-
-        // Lower after structural passes.
+        // Lower first; all binding / instance-creation work runs on the arena.
         let (mut arena, mut types, root) = crate::expr_arena::lower(self);
-
-        // ── Arena: set_origin ─────────────────────────────────────────────
-        ti::type_annotation_binding::arena::set_origin(root, &arena, &mut types);
+        ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+            global_variable_type_spec.as_slice(),
+            custom_instance_spec,
+        )?;
 
         ti::variant_inference::arena::infer_variants(root, &mut arena, &mut types, component_dependency);
         ti::enum_inference::arena::infer_enums(root, &mut arena, &mut types, component_dependency);
@@ -1247,17 +1242,30 @@ impl Expr {
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
-        self.set_origin();
-        self.bind_global_variable_types(global_variable_type_spec);
-        self.bind_type_annotations();
-        self.bind_variables_of_list_comprehension();
-        self.bind_variables_of_list_reduce();
-        self.bind_variables_of_pattern_match();
-        self.bind_variables_of_let_assignment();
-        self.identify_instance_creation(component_dependency, custom_instance_spec)?;
-        self.ensure_stateful_instance();
-        self.infer_variants(component_dependency);
-        self.infer_enums(component_dependency);
+        use crate::type_inference as ti;
+
+        let (mut arena, mut types, root) = crate::expr_arena::lower(self);
+        ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+            global_variable_type_spec.as_slice(),
+            custom_instance_spec,
+        )?;
+        ti::variant_inference::arena::infer_variants(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+        );
+        ti::enum_inference::arena::infer_enums(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+        );
+        *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
     }
 
