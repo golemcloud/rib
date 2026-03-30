@@ -62,13 +62,23 @@ impl RibCompiler {
     }
 
     pub fn infer_types(&self, expr: Expr) -> Result<InferredExpr, RibCompilationError> {
-        InferredExpr::from_expr(
-            expr.clone(),
-            &self.component_dependency,
-            &self.global_variable_type_spec,
-            &self.custom_instance_spec,
-        )
-        .map_err(|err| {
+        let _infer_profile = crate::profile::InferOnlyProfileGuard::new();
+        let expr_for_infer = {
+            let _p = crate::profile::Scope::new("compile: RibCompiler.infer_types expr.clone()");
+            expr.clone()
+        };
+        let result = {
+            let _p = crate::profile::Scope::new(
+                "compile: RibCompiler.infer_types InferredExpr::from_expr",
+            );
+            InferredExpr::from_expr(
+                expr_for_infer,
+                &self.component_dependency,
+                &self.global_variable_type_spec,
+                &self.custom_instance_spec,
+            )
+        };
+        result.map_err(|err| {
             let rib_type_error = RibTypeError::from_rib_type_error_internal(err, expr);
             RibCompilationError::RibTypeError(Box::new(rib_type_error))
         })
@@ -87,14 +97,26 @@ impl RibCompiler {
     }
 
     pub fn compile(&self, expr: Expr) -> Result<CompilerOutput, RibCompilationError> {
-        let inferred_expr = self.infer_types(expr)?;
+        let _compile_profile = crate::profile::CompileProfileGuard::enter();
+        let inferred_expr = {
+            let _p = crate::profile::Scope::new("compile: RibCompiler.compile infer_types (total)");
+            self.infer_types(expr)?
+        };
 
-        let function_calls_identified =
-            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component_dependency)?;
+        let function_calls_identified = {
+            let _p =
+                crate::profile::Scope::new("compile: WorkerFunctionsInRib::from_inferred_expr");
+            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component_dependency)?
+        };
 
-        // The types that are tagged as global input in the script
-        let global_input_type_info = RibInputTypeInfo::from_expr(&inferred_expr)?;
-        let output_type_info = RibOutputTypeInfo::from_expr(&inferred_expr)?;
+        let global_input_type_info = {
+            let _p = crate::profile::Scope::new("compile: RibInputTypeInfo::from_expr");
+            RibInputTypeInfo::from_expr(&inferred_expr)?
+        };
+        let output_type_info = {
+            let _p = crate::profile::Scope::new("compile: RibOutputTypeInfo::from_expr");
+            RibOutputTypeInfo::from_expr(&inferred_expr)?
+        };
 
         // allowed_global_variables
         let allowed_global_variables: Vec<String> = self
@@ -120,7 +142,10 @@ impl RibCompiler {
             });
         }
 
-        let byte_code = RibByteCode::from_expr(&inferred_expr)?;
+        let byte_code = {
+            let _p = crate::profile::Scope::new("compile: RibByteCode::from_expr");
+            RibByteCode::from_expr(&inferred_expr)?
+        };
 
         Ok(CompilerOutput {
             worker_invoke_calls: function_calls_identified,

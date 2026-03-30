@@ -1141,96 +1141,132 @@ impl Expr {
     ) -> Result<(), RibTypeErrorInternal> {
         use crate::type_inference as ti;
 
-        // Lower first; all binding / instance-creation work runs on the arena.
-        let (mut arena, mut types, root) = crate::expr_arena::lower(self);
-        ti::initial_arena_phase::run_initial_binding_and_instance_phases(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-            global_variable_type_spec.as_slice(),
-            custom_instance_spec,
-        )?;
+        let (mut arena, mut types, root) = {
+            let _p = crate::profile::Scope::new("infer_types: lower");
+            crate::expr_arena::lower(self)
+        };
 
-        ti::variant_inference::infer_variants_lowered(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-        );
-        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
-        ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        {
+            let _p = crate::profile::Scope::new(
+                "infer_types: initial_arena + variants/enums/bind_instance",
+            );
+            ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+                global_variable_type_spec.as_slice(),
+                custom_instance_spec,
+            )?;
 
-        // ── Fix-point 1: resolve instance / worker function invocations ────
-        ti::arena_type_inference_fix_point(
-            |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                ti::instance_type_binding::bind_instance_types_lowered(root, arena, types);
-                ti::worker_function_invocation::infer_worker_function_invokes_lowered(
-                    root,
-                    arena,
-                    types,
-                    component_dependency,
-                )
-            },
-            root,
-            &mut arena,
-            &mut types,
-        )?;
+            ti::variant_inference::infer_variants_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            );
+            ti::enum_inference::infer_enums_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            );
+            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        }
 
-        // Function-call argument type inference (outside the scan fix-point).
-        ti::call_arguments_inference::infer_function_call_types_lowered(
-            root,
-            &arena,
-            &mut types,
-            component_dependency,
-            custom_instance_spec,
-        )
-        .map_err(RibTypeErrorInternal::from)?;
+        {
+            let _p =
+                crate::profile::Scope::new("infer_types: fixpoint 1 (instance + worker invokes)");
+            ti::arena_type_inference_fix_point(
+                |root, arena, types| -> Result<(), RibTypeErrorInternal> {
+                    ti::instance_type_binding::bind_instance_types_lowered(root, arena, types);
+                    ti::worker_function_invocation::infer_worker_function_invokes_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                    )
+                },
+                root,
+                &mut arena,
+                &mut types,
+            )?;
+        }
 
-        // ── Fix-point 2: main inference scan ──────────────────────────────
-        ti::arena_type_inference_fix_point(
-            |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
-                ti::type_push_down::push_types_down_lowered(root, arena, types)?;
-                ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
-                ti::type_pull_up::type_pull_up_lowered(root, arena, types, component_dependency)?;
-                ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
-                ti::call_arguments_inference::infer_function_call_types_lowered(
-                    root,
-                    arena,
-                    types,
-                    component_dependency,
-                    custom_instance_spec,
-                )
-                .map_err(RibTypeErrorInternal::from)?;
-                Ok(())
-            },
-            root,
-            &mut arena,
-            &mut types,
-        )?;
+        {
+            let _p = crate::profile::Scope::new("infer_types: infer_function_call_types_lowered");
+            ti::call_arguments_inference::infer_function_call_types_lowered(
+                root,
+                &arena,
+                &mut types,
+                component_dependency,
+                custom_instance_spec,
+            )
+            .map_err(RibTypeErrorInternal::from)?;
+        }
 
-        // ── Final arena refinement ─────────────────────────────────────────
-        // One more round after fix-point 2 converges, to ensure all types
-        // are fully propagated before we rebuild the Expr tree.
-        ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
-        ti::type_pull_up::type_pull_up_lowered(root, &mut arena, &mut types, component_dependency)?;
-        ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
-        ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
+        {
+            let _p = crate::profile::Scope::new("infer_types: fixpoint 2 (main scan)");
+            ti::arena_type_inference_fix_point(
+                |root, arena, types| -> Result<(), RibTypeErrorInternal> {
+                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                    ti::type_push_down::push_types_down_lowered(root, arena, types)?;
+                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                    ti::type_pull_up::type_pull_up_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                    )?;
+                    ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
+                    ti::call_arguments_inference::infer_function_call_types_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                        custom_instance_spec,
+                    )
+                    .map_err(RibTypeErrorInternal::from)?;
+                    Ok(())
+                },
+                root,
+                &mut arena,
+                &mut types,
+            )?;
+        }
 
-        // Align InstanceType.worker_name with arena worker subtrees, then
-        // propagate instance types to identifiers (single implementation path).
-        ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(root, &arena, &mut types);
-        ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        {
+            let _p = crate::profile::Scope::new("infer_types: final arena refinement + sync/bind");
+            ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
+            ti::type_pull_up::type_pull_up_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            )?;
+            ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
+            ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
+            ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(
+                root, &arena, &mut types,
+            );
+            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        }
 
-        // ── Rebuild ────────────────────────────────────────────────────────
-        // Convert the arena back into a single Expr tree that carries all
-        // inferred types and structural mutations from the arena passes.
-        *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        {
+            let _p = crate::profile::Scope::new("infer_types: rebuild_expr");
+            *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        }
 
-        // ── Validation ────────────────────────────────────────────────────
-        self.check_types(component_dependency)?;
-        self.unify_types()?;
+        {
+            let _p = crate::profile::Scope::new("infer_types: check_types");
+            self.check_types(component_dependency)?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: unify_types");
+            self.unify_types()?;
+        }
+
         Ok(())
     }
 
