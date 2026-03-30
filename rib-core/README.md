@@ -2,9 +2,7 @@
 
 Core library for the Rib language: parser, type inference, compiler, and interpreter.
 
-## Profiling compile time
-
-### How to produce the profile output
+## Rib compilation profile
 
 ![img.png](images/img.png)
 
