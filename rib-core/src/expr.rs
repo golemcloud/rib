@@ -1253,18 +1253,18 @@ impl Expr {
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: rebuild_expr");
-            *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
-        }
-
-        {
-            let _p = crate::profile::Scope::new("infer_types: check_types");
-            self.check_types(component_dependency)?;
+            let _p = crate::profile::Scope::new("infer_types: type_check");
+            type_checker::checker::type_check(root, &arena, &mut types, component_dependency)?;
         }
 
         {
             let _p = crate::profile::Scope::new("infer_types: unify_types");
-            self.unify_types()?;
+            type_inference::unify_types_lowered(root, &arena, &mut types)?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: rebuild_expr");
+            *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         }
 
         Ok(())
@@ -1309,19 +1309,7 @@ impl Expr {
     pub fn bind_type_annotations(&mut self) {
         type_inference::bind_type_annotations(self);
     }
-
-    pub fn check_types(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_checker::type_check(self, component_dependency)
-    }
-
-    pub fn unify_types(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::unify_types(self)?;
-        Ok(())
-    }
-
+    
     pub fn merge_inferred_type(&self, new_inferred_type: InferredType) -> Expr {
         let mut expr_copied = self.clone();
         expr_copied.add_infer_type_mut(new_inferred_type);

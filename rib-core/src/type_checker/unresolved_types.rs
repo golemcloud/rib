@@ -15,7 +15,6 @@
 use crate::call_type::{CallType, InstanceCreationType};
 use crate::{Expr, UnResolvedTypesError};
 use std::collections::VecDeque;
-use std::ops::Deref;
 
 pub fn check_unresolved_types(expr: &Expr) -> Result<(), UnResolvedTypesError> {
     let mut queue = VecDeque::new();
@@ -104,12 +103,7 @@ pub fn check_unresolved_types(expr: &Expr) -> Result<(), UnResolvedTypesError> {
                 inferred_type,
                 ..
             } => {
-                internal::unresolved_types_in_record(
-                    &exprs
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.deref().clone()))
-                        .collect(),
-                )?;
+                internal::unresolved_types_in_record_fields(exprs.as_slice())?;
 
                 if inferred_type.is_unknown() {
                     return Err(UnResolvedTypesError::from(expr.source_span()));
@@ -458,11 +452,12 @@ mod internal {
     use crate::type_checker::unresolved_types::check_unresolved_types;
     use crate::{Expr, MatchArm, UnResolvedTypesError};
 
-    pub fn unresolved_types_in_record(
-        expr_fields: &Vec<(String, Expr)>,
+    pub fn unresolved_types_in_record_fields(
+        expr_fields: &[(String, Box<Expr>)],
     ) -> Result<(), UnResolvedTypesError> {
         for (field_name, field_expr) in expr_fields {
-            check_unresolved_types(field_expr).map_err(|err| err.at_field(field_name.clone()))?;
+            check_unresolved_types(field_expr.as_ref())
+                .map_err(|err| err.at_field(field_name.clone()))?;
         }
 
         Ok(())
@@ -601,30 +596,21 @@ mod internal {
         }
 
         for match_arm in match_arms {
-            let exprs: Vec<Expr> = match_arm
-                .arm_pattern
-                .clone()
-                .get_expr_literals()
-                .into_iter()
-                .cloned()
-                .collect();
-
-            for expr in exprs {
-                let expr_type = expr.inferred_type();
+            for sub_expr in match_arm.arm_pattern.get_expr_literals() {
+                let expr_type = sub_expr.inferred_type();
                 if expr_type.is_unknown() {
-                    return Err(UnResolvedTypesError::from(expr.source_span()));
+                    return Err(UnResolvedTypesError::from(sub_expr.source_span()));
                 } else {
-                    check_unresolved_types(&expr)?;
+                    check_unresolved_types(sub_expr)?;
                 }
             }
 
-            let expr = match_arm.clone().arm_resolution_expr;
-
-            let expr_type = expr.inferred_type();
+            let resolution = match_arm.arm_resolution_expr.as_ref();
+            let expr_type = resolution.inferred_type();
             if expr_type.is_unknown() {
-                return Err(UnResolvedTypesError::from(expr.source_span()));
+                return Err(UnResolvedTypesError::from(resolution.source_span()));
             } else {
-                check_unresolved_types(&expr)?;
+                check_unresolved_types(resolution)?;
             }
         }
 

@@ -1572,7 +1572,7 @@ pub fn rebuild_expr(id: ExprId, arena: &ExprArena, types: &TypeTable) -> Expr {
     }
 }
 
-fn rebuild_arm_pattern(
+pub(crate) fn rebuild_arm_pattern(
     pat_id: ArmPatternId,
     arena: &ExprArena,
     types: &TypeTable,
@@ -1629,7 +1629,7 @@ fn rebuild_arm_pattern(
     }
 }
 
-fn rebuild_call_type(
+pub(crate) fn rebuild_call_type(
     call_type: &CallTypeNode,
     arena: &ExprArena,
     types: &TypeTable,
