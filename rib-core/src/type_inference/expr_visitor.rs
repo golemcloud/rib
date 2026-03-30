@@ -1,3 +1,4 @@
+use crate::call_type::{CallType, InstanceCreationType};
 use crate::{Expr, TypeInternal};
 use std::collections::VecDeque;
 
@@ -120,7 +121,7 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
             inferred_type,
             ..
         } => {
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(exprs) = exprs {
                 queue.extend(exprs.iter_mut())
             }
@@ -254,7 +255,7 @@ fn visit_children_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
             inferred_type,
             ..
         } => {
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(exprs) = exprs {
                 for e in exprs {
                     each(e);
@@ -402,7 +403,7 @@ fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
                     each(worker_expr);
                 }
             }
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(worker) = worker {
                 each(worker);
             }
@@ -806,29 +807,24 @@ pub mod arena {
     }
 }
 
-mod internal {
-    use crate::call_type::{CallType, InstanceCreationType};
-    use crate::Expr;
+pub(crate) fn get_expressions_in_call_type_mut(
+    call_type: &mut CallType,
+) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {
+    match call_type {
+        CallType::Function {
+            instance_identifier: module,
+            ..
+        } => (None, module.as_mut().and_then(|m| m.worker_name_mut())),
 
-    pub(crate) fn get_expressions_in_call_type_mut(
-        call_type: &mut CallType,
-    ) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {
-        match call_type {
-            CallType::Function {
-                instance_identifier: module,
-                ..
-            } => (None, module.as_mut().and_then(|m| m.worker_name_mut())),
+        CallType::InstanceCreation(instance_creation) => match instance_creation {
+            InstanceCreationType::WitWorker { worker_name, .. } => (None, worker_name.as_mut()),
 
-            CallType::InstanceCreation(instance_creation) => match instance_creation {
-                InstanceCreationType::WitWorker { worker_name, .. } => (None, worker_name.as_mut()),
+            InstanceCreationType::WitResource { module, .. } => {
+                (None, module.as_mut().and_then(|m| m.worker_name_mut()))
+            }
+        },
 
-                InstanceCreationType::WitResource { module, .. } => {
-                    (None, module.as_mut().and_then(|m| m.worker_name_mut()))
-                }
-            },
-
-            CallType::VariantConstructor(_) => (None, None),
-            CallType::EnumConstructor(_) => (None, None),
-        }
+        CallType::VariantConstructor(_) => (None, None),
+        CallType::EnumConstructor(_) => (None, None),
     }
 }

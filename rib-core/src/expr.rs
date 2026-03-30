@@ -1152,15 +1152,15 @@ impl Expr {
             custom_instance_spec,
         )?;
 
-        ti::variant_inference::arena::infer_variants(root, &mut arena, &mut types, component_dependency);
-        ti::enum_inference::arena::infer_enums(root, &mut arena, &mut types, component_dependency);
-        ti::instance_type_binding::arena::bind_instance_types(root, &arena, &mut types);
+        ti::variant_inference::infer_variants_lowered(root, &mut arena, &mut types, component_dependency);
+        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
+        ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
 
         // ── Fix-point 1: resolve instance / worker function invocations ────
         ti::arena_type_inference_fix_point(
             |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                ti::instance_type_binding::arena::bind_instance_types(root, arena, types);
-                ti::worker_function_invocation::arena::infer_worker_function_invokes(
+                ti::instance_type_binding::bind_instance_types_lowered(root, arena, types);
+                ti::worker_function_invocation::infer_worker_function_invokes_lowered(
                     root,
                     arena,
                     types,
@@ -1173,7 +1173,7 @@ impl Expr {
         )?;
 
         // Function-call argument type inference (outside the scan fix-point).
-        ti::call_arguments_inference::arena::infer_function_call_types(
+        ti::call_arguments_inference::infer_function_call_types_lowered(
             root,
             &arena,
             &mut types,
@@ -1185,12 +1185,12 @@ impl Expr {
         // ── Fix-point 2: main inference scan ──────────────────────────────
         ti::arena_type_inference_fix_point(
             |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                ti::identifier_inference::arena::infer_all_identifiers(root, arena, types);
-                ti::type_push_down::arena::push_types_down(root, arena, types)?;
-                ti::identifier_inference::arena::infer_all_identifiers(root, arena, types);
-                ti::type_pull_up::arena::type_pull_up(root, arena, types, component_dependency)?;
-                ti::global_input_inference::arena::infer_global_inputs(root, arena, types);
-                ti::call_arguments_inference::arena::infer_function_call_types(
+                ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                ti::type_push_down::push_types_down_lowered(root, arena, types)?;
+                ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                ti::type_pull_up::type_pull_up_lowered(root, arena, types, component_dependency)?;
+                ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
+                ti::call_arguments_inference::infer_function_call_types_lowered(
                     root,
                     arena,
                     types,
@@ -1208,22 +1208,22 @@ impl Expr {
         // ── Final arena refinement ─────────────────────────────────────────
         // One more round after fix-point 2 converges, to ensure all types
         // are fully propagated before we rebuild the Expr tree.
-        ti::type_push_down::arena::push_types_down(root, &arena, &mut types)?;
-        ti::type_pull_up::arena::type_pull_up(
+        ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
+        ti::type_pull_up::type_pull_up_lowered(
             root,
             &mut arena,
             &mut types,
             component_dependency,
         )?;
-        ti::global_input_inference::arena::infer_global_inputs(root, &arena, &mut types);
-        ti::identifier_inference::arena::infer_all_identifiers(root, &arena, &mut types);
+        ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
+        ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
 
         // Align InstanceType.worker_name with arena worker subtrees, then
         // propagate instance types to identifiers (single implementation path).
-        ti::instance_type_binding::arena::sync_embedded_worker_exprs_from_calls(
+        ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(
             root, &arena, &mut types,
         );
-        ti::instance_type_binding::arena::bind_instance_types(root, &arena, &mut types);
+        ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
 
         // ── Rebuild ────────────────────────────────────────────────────────
         // Convert the arena back into a single Expr tree that carries all
@@ -1253,13 +1253,13 @@ impl Expr {
             global_variable_type_spec.as_slice(),
             custom_instance_spec,
         )?;
-        ti::variant_inference::arena::infer_variants(
+        ti::variant_inference::infer_variants_lowered(
             root,
             &mut arena,
             &mut types,
             component_dependency,
         );
-        ti::enum_inference::arena::infer_enums(
+        ti::enum_inference::infer_enums_lowered(
             root,
             &mut arena,
             &mut types,
