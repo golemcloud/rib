@@ -35,6 +35,8 @@ pub use wasm_wave_text::*;
 
 mod call_type;
 
+mod profile;
+
 pub mod analysis;
 mod compiler;
 mod expr;

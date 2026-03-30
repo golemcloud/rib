@@ -19,12 +19,6 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::{Expr, InferredType, VariableId};
 use std::collections::HashMap;
 
-pub fn infer_all_identifiers(expr: &mut Expr) {
-    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    infer_all_identifiers_lowered(root, &expr_arena, &mut types);
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
-}
-
 #[derive(Debug, Clone)]
 struct IdentifierTypeState(HashMap<VariableId, InferredType>);
 

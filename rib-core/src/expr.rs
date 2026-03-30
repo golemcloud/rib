@@ -1266,21 +1266,6 @@ impl Expr {
         type_inference::ensure_stateful_instance(self)
     }
 
-    pub fn push_types_down(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::push_types_down(self)
-    }
-
-    pub fn infer_all_identifiers(&mut self) {
-        type_inference::infer_all_identifiers(self)
-    }
-
-    pub fn pull_types_up(
-        &mut self,
-        component_dependencies: &ComponentDependencies,
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::type_pull_up(self, component_dependencies)
-    }
-
     pub fn infer_global_inputs(&mut self) {
         type_inference::infer_global_inputs(self);
     }

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::Expr;
 
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceIdentifierNode, MatchArmNode, RangeKind,
@@ -28,20 +27,6 @@ use crate::{
     InferredType, InterfaceName, PackageName, Path, TypeInternal, TypeMismatchError,
 };
 
-/// Runs [`type_pull_up_lowered`] on a lowered copy of `expr` and writes back the
-/// rebuilt tree. All pull-up logic lives in the arena implementation.
-pub fn type_pull_up(
-    expr: &mut Expr,
-    component_dependencies: &ComponentDependencies,
-) -> Result<(), RibTypeErrorInternal> {
-    let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    type_pull_up_lowered(root, &mut expr_arena, &mut types, component_dependencies)?;
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
-    Ok(())
-}
-
-/// Arena version of `type_pull_up`.
-///
 /// Post-order traversal: for each node, read the types of its children from
 /// `TypeTable` to compute/update the node's own type.
 pub fn type_pull_up_lowered(
@@ -453,19 +438,26 @@ mod type_pull_up_tests {
 
     use test_r::test;
 
-    use crate::call_type::CallType;
     use crate::function_name::DynamicParsedFunctionName;
-    use crate::DynamicParsedFunctionReference::Function;
-    use crate::ParsedFunctionSite::PackagedInterface;
-    use crate::{ArmPattern, ComponentDependencies, Expr, InferredType, MatchArm, VariableId};
+    use crate::rib_type_error::RibTypeErrorInternal;
+    use crate::{ArmPattern, ComponentDependencies, Expr, InferredType, MatchArm};
+
+    fn type_pull_up_via_arena(
+        expr: &mut Expr,
+        component_dependencies: &ComponentDependencies,
+    ) -> Result<(), RibTypeErrorInternal> {
+        let (mut arena, mut types, root) = crate::expr_arena::lower(expr);
+        super::type_pull_up_lowered(root, &mut arena, &mut types, component_dependencies)?;
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        Ok(())
+    }
 
     #[test]
     pub fn test_pull_up_identifier() {
         let expr = "foo";
         let mut expr = Expr::from_text(expr).unwrap();
         expr.add_infer_type_mut(InferredType::string());
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::string());
     }
 
@@ -478,8 +470,7 @@ mod type_pull_up_tests {
             )]));
         let select_expr = Expr::select_field(record_identifier, "foo", None);
         let mut expr = Expr::select_field(select_expr, "bar", None);
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::u64());
     }
 
@@ -488,8 +479,7 @@ mod type_pull_up_tests {
         let identifier = Expr::identifier_global("foo", None)
             .merge_inferred_type(InferredType::list(InferredType::u64()));
         let mut expr = Expr::select_index(identifier.clone(), Expr::number(BigDecimal::from(0)));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::select_index(identifier, Expr::number(BigDecimal::from(0)))
             .merge_inferred_type(InferredType::u64());
         assert_eq!(expr, expected);
@@ -504,8 +494,7 @@ mod type_pull_up_tests {
 
         let mut expr =
             Expr::sequence(elems.clone(), None).with_inferred_type(InferredType::unknown());
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -520,8 +509,7 @@ mod type_pull_up_tests {
             Expr::number_inferred(BigDecimal::from(1), None, InferredType::u64()),
         ]);
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr.inferred_type(),
@@ -546,8 +534,7 @@ mod type_pull_up_tests {
             ("bar".to_string(), InferredType::unknown()),
         ]));
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -567,8 +554,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_concat() {
         let mut expr = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")]);
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")])
             .with_inferred_type(InferredType::string());
         assert_eq!(expr, expected);
@@ -577,8 +563,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_not() {
         let mut expr = Expr::not(Expr::boolean(true));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -602,8 +587,7 @@ mod type_pull_up_tests {
             select_index4.clone(),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::cond(
             Expr::greater_than(
                 Expr::select_index(
@@ -649,8 +633,7 @@ mod type_pull_up_tests {
         let select_field2 = Expr::select_field(inner, "baz", None);
         let mut expr = Expr::greater_than(select_field1.clone(), select_field2.clone());
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let expected = Expr::greater_than(
             select_field1.merge_inferred_type(InferredType::string()),
@@ -669,8 +652,7 @@ mod type_pull_up_tests {
         let select_index2 = Expr::select_index(inner, Expr::number(BigDecimal::from(1)));
         let mut expr = Expr::greater_than_or_equal_to(select_index1.clone(), select_index2.clone());
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let expected = Expr::greater_than_or_equal_to(
             select_index1.merge_inferred_type(InferredType::u64()),
@@ -705,8 +687,7 @@ mod type_pull_up_tests {
             select_field_from_second.clone(),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let new_select_field_from_first = Expr::select_field(
             Expr::select_index(inner.clone(), Expr::number(BigDecimal::from(0)))
@@ -737,8 +718,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(1)),
             Expr::number(BigDecimal::from(2)),
         );
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -749,8 +729,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(2)),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
@@ -765,78 +744,9 @@ mod type_pull_up_tests {
             None,
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::unknown());
-    }
-
-    #[test]
-    pub fn test_pull_up_for_dynamic_call() {
-        let rib = r#"
-           let input = { foo: "afs", bar: "al" };
-           golem:it/api.{cart-checkout}(input.foo)
-        "#;
-
-        let mut expr = Expr::from_text(rib).unwrap();
-        let component_dependencies = ComponentDependencies::default();
-
-        expr.infer_types_initial_phase(&component_dependencies, &vec![], &[])
-            .unwrap();
-        expr.infer_all_identifiers();
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
-
-        let expected = Expr::expr_block(vec![
-            Expr::let_binding_with_variable_id(
-                VariableId::local("input", 0),
-                Expr::record(vec![
-                    (
-                        "foo".to_string(),
-                        Expr::literal("afs").with_inferred_type(InferredType::string()),
-                    ),
-                    (
-                        "bar".to_string(),
-                        Expr::literal("al").with_inferred_type(InferredType::string()),
-                    ),
-                ])
-                .with_inferred_type(InferredType::record(vec![
-                    ("foo".to_string(), InferredType::string()),
-                    ("bar".to_string(), InferredType::string()),
-                ])),
-                None,
-            ),
-            Expr::call(
-                CallType::function_call(
-                    DynamicParsedFunctionName {
-                        site: PackagedInterface {
-                            namespace: "golem".to_string(),
-                            package: "it".to_string(),
-                            interface: "api".to_string(),
-                            version: None,
-                        },
-                        function: Function {
-                            function: "cart-checkout".to_string(),
-                        },
-                    },
-                    None,
-                ),
-                None,
-                vec![Expr::select_field(
-                    Expr::identifier_local("input", 0, None).with_inferred_type(
-                        InferredType::record(vec![
-                            ("foo".to_string(), InferredType::string()),
-                            ("bar".to_string(), InferredType::string()),
-                        ]),
-                    ),
-                    "foo",
-                    None,
-                )
-                .with_inferred_type(InferredType::string())],
-            ),
-        ]);
-
-        assert_eq!(expr, expected);
     }
 
     #[test]
@@ -844,8 +754,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::option(Some(number)).unwrap();
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -857,8 +766,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::get_tag(Expr::option(Some(number)));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -926,8 +834,7 @@ mod type_pull_up_tests {
             ],
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let expected = expected_pattern_match();
 

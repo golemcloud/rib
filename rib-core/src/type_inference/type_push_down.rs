@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::Expr;
 
 use crate::analysis::AnalysedType;
 use crate::expr_arena::{
@@ -30,15 +29,6 @@ use crate::{
     TypeInternal, TypeMismatchError, VariableId,
 };
 use std::ops::Deref;
-
-/// Runs [`push_types_down_lowered`] on a lowered copy of `expr` and writes back
-/// the rebuilt tree.
-pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
-    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    push_types_down_lowered(root, &expr_arena, &mut types)?;
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
-    Ok(())
-}
 
 // actual_inferred_type: InferredType found in the outer structure
 // expr: The expr corresponding to the outer inferred type. Example: yield expr in a list comprehension
@@ -86,8 +76,6 @@ fn get_compilation_error_for_ambiguity(
     }
 }
 
-/// Lowered-tree implementation used by [`super::push_types_down`].
-///
 /// Pre-order traversal: for each parent node, read its type from
 /// `TypeTable` and push derived types down into child nodes.
 pub fn push_types_down_lowered(
@@ -633,7 +621,15 @@ fn collect_pre_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
 mod type_push_down_tests {
     use test_r::test;
 
+    use crate::rib_type_error::RibTypeErrorInternal;
     use crate::{Expr, InferredType, RibCompiler};
+
+    fn push_types_down_via_arena(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
+        let (arena, mut types, root) = crate::expr_arena::lower(expr);
+        super::push_types_down_lowered(root, &arena, &mut types)?;
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        Ok(())
+    }
 
     fn strip_spaces(input: &str) -> String {
         let lines = input.lines();
@@ -669,7 +665,7 @@ mod type_push_down_tests {
             InferredType::record(vec![("titles".to_string(), InferredType::u64())]),
         ]));
 
-        expr.push_types_down().unwrap();
+        push_types_down_via_arena(&mut expr).unwrap();
         let expected = Expr::record(vec![(
             "titles".to_string(),
             Expr::identifier_global("x", None).with_inferred_type(InferredType::u64()),
@@ -695,7 +691,7 @@ mod type_push_down_tests {
             InferredType::list(InferredType::u64()),
         ]));
 
-        expr.push_types_down().unwrap();
+        push_types_down_via_arena(&mut expr).unwrap();
         let expected =
             Expr::sequence(
                 vec![
