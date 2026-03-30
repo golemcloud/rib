@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    visit_post_order_mut, visit_pre_order_mut, ArmPattern, Expr, MatchArm, MatchIdentifier,
-    VariableId,
-};
+use crate::{Expr, MatchArm, MatchIdentifier, VariableId};
 use std::collections::HashMap;
 
 use crate::expr_arena::{
@@ -348,27 +345,6 @@ fn collect_pre_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
         for child in children_of(id, arena).into_iter().rev() {
             stack.push(child);
         }
-    }
-}
-
-struct IdentifierVariableIdState(HashMap<String, VariableId>);
-
-impl IdentifierVariableIdState {
-    fn new() -> Self {
-        IdentifierVariableIdState(HashMap::new())
-    }
-
-    fn update_variable_id(&mut self, name: &str) {
-        self.0
-            .entry(name.to_string())
-            .and_modify(|x| {
-                *x = x.increment_local_variable_id();
-            })
-            .or_insert_with(|| VariableId::local(name, 0));
-    }
-
-    fn lookup(&self, name: &str) -> Option<&VariableId> {
-        self.0.get(name)
     }
 }
 
