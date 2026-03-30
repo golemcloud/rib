@@ -202,19 +202,16 @@ fn check_invalid_worker_name_lowered(
                 check_worker_name_opt(*worker_name, arena, types)?;
             }
             CallTypeNode::Function {
-                instance_identifier,
+                instance_identifier: Some(ii),
                 ..
             } => {
-                if let Some(ii) = instance_identifier {
-                    check_worker_name_from_instance_id(ii, arena, types)?;
-                }
+                check_worker_name_from_instance_id(ii, arena, types)?;
             }
             CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
-                module, ..
+                module: Some(m),
+                ..
             }) => {
-                if let Some(m) = module {
-                    check_worker_name_from_instance_id(m, arena, types)?;
-                }
+                check_worker_name_from_instance_id(m, arena, types)?;
             }
             _ => {}
         }
@@ -375,37 +372,33 @@ fn call_type_worker_queue_ids(ct: &CallTypeNode) -> Vec<ExprId> {
     let mut out = Vec::new();
     match ct {
         CallTypeNode::Function {
-            instance_identifier,
+            instance_identifier: Some(ii),
             ..
-        } => {
-            if let Some(ii) = instance_identifier {
-                match ii {
-                    InstanceIdentifierNode::WitWorker { worker_name, .. }
-                    | InstanceIdentifierNode::WitResource { worker_name, .. } => {
-                        if let Some(w) = worker_name {
-                            out.push(*w);
-                        }
-                    }
+        } => match ii {
+            InstanceIdentifierNode::WitWorker { worker_name, .. }
+            | InstanceIdentifierNode::WitResource { worker_name, .. } => {
+                if let Some(w) = worker_name {
+                    out.push(*w);
                 }
             }
+        },
+        CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+            worker_name: Some(w),
+            ..
+        }) => {
+            out.push(*w);
         }
-        CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker { worker_name, .. }) => {
-            if let Some(w) = worker_name {
-                out.push(*w);
-            }
-        }
-        CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource { module, .. }) => {
-            if let Some(m) = module {
-                match m {
-                    InstanceIdentifierNode::WitWorker { worker_name, .. }
-                    | InstanceIdentifierNode::WitResource { worker_name, .. } => {
-                        if let Some(w) = worker_name {
-                            out.push(*w);
-                        }
-                    }
+        CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
+            module: Some(m),
+            ..
+        }) => match m {
+            InstanceIdentifierNode::WitWorker { worker_name, .. }
+            | InstanceIdentifierNode::WitResource { worker_name, .. } => {
+                if let Some(w) = worker_name {
+                    out.push(*w);
                 }
             }
-        }
+        },
         _ => {}
     }
     out

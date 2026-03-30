@@ -58,7 +58,7 @@ pub fn infer_worker_function_invokes_lowered(
                         })
                         .map_err(RibTypeErrorInternal::from)?;
 
-                    let module = get_instance_identifier_from_arena(&instance_type, lhs_id, arena);
+                    let module = get_instance_identifier_from_arena(instance_type, lhs_id, arena);
 
                     // Narrow the instance type on the lhs
                     let lhs_type_narrowed = {
@@ -172,7 +172,7 @@ pub fn infer_worker_function_invokes_lowered(
                             .map_err(RibTypeErrorInternal::from)?;
 
                         let module =
-                            get_instance_identifier_from_arena(&instance_type, lhs_id, arena);
+                            get_instance_identifier_from_arena(instance_type, lhs_id, arena);
 
                         // Narrow the lhs type
                         let lhs_narrowed = {

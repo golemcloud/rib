@@ -72,7 +72,7 @@ pub mod lowered {
             // Expr pipeline where set_origin runs first (setting OriginatedAt
             // on all nodes), then bind_type_annotations overwrites annotated
             // nodes with Declared.
-            if !current.origin.is_declared().is_some() {
+            if current.origin.is_declared().is_none() {
                 let span = arena.expr(id).source_span.clone();
                 let origin = TypeOrigin::OriginatedAt(span);
                 let updated = current.clone().add_origin(origin);

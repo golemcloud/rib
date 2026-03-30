@@ -363,7 +363,7 @@ impl TypeTable {
         }
         self.types
             .iter()
-            .all(|(id, ty)| other.types.get(id).map_or(false, |other_ty| ty == other_ty))
+            .all(|(id, ty)| other.types.get(id) == Some(ty))
     }
 
     /// Returns `true` if the current state matches a previously taken snapshot.
@@ -377,7 +377,7 @@ impl TypeTable {
         }
         snapshot
             .iter()
-            .all(|(id, ty)| self.types.get(id).map_or(false, |current| current == ty))
+            .all(|(id, ty)| self.types.get(id) == Some(ty))
     }
 }
 

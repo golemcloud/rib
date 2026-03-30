@@ -137,9 +137,9 @@ static PROFILE_INIT: Once = Once::new();
 static PROFILE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
-    static PROFILE_ENTRIES: RefCell<Vec<(&'static str, Duration)>> = RefCell::new(Vec::new());
+    static PROFILE_ENTRIES: RefCell<Vec<(&'static str, Duration)>> = const { RefCell::new(Vec::new()) };
     /// Nesting depth of `CompileProfileGuard` (inside `RibCompiler::compile`).
-    static COMPILE_SESSION_DEPTH: Cell<u32> = Cell::new(0);
+    static COMPILE_SESSION_DEPTH: Cell<u32> = const { Cell::new(0) };
 }
 
 pub(crate) fn rib_profile_enabled() -> bool {

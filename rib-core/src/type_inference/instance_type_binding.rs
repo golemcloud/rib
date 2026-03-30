@@ -65,19 +65,25 @@ fn worker_name_expr_id_from_call_node(ct: &CallTypeNode) -> Option<ExprId> {
             ..
         }) => Some(*id),
         CallTypeNode::Function {
-            instance_identifier: Some(ii),
+            instance_identifier:
+                Some(InstanceIdentifierNode::WitWorker {
+                    worker_name: Some(id),
+                    ..
+                }),
             ..
-        } => match ii {
-            InstanceIdentifierNode::WitWorker {
-                worker_name: Some(id),
-                ..
-            }
-            | InstanceIdentifierNode::WitResource {
-                worker_name: Some(id),
-                ..
-            } => Some(*id),
-            _ => None,
-        },
+        }
+        | CallTypeNode::Function {
+            instance_identifier:
+                Some(InstanceIdentifierNode::WitResource {
+                    worker_name: Some(id),
+                    ..
+                }),
+            ..
+        } => Some(*id),
+        CallTypeNode::Function {
+            instance_identifier: Some(_),
+            ..
+        } => None,
         _ => None,
     }
 }
