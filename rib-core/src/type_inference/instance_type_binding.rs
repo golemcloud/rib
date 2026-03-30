@@ -28,7 +28,7 @@ use std::collections::HashMap;
 /// [`InstanceType`] stores `Option<Box<Expr>>` for worker names; during
 /// inference those can diverge from the canonical subtree referenced by
 /// [`ExprId`] in the call node (for example after
-/// [`super::stateful_instance::ensure_stateful_instance_lowered`]).
+/// [`super::stateful_instance::ensure_stateful_instance`]).
 /// This pass aligns `TypeTable` with what [`rebuild_expr`] will produce.
 pub fn sync_embedded_worker_exprs_from_calls(
     root: ExprId,

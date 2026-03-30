@@ -16,16 +16,9 @@ use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
 };
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{
-    visit_post_order_rev_mut, CallType, Expr, InferredType, InstanceCreationType, TypeInternal,
-    TypeOrigin,
-};
+use crate::{InferredType, TypeInternal, TypeOrigin};
 
-pub fn ensure_stateful_instance_lowered(
-    root: ExprId,
-    arena: &mut ExprArena,
-    types: &mut TypeTable,
-) {
+pub fn ensure_stateful_instance(root: ExprId, arena: &mut ExprArena, types: &mut TypeTable) {
     let mut ids_to_patch = Vec::new();
 
     let mut stack = vec![root];
@@ -96,29 +89,4 @@ pub fn ensure_stateful_instance_lowered(
             }
         }
     }
-}
-
-pub fn ensure_stateful_instance(expr: &mut Expr) {
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::Call {
-            call_type:
-                CallType::InstanceCreation(InstanceCreationType::WitWorker { worker_name, .. }),
-            inferred_type,
-            args,
-            ..
-        } = expr
-        {
-            if worker_name.is_none() {
-                *worker_name = Some(Box::new(Expr::generate_worker_name(None)));
-
-                let type_internal = &mut *inferred_type.inner;
-
-                *args = vec![Expr::generate_worker_name(None)];
-
-                if let TypeInternal::Instance { instance_type } = type_internal {
-                    instance_type.set_worker_name(Expr::generate_worker_name(None))
-                }
-            }
-        }
-    });
 }

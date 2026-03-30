@@ -1290,10 +1290,6 @@ impl Expr {
         Ok(())
     }
 
-    pub fn ensure_stateful_instance(&mut self) {
-        type_inference::ensure_stateful_instance(self)
-    }
-
     pub fn bind_type_annotations(&mut self) {
         type_inference::bind_type_annotations(self);
     }

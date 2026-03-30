@@ -16,8 +16,8 @@ use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_checker::Path;
 use crate::type_checker::PathElem;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{InferredType};
-use crate::{VariableId};
+use crate::InferredType;
+use crate::VariableId;
 
 #[derive(Clone, Debug)]
 pub struct GlobalVariableTypeSpec {
