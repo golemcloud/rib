@@ -462,8 +462,8 @@ pub mod arena {
     use crate::type_inference::call_arguments_inference::internal::FunctionDetails;
     use crate::type_inference::expr_visitor::arena::children_of;
     use crate::{
-        ComponentDependencies, CustomInstanceSpec, FullyQualifiedResourceConstructor,
-        FullyQualifiedResourceMethod, FunctionCallError, FunctionName, InferredType, TypeInternal,
+        ComponentDependencies, CustomInstanceSpec, FullyQualifiedResourceMethod, FunctionCallError,
+        FunctionName, InferredType, TypeInternal,
     };
 
     /// Arena version of `infer_function_call_types`.

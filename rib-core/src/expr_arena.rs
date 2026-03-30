@@ -1634,7 +1634,7 @@ fn rebuild_call_type(
     arena: &ExprArena,
     types: &TypeTable,
 ) -> crate::call_type::CallType {
-    use crate::call_type::{CallType, InstanceCreationType, InstanceIdentifier};
+    use crate::call_type::{CallType, InstanceCreationType};
     match call_type {
         CallTypeNode::Function {
             component_info,

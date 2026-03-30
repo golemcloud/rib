@@ -134,7 +134,7 @@ pub mod arena {
     fn convert_identifier_nodes(
         root: ExprId,
         arena: &mut ExprArena,
-        types: &TypeTable,
+        _types: &TypeTable,
         no_arg_variants: &[String],
     ) {
         let mut ids_to_convert = Vec::new();

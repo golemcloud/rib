@@ -39,15 +39,14 @@ pub mod arena {
     };
     use crate::rib_type_error::RibTypeErrorInternal;
     use crate::type_inference::expr_visitor::arena::children_of;
-    use crate::type_inference::type_hint::TypeHint;
+    use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
     use crate::type_refinement::precise_types::{ListType, RecordType};
     use crate::type_refinement::TypeRefinement;
     use crate::{
-        ActualType, ComponentDependencies, CustomError, ExpectedType, FullyQualifiedResourceMethod,
-        FunctionName, GetTypeHint, InferredType, InstanceIdentifier, InterfaceName, PackageName,
-        Path, TypeInternal, TypeMismatchError,
+        ActualType, ComponentDependencies, ExpectedType, FullyQualifiedResourceMethod,
+        FunctionName, InferredType, InterfaceName, PackageName, Path, TypeInternal,
+        TypeMismatchError,
     };
-    use std::ops::Deref;
 
     /// Arena version of `type_pull_up`.
     ///

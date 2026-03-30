@@ -67,7 +67,7 @@ pub mod arena {
                         ref component_info,
                         ..
                     }),
-                ref args,
+                args: _,
                 ..
             } = call_kind
             {

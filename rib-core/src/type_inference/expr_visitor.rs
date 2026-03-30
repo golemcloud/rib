@@ -612,11 +612,8 @@ fn visit_children<'a>(expr: &'a Expr, mut each: impl FnMut(&'a Expr)) {
 // `(ExprId, &ExprArena, &mut TypeTable)`.  The old visitors are untouched;
 // passes migrate one at a time.
 //
-// Traversal order semantics are identical to the non-arena variants:
-//   - `arena_visit_post_order_mut`      — children first, then parent (bottom-up)
-//   - `arena_try_visit_post_order_mut`  — same, but fallible
-//   - `arena_visit_pre_order_mut`       — parent first, then children (top-down)
-//   - `arena_try_visit_pre_order_mut`   — same, but fallible
+// Arena traversal currently exposes pre-order mutation and `children_of` for
+// passes that implement their own walk.
 // =============================================================================
 
 pub mod arena {
@@ -624,34 +621,6 @@ pub mod arena {
         ArmPatternNode, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
         InstanceIdentifierNode, MatchArmNode, RangeKind, ResultExprKind, TypeTable,
     };
-
-    // -------------------------------------------------------------------------
-    // Post-order (bottom-up): children first, then parent.
-    // -------------------------------------------------------------------------
-
-    pub fn visit_post_order_mut(
-        id: ExprId,
-        arena: &ExprArena,
-        types: &mut TypeTable,
-        f: &mut impl FnMut(ExprId, &ExprArena, &mut TypeTable),
-    ) {
-        for child in children_of(id, arena) {
-            visit_post_order_mut(child, arena, types, f);
-        }
-        f(id, arena, types);
-    }
-
-    pub fn try_visit_post_order_mut<E>(
-        id: ExprId,
-        arena: &ExprArena,
-        types: &mut TypeTable,
-        f: &mut impl FnMut(ExprId, &ExprArena, &mut TypeTable) -> Result<(), E>,
-    ) -> Result<(), E> {
-        for child in children_of(id, arena) {
-            try_visit_post_order_mut(child, arena, types, f)?;
-        }
-        f(id, arena, types)
-    }
 
     // -------------------------------------------------------------------------
     // Pre-order (top-down): parent first, then children.
@@ -667,35 +636,6 @@ pub mod arena {
         for child in children_of(id, arena) {
             visit_pre_order_mut(child, arena, types, f);
         }
-    }
-
-    pub fn try_visit_pre_order_mut<E>(
-        id: ExprId,
-        arena: &ExprArena,
-        types: &mut TypeTable,
-        f: &mut impl FnMut(ExprId, &ExprArena, &mut TypeTable) -> Result<(), E>,
-    ) -> Result<(), E> {
-        f(id, arena, types)?;
-        for child in children_of(id, arena) {
-            try_visit_pre_order_mut(child, arena, types, f)?;
-        }
-        Ok(())
-    }
-
-    // -------------------------------------------------------------------------
-    // Immutable post-order (no TypeTable mutation needed).
-    // -------------------------------------------------------------------------
-
-    pub fn visit_post_order(
-        id: ExprId,
-        arena: &ExprArena,
-        types: &TypeTable,
-        f: &mut impl FnMut(ExprId, &ExprArena, &TypeTable),
-    ) {
-        for child in children_of(id, arena) {
-            visit_post_order(child, arena, types, f);
-        }
-        f(id, arena, types);
     }
 
     // -------------------------------------------------------------------------

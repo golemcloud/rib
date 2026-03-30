@@ -16,10 +16,10 @@ use crate::rib_type_error::RibTypeErrorInternal;
 use crate::Expr;
 
 pub mod arena {
-    use crate::call_type::{CallType, InstanceCreationType, InstanceIdentifier};
+    use crate::call_type::InstanceIdentifier;
     use crate::expr_arena::{
-        CallTypeNode, ExprArena, ExprId, ExprKind, ExprNode, InstanceCreationNode,
-        InstanceIdentifierNode, TypeTable,
+        CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, InstanceIdentifierNode,
+        TypeTable,
     };
     use crate::rib_type_error::RibTypeErrorInternal;
     use crate::type_inference::expr_visitor::arena::children_of;
@@ -27,7 +27,7 @@ pub mod arena {
     use crate::InstanceType;
     use crate::{
         CustomError, DynamicParsedFunctionName, FullyQualifiedResourceConstructor,
-        FunctionCallError, FunctionName, InferredType, TypeInternal, TypeOrigin, VariableId,
+        FunctionCallError, FunctionName, InferredType, TypeInternal, TypeOrigin,
     };
 
     /// Arena version of `infer_worker_function_invokes`.

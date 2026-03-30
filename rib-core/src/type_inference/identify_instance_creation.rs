@@ -339,7 +339,7 @@ pub mod arena {
                     }
                     InstanceCreationNode::WitResource {
                         component_info,
-                        module,
+                        module: _,
                         resource_name,
                     } => {
                         InstanceCreationType::WitResource {
