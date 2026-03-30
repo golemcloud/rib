@@ -16,8 +16,10 @@ use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
 };
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{visit_post_order_rev_mut, CallType, Expr, InstanceCreationType, InferredType, TypeInternal,
-            TypeOrigin};
+use crate::{
+    visit_post_order_rev_mut, CallType, Expr, InferredType, InstanceCreationType, TypeInternal,
+    TypeOrigin,
+};
 
 pub fn ensure_stateful_instance_lowered(
     root: ExprId,
@@ -80,7 +82,8 @@ pub fn ensure_stateful_instance_lowered(
             };
 
             let current_type = types.get(id).clone();
-            if let TypeInternal::Instance { mut instance_type } = current_type.internal_type().clone()
+            if let TypeInternal::Instance { mut instance_type } =
+                current_type.internal_type().clone()
             {
                 instance_type.set_worker_name(crate::Expr::generate_worker_name(None));
                 let new_type = InferredType::new(

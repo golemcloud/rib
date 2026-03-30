@@ -19,12 +19,7 @@ use crate::{ComponentDependencies, Expr};
 
 pub fn infer_enums(expr: &mut Expr, component_dependencies: &ComponentDependencies) {
     let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    infer_enums_lowered(
-        root,
-        &mut expr_arena,
-        &mut types,
-        component_dependencies,
-    );
+    infer_enums_lowered(root, &mut expr_arena, &mut types, component_dependencies);
     *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 

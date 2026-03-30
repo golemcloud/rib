@@ -1152,7 +1152,12 @@ impl Expr {
             custom_instance_spec,
         )?;
 
-        ti::variant_inference::infer_variants_lowered(root, &mut arena, &mut types, component_dependency);
+        ti::variant_inference::infer_variants_lowered(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+        );
         ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
         ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
 
@@ -1209,20 +1214,13 @@ impl Expr {
         // One more round after fix-point 2 converges, to ensure all types
         // are fully propagated before we rebuild the Expr tree.
         ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
-        ti::type_pull_up::type_pull_up_lowered(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-        )?;
+        ti::type_pull_up::type_pull_up_lowered(root, &mut arena, &mut types, component_dependency)?;
         ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
         ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
 
         // Align InstanceType.worker_name with arena worker subtrees, then
         // propagate instance types to identifiers (single implementation path).
-        ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(
-            root, &arena, &mut types,
-        );
+        ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(root, &arena, &mut types);
         ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
 
         // ── Rebuild ────────────────────────────────────────────────────────
@@ -1259,61 +1257,13 @@ impl Expr {
             &mut types,
             component_dependency,
         );
-        ti::enum_inference::infer_enums_lowered(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-        );
+        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
         *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
     }
 
-    // Make sure the bindings in the arm pattern of a pattern match are given variable-ids.
-    // The same variable-ids will be tagged to the corresponding identifiers in the arm resolution
-    // to avoid conflicts.
-    pub fn bind_variables_of_pattern_match(&mut self) {
-        type_inference::bind_variables_of_pattern_match(self);
-    }
-
-    // Make sure the variable assignment (let binding) are given variable ids,
-    // which will be tagged to the corresponding identifiers to avoid conflicts.
-    // This is done only for local variables and not global variables
-    pub fn bind_variables_of_let_assignment(&mut self) {
-        type_inference::bind_variables_of_let_assignment(self);
-    }
-
-    pub fn bind_variables_of_list_comprehension(&mut self) {
-        type_inference::bind_variables_of_list_comprehension(self);
-    }
-
-    pub fn bind_variables_of_list_reduce(&mut self) {
-        type_inference::bind_variables_of_list_reduce(self);
-    }
-
-    pub fn identify_instance_creation(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::identify_instance_creation(self, component_dependency, custom_instance_spec)
-    }
-
     pub fn ensure_stateful_instance(&mut self) {
         type_inference::ensure_stateful_instance(self)
-    }
-
-    pub fn infer_function_call_types(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::infer_function_call_types(
-            self,
-            component_dependency,
-            custom_instance_spec,
-        )?;
-        Ok(())
     }
 
     pub fn push_types_down(&mut self) -> Result<(), RibTypeErrorInternal> {

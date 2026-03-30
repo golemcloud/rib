@@ -12,331 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::VecDeque;
 use std::fmt::Display;
 
 use crate::analysis::AnalysedType;
-use crate::call_type::{CallType, InstanceCreationType};
+use crate::call_type::CallType;
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
 };
 use crate::inferred_type::TypeOrigin;
-use crate::rib_source_span::SourceSpan;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::type_inference::GetTypeHint;
 use crate::{
-    ActualType, ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName, Expr,
-    ExpectedType, FullyQualifiedResourceConstructor, FullyQualifiedResourceMethod,
-    FunctionCallError, FunctionName, InferredType, TypeInternal, TypeMismatchError,
+    ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName,
+    FullyQualifiedResourceMethod, FunctionCallError, FunctionName, InferredType, TypeInternal,
 };
-
-
-// Resolving function arguments and return types based on function type registry
-// If the function call is a mere instance creation, then the return type
-// At this point we can even annotate the call_type with the actual component name
-// If component  is ambiguous at this stage, compiler has no other choice than bailing
-// and asking the user to specify the type parameter that may help with drilling down the component explicitly.
-pub fn infer_function_call_types(
-    expr: &mut Expr,
-    component_dependency: &ComponentDependencies,
-    custom_instance_spec: &[CustomInstanceSpec],
-) -> Result<(), FunctionCallError> {
-    let mut visitor = VecDeque::new();
-    visitor.push_back(expr);
-    while let Some(expr) = visitor.pop_back() {
-        let source_span = expr.source_span();
-
-        if let Expr::Call {
-            call_type,
-            args,
-            inferred_type,
-            ..
-        } = expr
-        {
-            resolve_call_argument_types(
-                &source_span,
-                call_type,
-                component_dependency,
-                args,
-                inferred_type,
-                custom_instance_spec,
-            )?;
-        } else {
-            expr.visit_expr_nodes_lazy(&mut visitor);
-        }
-    }
-
-    Ok(())
-}
-
-pub fn resolve_call_argument_types(
-    source_span: &SourceSpan,
-    call_type: &mut CallType,
-    component_dependency: &ComponentDependencies,
-    args: &mut [Expr],
-    function_result_inferred_type: &mut InferredType,
-    custom_instance_spec: &[CustomInstanceSpec],
-) -> Result<(), FunctionCallError> {
-    let cloned = call_type.clone();
-
-    match call_type {
-        CallType::InstanceCreation(instance) => match instance {
-            InstanceCreationType::WitWorker { .. } => {
-                // If there is a custom instance spec, we completely discard about tagging anything
-                // that's in the worker instance argument to be a string
-                if custom_instance_spec.is_empty() {
-                    for arg in args.iter_mut() {
-                        if arg.inferred_type().is_unknown() {
-                            arg.add_infer_type_mut(InferredType::string());
-                        }
-                    }
-                }
-
-                Ok(())
-            }
-
-            InstanceCreationType::WitResource { resource_name, .. } => {
-                infer_resource_constructor_arguments(
-                    source_span,
-                    resource_name,
-                    Some(args),
-                    component_dependency,
-                )?;
-
-                Ok(())
-            }
-        },
-
-        CallType::Function { function_name, .. } => {
-            let function_name0 = FunctionName::from_dynamic_parsed_function_name(function_name);
-
-            match function_name0 {
-                FunctionName::ResourceMethod(fqn_resource_method) => {
-                    infer_resource_method_arguments(
-                        source_span,
-                        &fqn_resource_method,
-                        function_name,
-                        component_dependency,
-                        args,
-                        function_result_inferred_type,
-                    )
-                }
-                _ => {
-                    let registry_key = FunctionName::from_call_type(&cloned).ok_or(
-                        FunctionCallError::InvalidFunctionCall {
-                            function_name: function_name.to_string(),
-                            source_span: source_span.clone(),
-                            message: "unknown function".to_string(),
-                        },
-                    )?;
-
-                    infer_args_and_result_type(
-                        source_span,
-                        &FunctionDetails::Fqn(function_name.clone()),
-                        component_dependency,
-                        &registry_key,
-                        args,
-                        Some(function_result_inferred_type),
-                    )
-                }
-            }
-        }
-
-        CallType::EnumConstructor(name) => {
-            if args.is_empty() {
-                Ok(())
-            } else {
-                Err(FunctionCallError::ArgumentSizeMisMatch {
-                    function_name: name.to_string(),
-                    source_span: source_span.clone(),
-                    expected: 0,
-                    provided: args.len(),
-                })
-            }
-        }
-
-        CallType::VariantConstructor(variant_name) => {
-            let function_name = FunctionName::Variant(variant_name.clone());
-            infer_args_and_result_type(
-                source_span,
-                &FunctionDetails::VariantName(variant_name.clone()),
-                component_dependency,
-                &function_name,
-                args,
-                Some(function_result_inferred_type),
-            )
-        }
-    }
-}
-
-fn infer_resource_method_arguments(
-    source_span: &SourceSpan,
-    fqn_resource_method: &FullyQualifiedResourceMethod,
-    dynamic_parsed_function_name: &mut DynamicParsedFunctionName,
-    function_type_registry: &ComponentDependencies,
-    resource_method_args: &mut [Expr],
-    function_result_inferred_type: &mut InferredType,
-) -> Result<(), FunctionCallError> {
-    // Infer the types of resource method parameters
-
-    let resource_constructor_name = dynamic_parsed_function_name
-        .resource_name_simplified()
-        .unwrap_or_default();
-
-    let resource_method = fqn_resource_method.method_name.clone();
-
-    infer_args_and_result_type(
-        source_span,
-        &FunctionDetails::ResourceMethodName {
-            resource_name: resource_constructor_name,
-            resource_method_name: resource_method,
-        },
-        function_type_registry,
-        &FunctionName::ResourceMethod(fqn_resource_method.clone()),
-        resource_method_args,
-        Some(function_result_inferred_type),
-    )
-}
-
-fn infer_resource_constructor_arguments(
-    source_span: &SourceSpan,
-    resource_constructor: &FullyQualifiedResourceConstructor,
-    raw_resource_parameters: Option<&mut [Expr]>,
-    function_type_registry: &ComponentDependencies,
-) -> Result<(), FunctionCallError> {
-    let mut constructor_params: &mut [Expr] = &mut [];
-
-    if let Some(resource_params) = raw_resource_parameters {
-        constructor_params = resource_params
-    }
-
-    let function_name = FunctionName::ResourceConstructor(resource_constructor.clone());
-
-    // Infer the types of constructor parameter expressions
-    infer_args_and_result_type(
-        source_span,
-        &FunctionDetails::ResourceConstructorName {
-            resource_constructor_name: resource_constructor.resource_name.clone(),
-        },
-        function_type_registry,
-        &function_name,
-        constructor_params,
-        None,
-    )
-}
-
-fn infer_args_and_result_type(
-    original_source_span: &SourceSpan,
-    function_name: &FunctionDetails,
-    component_dependency: &ComponentDependencies,
-    key: &FunctionName,
-    args: &mut [Expr],
-    function_result_inferred_type: Option<&mut InferredType>,
-) -> Result<(), FunctionCallError> {
-    let (_, function_type) =
-        component_dependency
-            .get_function_type(&None, key)
-            .map_err(|err| FunctionCallError::InvalidFunctionCall {
-                function_name: function_name.to_string(),
-                source_span: original_source_span.clone(),
-                message: err.to_string(),
-            })?;
-
-    let mut parameter_types: Vec<AnalysedType> = function_type
-        .parameter_types
-        .iter()
-        .map(|t| AnalysedType::try_from(t).unwrap())
-        .collect::<Vec<_>>();
-
-    match key {
-        FunctionName::Variant(_) => {
-            let result_type = function_type.as_type_variant().ok_or(
-                FunctionCallError::InvalidFunctionCall {
-                    function_name: function_name.to_string(),
-                    source_span: original_source_span.clone(),
-                    message: "expected a variant type".to_string(),
-                },
-            )?;
-
-            if parameter_types.len() == args.len() {
-                tag_argument_types(function_name, args, &parameter_types)?;
-
-                if let Some(function_result_type) = function_result_inferred_type {
-                    *function_result_type = InferredType::from_type_variant(&result_type);
-                }
-
-                Ok(())
-            } else {
-                Err(FunctionCallError::ArgumentSizeMisMatch {
-                    function_name: function_name.name(),
-                    source_span: original_source_span.clone(),
-                    expected: parameter_types.len(),
-                    provided: args.len(),
-                })
-            }
-        }
-
-        FunctionName::Enum(_) => Ok(()),
-
-        FunctionName::ResourceConstructor(_) | FunctionName::Function(_) => {
-            if parameter_types.len() == args.len() {
-                let result_type = function_type.return_type.clone();
-
-                tag_argument_types(function_name, args, &parameter_types)?;
-
-                if let Some(function_result_type) = function_result_inferred_type {
-                    *function_result_type = {
-                        if let Some(tpe) = result_type {
-                            tpe
-                        } else {
-                            InferredType::sequence(vec![])
-                        }
-                    };
-                }
-
-                Ok(())
-            } else {
-                Err(FunctionCallError::ArgumentSizeMisMatch {
-                    function_name: function_name.name(),
-                    source_span: original_source_span.clone(),
-                    expected: parameter_types.len(),
-                    provided: args.len(),
-                })
-            }
-        }
-
-        FunctionName::ResourceMethod(_) => {
-            if let Some(AnalysedType::Handle(_)) = parameter_types.first() {
-                parameter_types.remove(0);
-            }
-
-            let return_type = function_type.return_type.clone();
-
-            if parameter_types.len() == args.len() {
-                tag_argument_types(function_name, args, &parameter_types)?;
-
-                if let Some(function_result_type) = function_result_inferred_type {
-                    *function_result_type = {
-                        if let Some(tpe) = return_type {
-                            tpe
-                        } else {
-                            InferredType::sequence(vec![])
-                        }
-                    }
-                };
-
-                Ok(())
-            } else {
-                Err(FunctionCallError::ArgumentSizeMisMatch {
-                    function_name: function_name.name(),
-                    source_span: original_source_span.clone(),
-                    expected: parameter_types.len(),
-                    provided: args.len(),
-                })
-            }
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum FunctionDetails {
@@ -395,67 +83,7 @@ impl Display for FunctionDetails {
     }
 }
 
-// A preliminary check of the arguments passed before  typ inference
-fn check_function_arguments(
-    function_name: &FunctionDetails,
-    expected: &AnalysedType,
-    provided: &Expr,
-) -> Result<(), FunctionCallError> {
-    let is_valid =
-        if provided.inferred_type().is_unknown() | provided.inferred_type().is_all_of() {
-            true
-        } else {
-            provided.inferred_type().get_type_hint().get_type_kind()
-                == expected.get_type_hint().get_type_kind()
-        };
-
-    if is_valid {
-        Ok(())
-    } else {
-        Err(FunctionCallError::TypeMisMatch {
-            function_name: function_name.name(),
-            argument_source_span: provided.source_span(),
-            error: TypeMismatchError {
-                source_span: provided.source_span(),
-                expected_type: ExpectedType::AnalysedType(expected.clone()),
-                actual_type: ActualType::Inferred(provided.inferred_type().clone()),
-                field_path: Default::default(),
-                additional_error_detail: vec![],
-            },
-        })
-    }
-}
-
-fn tag_argument_types(
-    function_name: &FunctionDetails,
-    args: &mut [Expr],
-    parameter_types: &[AnalysedType],
-) -> Result<(), FunctionCallError> {
-    for (arg, param_type) in args.iter_mut().zip(parameter_types) {
-        // This is to get around a variant conflict problem and is not the best solution
-        if let AnalysedType::Variant(type_variant) = param_type {
-            if let TypeInternal::Variant(collections) =
-                arg.inferred_type_mut().internal_type_mut()
-            {
-                *collections = type_variant
-                    .cases
-                    .iter()
-                    .map(|case| (case.name.clone(), case.typ.as_ref().map(InferredType::from)))
-                    .collect();
-            }
-        }
-
-        check_function_arguments(function_name, param_type, arg)?;
-        arg.add_infer_type_mut(
-            InferredType::from(param_type).add_origin(TypeOrigin::Declared(arg.source_span())),
-        );
-    }
-
-    Ok(())
-}
-
-
-/// Lowered-tree implementation used by the public `infer_function_call_types` entry when needed from [`crate::expr_arena`].
+/// Arena-based function-call argument typing (used from [`crate::expr_arena`] inference).
 pub fn infer_function_call_types_lowered(
     root: ExprId,
     arena: &ExprArena,
@@ -621,8 +249,7 @@ fn infer_resource_method_args_arena(
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
-    let resource_constructor_name =
-        function_name.resource_name_simplified().unwrap_or_default();
+    let resource_constructor_name = function_name.resource_name_simplified().unwrap_or_default();
     let resource_method = fqrm.method_name.clone();
     infer_args_and_result_type_arena(
         span,
@@ -650,14 +277,13 @@ fn infer_args_and_result_type_arena(
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
-    let (_, function_type) =
-        component_dependency
-            .get_function_type(&None, key)
-            .map_err(|err| FunctionCallError::InvalidFunctionCall {
-                function_name: function_details.to_string(),
-                source_span: span.clone(),
-                message: err.to_string(),
-            })?;
+    let (_, function_type) = component_dependency
+        .get_function_type(&None, key)
+        .map_err(|err| FunctionCallError::InvalidFunctionCall {
+            function_name: function_details.to_string(),
+            source_span: span.clone(),
+            message: err.to_string(),
+        })?;
 
     let mut parameter_types: Vec<AnalysedType> = function_type
         .parameter_types
@@ -667,22 +293,17 @@ fn infer_args_and_result_type_arena(
 
     match key {
         FunctionName::Variant(_) => {
-            let result_type = function_type.as_type_variant().ok_or(
-                FunctionCallError::InvalidFunctionCall {
-                    function_name: function_details.to_string(),
-                    source_span: span.clone(),
-                    message: "expected a variant type".to_string(),
-                },
-            )?;
+            let result_type =
+                function_type
+                    .as_type_variant()
+                    .ok_or(FunctionCallError::InvalidFunctionCall {
+                        function_name: function_details.to_string(),
+                        source_span: span.clone(),
+                        message: "expected a variant type".to_string(),
+                    })?;
 
             if parameter_types.len() == args.len() {
-                tag_argument_types_arena(
-                    function_details,
-                    args,
-                    &parameter_types,
-                    arena,
-                    types,
-                )?;
+                tag_argument_types_arena(function_details, args, &parameter_types, arena, types)?;
                 if let Some(rid) = result_id {
                     types.set(rid, InferredType::from_type_variant(&result_type));
                 }
@@ -702,13 +323,7 @@ fn infer_args_and_result_type_arena(
         FunctionName::ResourceConstructor(_) | FunctionName::Function(_) => {
             if parameter_types.len() == args.len() {
                 let result_type = function_type.return_type.clone();
-                tag_argument_types_arena(
-                    function_details,
-                    args,
-                    &parameter_types,
-                    arena,
-                    types,
-                )?;
+                tag_argument_types_arena(function_details, args, &parameter_types, arena, types)?;
                 if let Some(rid) = result_id {
                     let rt = result_type.unwrap_or_else(|| InferredType::sequence(vec![]));
                     types.set(rid, rt);
@@ -730,13 +345,7 @@ fn infer_args_and_result_type_arena(
             }
             let return_type = function_type.return_type.clone();
             if parameter_types.len() == args.len() {
-                tag_argument_types_arena(
-                    function_details,
-                    args,
-                    &parameter_types,
-                    arena,
-                    types,
-                )?;
+                tag_argument_types_arena(function_details, args, &parameter_types, arena, types)?;
                 if let Some(rid) = result_id {
                     let rt = return_type.unwrap_or_else(|| InferredType::sequence(vec![]));
                     types.set(rid, rt);
@@ -784,8 +393,7 @@ fn tag_argument_types_arena(
             true
         } else {
             use crate::type_inference::GetTypeHint;
-            arg_type.get_type_hint().get_type_kind()
-                == param_type.get_type_hint().get_type_kind()
+            arg_type.get_type_hint().get_type_kind() == param_type.get_type_hint().get_type_kind()
         };
 
         if !is_valid {
@@ -827,10 +435,28 @@ mod function_parameters_inference_tests {
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
     use crate::{
-        ComponentDependencies, ComponentDependencyKey, Expr, InferredType, ParsedFunctionSite,
+        ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
+        InferredType, ParsedFunctionSite,
     };
     use bigdecimal::BigDecimal;
     use uuid::Uuid;
+
+    fn infer_function_call_types_via_arena(
+        expr: &mut Expr,
+        component_dependency: &ComponentDependencies,
+        custom_instance_spec: &[CustomInstanceSpec],
+    ) -> Result<(), FunctionCallError> {
+        let (arena, mut types, root) = crate::expr_arena::lower(expr);
+        super::infer_function_call_types_lowered(
+            root,
+            &arena,
+            &mut types,
+            component_dependency,
+            custom_instance_spec,
+        )?;
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        Ok(())
+    }
 
     fn get_component_dependencies() -> ComponentDependencies {
         let metadata = vec![
@@ -874,8 +500,7 @@ mod function_parameters_inference_tests {
         let function_type_registry = get_component_dependencies();
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
-        expr.infer_function_call_types(&function_type_registry, &[])
-            .unwrap();
+        infer_function_call_types_via_arena(&mut expr, &function_type_registry, &[]).unwrap();
 
         let let_binding = Expr::let_binding("x", Expr::number(BigDecimal::from(1)), None);
 

@@ -46,9 +46,9 @@ pub(crate) mod global_input_inference;
 pub(crate) mod global_variable_type_binding;
 pub(crate) mod identifier_inference;
 pub(crate) mod identify_instance_creation;
-pub(crate) mod initial_arena_phase;
 mod inference_fix_point;
 mod inferred_expr;
+pub(crate) mod initial_arena_phase;
 pub(crate) mod instance_type_binding;
 mod rib_input_type;
 mod rib_output_type;
@@ -2599,11 +2599,7 @@ mod tests {
             }
         }
 
-        pub fn greater_than_or_equal_to(
-            lhs: Expr,
-            rhs: Expr,
-            inferred_type: InferredType,
-        ) -> Expr {
+        pub fn greater_than_or_equal_to(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::GreaterThanOrEqualTo {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2623,11 +2619,7 @@ mod tests {
             }
         }
 
-        pub fn less_than_or_equal_to(
-            lhs: Expr,
-            rhs: Expr,
-            inferred_type: InferredType,
-        ) -> Expr {
+        pub fn less_than_or_equal_to(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::LessThanOrEqualTo {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2812,9 +2804,7 @@ mod tests {
             ))
         }
 
-        pub fn expected_expr_for_enum_test(
-            component_dependencies: &ComponentDependencies,
-        ) -> Expr {
+        pub fn expected_expr_for_enum_test(component_dependencies: &ComponentDependencies) -> Expr {
             let expected_component_in_function_calls = component_dependencies
                 .clone()
                 .dependencies

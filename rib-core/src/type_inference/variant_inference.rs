@@ -18,12 +18,7 @@ use crate::{ComponentDependencies, Expr, InferredType};
 
 pub fn infer_variants(expr: &mut Expr, component_dependency: &ComponentDependencies) {
     let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    infer_variants_lowered(
-        root,
-        &mut expr_arena,
-        &mut types,
-        component_dependency,
-    );
+    infer_variants_lowered(root, &mut expr_arena, &mut types, component_dependency);
     *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 

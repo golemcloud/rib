@@ -28,7 +28,6 @@ use crate::{
     InferredType, InterfaceName, PackageName, Path, TypeInternal, TypeMismatchError,
 };
 
-
 /// Runs [`type_pull_up_lowered`] on a lowered copy of `expr` and writes back the
 /// rebuilt tree. All pull-up logic lives in the arena implementation.
 pub fn type_pull_up(
@@ -36,12 +35,7 @@ pub fn type_pull_up(
     component_dependencies: &ComponentDependencies,
 ) -> Result<(), RibTypeErrorInternal> {
     let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    type_pull_up_lowered(
-        root,
-        &mut expr_arena,
-        &mut types,
-        component_dependencies,
-    )?;
+    type_pull_up_lowered(root, &mut expr_arena, &mut types, component_dependencies)?;
     *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
     Ok(())
 }
@@ -971,7 +965,10 @@ mod type_pull_up_tests {
                     arm_resolution_expr: Box::new(
                         Expr::select_field(
                             Expr::identifier_global("baz", None).with_inferred_type(
-                                InferredType::record(vec![("qux".to_string(), InferredType::string())]),
+                                InferredType::record(vec![(
+                                    "qux".to_string(),
+                                    InferredType::string(),
+                                )]),
                             ),
                             "qux",
                             None,

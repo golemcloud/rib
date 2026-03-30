@@ -31,7 +31,6 @@ use crate::{
 };
 use std::ops::Deref;
 
-
 /// Runs [`push_types_down_lowered`] on a lowered copy of `expr` and writes back
 /// the rebuilt tree.
 pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
@@ -86,7 +85,6 @@ fn get_compilation_error_for_ambiguity(
         }
     }
 }
-
 
 /// Lowered-tree implementation used by [`super::push_types_down`].
 ///
@@ -418,12 +416,8 @@ fn handle_list_comprehension_arena(
 
     let refined_result = ListType::refine(comprehension_type).ok_or_else(|| {
         let yield_span = arena.expr(yield_id).source_span.clone();
-        get_compilation_error_for_ambiguity(
-            comprehension_type,
-            &yield_span,
-            &TypeHint::List(None),
-        )
-        .with_additional_error_detail("the result of a comprehension should be of type list")
+        get_compilation_error_for_ambiguity(comprehension_type, &yield_span, &TypeHint::List(None))
+            .with_additional_error_detail("the result of a comprehension should be of type list")
     })?;
 
     merge_into(yield_id, refined_result.inner_type().clone(), types);
@@ -559,10 +553,7 @@ fn update_arm_pattern_type_arena(
                     Some(ok) => ok.inner_type(),
                     None => {
                         ErrType::refine(predicate_type).ok_or_else(|| {
-                            InvalidPatternMatchError::constructor_type_mismatch(
-                                span.clone(),
-                                "ok",
-                            )
+                            InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "ok")
                         })?;
                         InferredType::unknown()
                     }
@@ -572,10 +563,7 @@ fn update_arm_pattern_type_arena(
                     Some(err) => err.inner_type(),
                     None => {
                         OkType::refine(predicate_type).ok_or_else(|| {
-                            InvalidPatternMatchError::constructor_type_mismatch(
-                                span.clone(),
-                                "err",
-                            )
+                            InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "err")
                         })?;
                         InferredType::unknown()
                     }

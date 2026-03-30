@@ -22,7 +22,7 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::type_parameter::TypeParameter;
 use crate::InstanceType;
 use crate::{
-    CustomError, DynamicParsedFunctionName, FullyQualifiedResourceConstructor, Expr,
+    CustomError, DynamicParsedFunctionName, Expr, FullyQualifiedResourceConstructor,
     FunctionCallError, FunctionName, InferredType, TypeInternal, TypeOrigin,
 };
 
@@ -58,8 +58,7 @@ pub fn infer_worker_function_invokes_lowered(
                         })
                         .map_err(RibTypeErrorInternal::from)?;
 
-                    let module =
-                        get_instance_identifier_from_arena(&instance_type, lhs_id, arena);
+                    let module = get_instance_identifier_from_arena(&instance_type, lhs_id, arena);
 
                     // Narrow the instance type on the lhs
                     let lhs_type_narrowed = {
@@ -69,13 +68,10 @@ pub fn infer_worker_function_invokes_lowered(
                     };
                     types.set(lhs_id, lhs_type_narrowed);
 
-                    if let FunctionName::ResourceConstructor(
-                        fully_qualified_resource_constructor,
-                    ) = function.function_name
+                    if let FunctionName::ResourceConstructor(fully_qualified_resource_constructor) =
+                        function.function_name
                     {
-                        let (resource_id, resource_mode) = match function
-                            .function_type
-                            .return_type
+                        let (resource_id, resource_mode) = match function.function_type.return_type
                         {
                             Some(rt) => match rt.internal_type() {
                                 TypeInternal::Resource {
@@ -83,14 +79,10 @@ pub fn infer_worker_function_invokes_lowered(
                                     resource_mode,
                                     ..
                                 } => (*resource_id, *resource_mode),
-                                _ => {
-                                    return Err(RibTypeErrorInternal::from(
-                                        CustomError::new(
-                                            span.clone(),
-                                            "expected resource type as return type of resource constructor",
-                                        ),
-                                    ))
-                                }
+                                _ => return Err(RibTypeErrorInternal::from(CustomError::new(
+                                    span.clone(),
+                                    "expected resource type as return type of resource constructor",
+                                ))),
                             },
                             None => {
                                 return Err(RibTypeErrorInternal::from(CustomError::new(
@@ -175,11 +167,7 @@ pub fn infer_worker_function_invokes_lowered(
                         let (component, function) = instance_type
                             .get_function(&method, type_parameter)
                             .map_err(|err| {
-                                FunctionCallError::invalid_function_call(
-                                    &method,
-                                    span.clone(),
-                                    err,
-                                )
+                                FunctionCallError::invalid_function_call(&method, span.clone(), err)
                             })
                             .map_err(RibTypeErrorInternal::from)?;
 
@@ -199,8 +187,8 @@ pub fn infer_worker_function_invokes_lowered(
 
                             FunctionName::Function(fn_name) => {
                                 let dpfn_str = fn_name.to_string();
-                                let dpfn = DynamicParsedFunctionName::parse(&dpfn_str)
-                                    .map_err(|err| {
+                                let dpfn =
+                                    DynamicParsedFunctionName::parse(&dpfn_str).map_err(|err| {
                                         RibTypeErrorInternal::from(
                                             FunctionCallError::invalid_function_call(
                                                 &dpfn_str,
@@ -210,9 +198,8 @@ pub fn infer_worker_function_invokes_lowered(
                                         )
                                     })?;
 
-                                let ii_node = to_instance_identifier_node_with_arena(
-                                    module, arena, types,
-                                );
+                                let ii_node =
+                                    to_instance_identifier_node_with_arena(module, arena, types);
                                 let node_mut = arena.expr_mut(id);
                                 node_mut.kind = ExprKind::Call {
                                     call_type: CallTypeNode::Function {
@@ -227,30 +214,32 @@ pub fn infer_worker_function_invokes_lowered(
                             }
 
                             FunctionName::ResourceConstructor(fqrc) => {
-                                let (resource_id, resource_mode) =
-                                    match function.function_type.return_type {
-                                        Some(rt) => match rt.internal_type() {
-                                            TypeInternal::Resource {
-                                                resource_id,
-                                                resource_mode,
-                                                ..
-                                            } => (*resource_id, *resource_mode),
-                                            _ => {
-                                                return Err(RibTypeErrorInternal::from(
-                                                    CustomError::new(
-                                                        span.clone(),
-                                                        "expected resource type",
-                                                    ),
-                                                ))
-                                            }
-                                        },
-                                        None => return Err(RibTypeErrorInternal::from(
-                                            CustomError::new(
-                                                span.clone(),
-                                                "resource constructor must have a return type",
-                                            ),
-                                        )),
-                                    };
+                                let (resource_id, resource_mode) = match function
+                                    .function_type
+                                    .return_type
+                                {
+                                    Some(rt) => match rt.internal_type() {
+                                        TypeInternal::Resource {
+                                            resource_id,
+                                            resource_mode,
+                                            ..
+                                        } => (*resource_id, *resource_mode),
+                                        _ => {
+                                            return Err(RibTypeErrorInternal::from(
+                                                CustomError::new(
+                                                    span.clone(),
+                                                    "expected resource type",
+                                                ),
+                                            ))
+                                        }
+                                    },
+                                    None => {
+                                        return Err(RibTypeErrorInternal::from(CustomError::new(
+                                            span.clone(),
+                                            "resource constructor must have a return type",
+                                        )))
+                                    }
+                                };
 
                                 // Need to pass args as Expr for get_resource_instance_type
                                 let args_exprs: Vec<crate::Expr> = vec![];
@@ -266,9 +255,7 @@ pub fn infer_worker_function_invokes_lowered(
                                     .map_err(|err| {
                                         RibTypeErrorInternal::from(CustomError::new(
                                             span.clone(),
-                                            format!(
-                                                "Failed to get resource instance type: {err}"
-                                            ),
+                                            format!("Failed to get resource instance type: {err}"),
                                         ))
                                     })?;
 
@@ -279,9 +266,8 @@ pub fn infer_worker_function_invokes_lowered(
                                     TypeOrigin::NoOrigin,
                                 );
 
-                                let module_node = to_instance_identifier_node_with_arena(
-                                    module, arena, types,
-                                );
+                                let module_node =
+                                    to_instance_identifier_node_with_arena(module, arena, types);
                                 let node_mut = arena.expr_mut(id);
                                 node_mut.kind = ExprKind::Call {
                                     call_type: CallTypeNode::InstanceCreation(
@@ -362,9 +348,8 @@ pub fn infer_worker_function_invokes_lowered(
                                     _ => InferredType::unknown(),
                                 };
 
-                                let dpfn = resource_method
-                                    .dynamic_parsed_function_name()
-                                    .map_err(|err| {
+                                let dpfn = resource_method.dynamic_parsed_function_name().map_err(
+                                    |err| {
                                         RibTypeErrorInternal::from(
                                             FunctionCallError::invalid_function_call(
                                                 resource_method.method_name(),
@@ -372,11 +357,11 @@ pub fn infer_worker_function_invokes_lowered(
                                                 format!("Invalid resource method name: {err}"),
                                             ),
                                         )
-                                    })?;
+                                    },
+                                )?;
 
-                                let ii_node = to_instance_identifier_node_with_arena(
-                                    module, arena, types,
-                                );
+                                let ii_node =
+                                    to_instance_identifier_node_with_arena(module, arena, types);
                                 let node_mut = arena.expr_mut(id);
                                 node_mut.kind = ExprKind::Call {
                                     call_type: CallTypeNode::Function {
@@ -475,7 +460,6 @@ fn to_instance_identifier_node_with_arena(
         },
     }
 }
-
 
 // This phase is responsible for identifying the worker function invocations
 // such as `worker.foo("x, y, z")` or `cart-resource.add-item(..)` etc

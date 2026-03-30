@@ -23,7 +23,6 @@ use crate::expr_arena::{
 };
 use crate::type_inference::expr_visitor::arena::children_of;
 
-
 // This function will assign ids to variables declared with `let` expressions,
 // and propagate these ids to the usage sites (`Expr::Identifier` nodes).
 pub fn bind_variables_of_let_assignment(expr: &mut Expr) {
@@ -333,7 +332,11 @@ pub fn bind_variables_of_list_comprehension_lowered(
 // bind_variables_of_list_reduce
 // -----------------------------------------------------------------------
 
-pub fn bind_variables_of_list_reduce_lowered(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
+pub fn bind_variables_of_list_reduce_lowered(
+    root: ExprId,
+    arena: &mut ExprArena,
+    _types: &TypeTable,
+) {
     let mut order = Vec::new();
     collect_pre_order(root, arena, &mut order);
 
@@ -427,11 +430,7 @@ fn bind_pattern_match_internal(
     index
 }
 
-fn process_arm_arena(
-    arm: MatchArmNode,
-    global_arm_index: usize,
-    arena: &mut ExprArena,
-) -> usize {
+fn process_arm_arena(arm: MatchArmNode, global_arm_index: usize, arena: &mut ExprArena) -> usize {
     let mut match_identifiers = vec![];
     collect_identifiers_from_arm_pattern(
         arm.arm_pattern,
@@ -608,6 +607,19 @@ mod name_binding_tests {
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::{Expr, InferredType, ParsedFunctionSite, VariableId};
 
+    /// Same pipeline as [`crate::type_inference::initial_arena_phase`]: lower → arena bind → rebuild.
+    fn bind_let_assignment_via_arena(expr: &mut Expr) {
+        let (mut arena, types, root) = crate::expr_arena::lower(expr);
+        super::bind_variables_of_let_assignment_lowered(root, &mut arena, &types);
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+    }
+
+    fn bind_pattern_match_via_arena(expr: &mut Expr) {
+        let (mut arena, types, root) = crate::expr_arena::lower(expr);
+        super::bind_variables_of_pattern_match_lowered(root, &mut arena, &types);
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+    }
+
     #[test]
     fn test_name_binding_simple() {
         let rib_expr = r#"
@@ -617,7 +629,7 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
-        expr.bind_variables_of_let_assignment();
+        bind_let_assignment_via_arena(&mut expr);
 
         let let_binding = Expr::let_binding_with_variable_id(
             VariableId::local("x", 0),
@@ -655,7 +667,7 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
-        expr.bind_variables_of_let_assignment();
+        bind_let_assignment_via_arena(&mut expr);
 
         let let_binding1 = Expr::let_binding_with_variable_id(
             VariableId::local("x", 0),
@@ -713,7 +725,7 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(expr_string).unwrap();
 
-        expr.bind_variables_of_pattern_match();
+        bind_pattern_match_via_arena(&mut expr);
 
         assert_eq!(expr, expectations::expected_match(1));
     }
@@ -734,7 +746,7 @@ mod name_binding_tests {
 
         let mut expr = Expr::from_text(expr_string).unwrap();
 
-        expr.bind_variables_of_pattern_match();
+        bind_pattern_match_via_arena(&mut expr);
 
         let first_expr = expectations::expected_match(1);
         let second_expr = expectations::expected_match(3);
