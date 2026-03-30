@@ -16,7 +16,7 @@ use crate::expr_arena::{
     ArmPatternId, ArmPatternNode, ExprArena, ExprId, ExprKind, MatchArmNode, TypeTable,
 };
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{Expr, InferredType, VariableId};
+use crate::{InferredType, VariableId};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

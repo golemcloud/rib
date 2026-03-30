@@ -15,7 +15,7 @@
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::generic_type_parameter::GenericTypeParameter;
-use crate::inferred_type::{DefaultType, TypeOrigin};
+use crate::inferred_type::DefaultType;
 use crate::parser::block::block;
 use crate::parser::type_name::TypeName;
 use crate::rib_source_span::SourceSpan;
@@ -1309,7 +1309,7 @@ impl Expr {
     pub fn bind_type_annotations(&mut self) {
         type_inference::bind_type_annotations(self);
     }
-    
+
     pub fn merge_inferred_type(&self, new_inferred_type: InferredType) -> Expr {
         let mut expr_copied = self.clone();
         expr_copied.add_infer_type_mut(new_inferred_type);

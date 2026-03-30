@@ -13,15 +13,14 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::call_type::{CallType, InstanceCreationType};
+use crate::call_type::InstanceCreationType;
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_parameter::TypeParameter;
-use crate::{
-    try_visit_post_order_mut, try_visit_post_order_rev_mut, CustomError, FunctionCallError,
-    InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
-};
 use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
+use crate::{
+    CustomError, FunctionCallError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
+};
 
 use crate::expr_arena::{
     rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,

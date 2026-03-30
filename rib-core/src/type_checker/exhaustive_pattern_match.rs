@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use crate::rib_source_span::SourceSpan;
-use crate::{try_visit_post_order_rev_mut, ArmPattern, ComponentDependencies, Expr};
-
+use crate::{ArmPattern, ComponentDependencies, Expr};
 
 pub(crate) fn check_exhaustive_pattern_match_with_arms(
     pattern_match_expr: &Expr,

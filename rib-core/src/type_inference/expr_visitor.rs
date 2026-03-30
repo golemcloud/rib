@@ -21,15 +21,6 @@ pub fn visit_pre_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
     visit_children_mut(expr, |child| visit_pre_order_mut(child, f));
 }
 
-// Fallible post-order: children first, then parent. Stops on first error.
-pub fn try_visit_post_order_mut<E>(
-    expr: &mut Expr,
-    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    try_visit_children_mut(expr, |child| try_visit_post_order_mut(child, f))?;
-    f(expr)
-}
-
 // Fallible pre-order reversed: parent first, then children right-to-left.
 pub fn try_visit_post_order_rev_mut<E>(
     expr: &mut Expr,
@@ -37,15 +28,6 @@ pub fn try_visit_post_order_rev_mut<E>(
 ) -> Result<(), E> {
     f(expr)?;
     try_visit_children_rev_mut(expr, |child| try_visit_post_order_rev_mut(child, f))
-}
-
-// Fallible pre-order: parent first, then children left-to-right.
-pub fn try_visit_pre_order_mut<E>(
-    expr: &mut Expr,
-    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    f(expr)?;
-    try_visit_children_mut(expr, |child| try_visit_pre_order_mut(child, f))
 }
 
 // Immutable post-order traversal.
@@ -459,26 +441,6 @@ fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
     }
 }
 
-fn try_visit_children_mut<E>(
-    expr: &mut Expr,
-    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    // We need to propagate errors properly. Use a Cell to smuggle the
-    // error out of the infallible closure interface.
-    let mut err: Option<E> = None;
-    visit_children_mut(expr, |child| {
-        if err.is_none() {
-            if let Err(e) = each(child) {
-                err = Some(e);
-            }
-        }
-    });
-    match err {
-        Some(e) => Err(e),
-        None => Ok(()),
-    }
-}
-
 fn try_visit_children_rev_mut<E>(
     expr: &mut Expr,
     mut each: impl FnMut(&mut Expr) -> Result<(), E>,
@@ -807,7 +769,7 @@ pub mod arena {
     }
 }
 
-pub fn get_expressions_in_call_type_mut(
+fn get_expressions_in_call_type_mut(
     call_type: &mut CallType,
 ) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {
     match call_type {

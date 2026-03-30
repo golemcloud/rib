@@ -16,7 +16,7 @@ use crate::expr_arena::{rebuild_expr, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::inferred_type::UnificationFailureInternal;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{try_visit_post_order_mut, Expr, InferredType, TypeUnificationError};
+use crate::{Expr, InferredType, TypeUnificationError};
 
 fn get_type_unification_error_from_mismatch(
     rib: &Expr,

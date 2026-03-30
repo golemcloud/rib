@@ -20,4 +20,3 @@ pub(crate) mod checker;
 mod exhaustive_pattern_match;
 mod path;
 mod unresolved_types;
-

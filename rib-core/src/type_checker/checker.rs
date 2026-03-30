@@ -15,9 +15,9 @@
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
-    rebuild_arm_pattern, rebuild_call_type, rebuild_expr, ArmPatternNode, CallTypeNode,
-    ExprArena, ExprId, ExprKind, InstanceCreationNode, InstanceIdentifierNode, MatchArmNode,
-    RangeKind, ResultExprKind, TypeTable,
+    rebuild_arm_pattern, rebuild_call_type, rebuild_expr, ArmPatternNode, CallTypeNode, ExprArena,
+    ExprId, ExprKind, InstanceCreationNode, InstanceIdentifierNode, MatchArmNode, RangeKind,
+    ResultExprKind, TypeTable,
 };
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_checker::exhaustive_pattern_match::{
@@ -102,9 +102,7 @@ fn check_invalid_function_args_lowered(
     for id in order {
         let node = arena.expr(id);
         let ExprKind::Call {
-            call_type,
-            args,
-            ..
+            call_type, args, ..
         } = &node.kind
         else {
             continue;
@@ -198,7 +196,9 @@ fn check_invalid_worker_name_lowered(
         };
 
         match call_type {
-            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker { worker_name, .. }) => {
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                worker_name, ..
+            }) => {
                 check_worker_name_opt(*worker_name, arena, types)?;
             }
             CallTypeNode::Function {
@@ -209,7 +209,9 @@ fn check_invalid_worker_name_lowered(
                     check_worker_name_from_instance_id(ii, arena, types)?;
                 }
             }
-            CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource { module, .. }) => {
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
+                module, ..
+            }) => {
                 if let Some(m) = module {
                     check_worker_name_from_instance_id(m, arena, types)?;
                 }
@@ -372,7 +374,10 @@ fn call_type_node_additional_detail(ct: &CallTypeNode) -> String {
 fn call_type_worker_queue_ids(ct: &CallTypeNode) -> Vec<ExprId> {
     let mut out = Vec::new();
     match ct {
-        CallTypeNode::Function { instance_identifier, .. } => {
+        CallTypeNode::Function {
+            instance_identifier,
+            ..
+        } => {
             if let Some(ii) = instance_identifier {
                 match ii {
                     InstanceIdentifierNode::WitWorker { worker_name, .. }
@@ -439,11 +444,7 @@ fn check_unresolved_types_lowered(
                 }
             }
 
-            ExprKind::InvokeMethodLazy {
-                lhs,
-                args,
-                ..
-            } => {
+            ExprKind::InvokeMethodLazy { lhs, args, .. } => {
                 queue.push_back(*lhs);
                 for a in args {
                     queue.push_back(*a);
@@ -529,7 +530,7 @@ fn check_unresolved_types_lowered(
                     if field_type.is_unknown() {
                         let ch = arena.expr(*eid);
                         return Err(
-                            UnResolvedTypesError::from(ch.source_span.clone()).at_index(index),
+                            UnResolvedTypesError::from(ch.source_span.clone()).at_index(index)
                         );
                     }
                     check_unresolved_types_lowered(*eid, arena, types)
@@ -570,12 +571,7 @@ fn check_unresolved_types_lowered(
                 }
             }
 
-            ExprKind::Cond {
-                cond,
-                lhs,
-                rhs,
-                ..
-            } => {
+            ExprKind::Cond { cond, lhs, rhs, .. } => {
                 unresolved_type_for_if_lowered(*cond, *lhs, *rhs, arena, types)?;
                 if inferred.is_unknown() {
                     return Err(UnResolvedTypesError::from(span));
@@ -609,9 +605,7 @@ fn check_unresolved_types_lowered(
             },
 
             ExprKind::Call {
-                call_type,
-                args,
-                ..
+                call_type, args, ..
             } => {
                 for a in args {
                     queue.push_back(*a);
@@ -620,8 +614,11 @@ fn check_unresolved_types_lowered(
                     queue.push_back(w);
                 }
                 if inferred.is_unknown() {
-                    return Err(UnResolvedTypesError::from(span)
-                        .with_additional_error_detail(call_type_node_additional_detail(call_type)));
+                    return Err(
+                        UnResolvedTypesError::from(span).with_additional_error_detail(
+                            call_type_node_additional_detail(call_type),
+                        ),
+                    );
                 }
             }
 
@@ -742,7 +739,10 @@ fn unresolved_type_for_pattern_match_lowered(
     Ok(())
 }
 
-fn arm_pattern_literal_expr_ids(pat: crate::expr_arena::ArmPatternId, arena: &ExprArena) -> Vec<ExprId> {
+fn arm_pattern_literal_expr_ids(
+    pat: crate::expr_arena::ArmPatternId,
+    arena: &ExprArena,
+) -> Vec<ExprId> {
     let mut out = Vec::new();
     fn walk(pat: crate::expr_arena::ArmPatternId, arena: &ExprArena, out: &mut Vec<ExprId>) {
         match arena.pattern(pat) {
