@@ -50,7 +50,7 @@ pub fn type_pull_up(
 ///
 /// Post-order traversal: for each node, read the types of its children from
 /// `TypeTable` to compute/update the node's own type.
-pub(crate) fn type_pull_up_lowered(
+pub fn type_pull_up_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

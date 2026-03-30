@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[allow(ambiguous_glob_reexports)]
 pub use call_arguments_inference::*;
 pub use custom_instance_spec::*;
 pub use enum_inference::*;
@@ -2473,7 +2472,7 @@ mod tests {
         use bigdecimal::BigDecimal;
         use uuid::Uuid;
 
-        pub(crate) fn result(
+        pub fn result(
             expr: Result<Expr, Expr>,
             type_annotation: Option<TypeName>,
             inferred_type: InferredType,
@@ -2485,7 +2484,7 @@ mod tests {
                 source_span: SourceSpan::default(),
             }
         }
-        pub(crate) fn plus(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
+        pub fn plus(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::Plus {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2495,7 +2494,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn pattern_match(
+        pub fn pattern_match(
             predicate: Expr,
             match_arms: Vec<MatchArm>,
             inferred_type: InferredType,
@@ -2508,7 +2507,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn literal(value: String, inferred_type: InferredType) -> Expr {
+        pub fn literal(value: String, inferred_type: InferredType) -> Expr {
             Expr::Literal {
                 value,
                 inferred_type,
@@ -2516,7 +2515,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn tuple(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
+        pub fn tuple(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
             Expr::Tuple {
                 exprs,
                 inferred_type,
@@ -2524,7 +2523,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn option(
+        pub fn option(
             expr: Option<Expr>,
             type_annotation: Option<TypeName>,
             inferred_type: InferredType,
@@ -2537,7 +2536,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn select_field(
+        pub fn select_field(
             expr: Expr,
             field: String,
             type_annotation: Option<TypeName>,
@@ -2552,7 +2551,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn select_dynamic(
+        pub fn select_dynamic(
             expr: Expr,
             index: Expr,
             type_annotation: Option<TypeName>,
@@ -2567,7 +2566,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn sequence(
+        pub fn sequence(
             exprs: Vec<Expr>,
             type_annotation: Option<TypeName>,
             inferred_type: InferredType,
@@ -2580,7 +2579,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn cond(cond: Expr, lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
+        pub fn cond(cond: Expr, lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::Cond {
                 cond: Box::new(cond),
                 lhs: Box::new(lhs),
@@ -2590,7 +2589,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn greater_than(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
+        pub fn greater_than(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::GreaterThan {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2600,7 +2599,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn greater_than_or_equal_to(
+        pub fn greater_than_or_equal_to(
             lhs: Expr,
             rhs: Expr,
             inferred_type: InferredType,
@@ -2614,7 +2613,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn less_than(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
+        pub fn less_than(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::LessThan {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2624,7 +2623,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn less_than_or_equal_to(
+        pub fn less_than_or_equal_to(
             lhs: Expr,
             rhs: Expr,
             inferred_type: InferredType,
@@ -2638,7 +2637,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn equal_to(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
+        pub fn equal_to(lhs: Expr, rhs: Expr, inferred_type: InferredType) -> Expr {
             Expr::EqualTo {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -2648,7 +2647,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn concat(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
+        pub fn concat(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
             Expr::Concat {
                 exprs,
                 inferred_type,
@@ -2656,7 +2655,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn call(
+        pub fn call(
             call_type: CallType,
             generic_type_parameter: Option<GenericTypeParameter>,
             args: Vec<Expr>,
@@ -2671,7 +2670,7 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub(crate) fn number(
+        pub fn number(
             value: Number,
             type_annotation: Option<TypeName>,
             inferred_type: InferredType,
@@ -2683,7 +2682,7 @@ mod tests {
                 source_span: SourceSpan::default(),
             }
         }
-        pub(crate) fn identifier(
+        pub fn identifier(
             variable_id: VariableId,
             type_annotation: Option<TypeName>,
             inferred_type: InferredType,
@@ -2695,7 +2694,7 @@ mod tests {
                 source_span: SourceSpan::default(),
             }
         }
-        pub(crate) fn record(exprs: Vec<(String, Expr)>, inferred_type: InferredType) -> Expr {
+        pub fn record(exprs: Vec<(String, Expr)>, inferred_type: InferredType) -> Expr {
             Expr::Record {
                 exprs: exprs
                     .iter()
@@ -2707,7 +2706,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn let_binding(
+        pub fn let_binding(
             variable_id: VariableId,
             type_annotation: Option<TypeName>,
             expr: Expr,
@@ -2721,7 +2720,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn expr_block(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
+        pub fn expr_block(exprs: Vec<Expr>, inferred_type: InferredType) -> Expr {
             Expr::ExprBlock {
                 exprs,
                 inferred_type,
@@ -2730,7 +2729,7 @@ mod tests {
             }
         }
 
-        pub(crate) fn get_test_compiler() -> RibCompiler {
+        pub fn get_test_compiler() -> RibCompiler {
             let metadata = vec![
                 AnalysedExport::Function(AnalysedFunction {
                     name: "foo".to_string(),
@@ -2768,14 +2767,14 @@ mod tests {
             ))
         }
 
-        pub(crate) fn create_none(typ: &AnalysedType) -> ValueAndType {
+        pub fn create_none(typ: &AnalysedType) -> ValueAndType {
             ValueAndType::new(
                 Value::Option(None),
                 crate::analysis::analysed_type::option(typ.clone()),
             )
         }
 
-        pub(crate) fn get_test_rib_compiler_with(
+        pub fn get_test_rib_compiler_with(
             function_name: &str,
             input_types: Vec<AnalysedType>,
             output: AnalysedType,
@@ -2813,7 +2812,7 @@ mod tests {
             ))
         }
 
-        pub(crate) fn expected_expr_for_enum_test(
+        pub fn expected_expr_for_enum_test(
             component_dependencies: &ComponentDependencies,
         ) -> Expr {
             let expected_component_in_function_calls = component_dependencies
@@ -3243,7 +3242,7 @@ mod tests {
             )
         }
 
-        pub(crate) fn expected_expr_for_select_index(
+        pub fn expected_expr_for_select_index(
             component_dependencies: &ComponentDependencies,
         ) -> Expr {
             let expected_component_in_function_calls = component_dependencies

@@ -20,7 +20,7 @@ use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference as ti;
 use crate::{ComponentDependencies, CustomInstanceSpec, GlobalVariableTypeSpec};
 
-pub(crate) fn run_initial_binding_and_instance_phases(
+pub fn run_initial_binding_and_instance_phases(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

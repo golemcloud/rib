@@ -1269,43 +1269,6 @@ impl Expr {
         Ok(())
     }
 
-    pub fn resolve_method_calls(&mut self) -> Result<(), RibTypeErrorInternal> {
-        self.bind_instance_types();
-        self.infer_worker_function_invokes()?;
-        Ok(())
-    }
-
-    pub fn set_origin(&mut self) {
-        type_inference::visit_post_order_mut(self, &mut |expr| {
-            let source_location = expr.source_span();
-            let origin = TypeOrigin::OriginatedAt(source_location.clone());
-            let inferred_type = expr.inferred_type();
-            let origin = inferred_type.add_origin(origin);
-            expr.with_inferred_type_mut(origin);
-        });
-    }
-
-    // An inference is a single cycle of to-and-fro scanning of Rib expression, that it takes part in fix point of inference.
-    // Not all phases of compilation will be part of this scan.
-    // Example: function call argument inference based on the worker function hardly needs to be part of the scan.
-    pub fn inference_scan(
-        &mut self,
-        component_dependencies: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        self.infer_all_identifiers();
-        self.push_types_down()?;
-        self.infer_all_identifiers();
-        self.pull_types_up(component_dependencies)?;
-        self.infer_global_inputs();
-        self.infer_function_call_types(component_dependencies, custom_instance_spec)?;
-        Ok(())
-    }
-
-    pub fn infer_worker_function_invokes(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::infer_worker_function_invokes(self)
-    }
-
     // Make sure the bindings in the arm pattern of a pattern match are given variable-ids.
     // The same variable-ids will be tagged to the corresponding identifiers in the arm resolution
     // to avoid conflicts.

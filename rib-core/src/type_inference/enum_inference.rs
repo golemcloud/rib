@@ -28,7 +28,7 @@ pub fn infer_enums(expr: &mut Expr, component_dependencies: &ComponentDependenci
     *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 
-pub(crate) fn infer_enums_lowered(
+pub fn infer_enums_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

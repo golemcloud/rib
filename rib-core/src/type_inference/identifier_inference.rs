@@ -45,7 +45,7 @@ impl IdentifierTypeState {
     }
 }
 
-pub(crate) fn infer_all_identifiers_lowered(
+pub fn infer_all_identifiers_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,

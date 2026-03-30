@@ -27,7 +27,7 @@ pub fn infer_variants(expr: &mut Expr, component_dependency: &ComponentDependenc
     *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
 
-pub(crate) fn infer_variants_lowered(
+pub fn infer_variants_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

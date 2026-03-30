@@ -17,7 +17,7 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::{Expr, InferredType};
 use std::collections::HashMap;
 
-pub(crate) fn infer_global_inputs_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+pub fn infer_global_inputs_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
     let global_vars = collect_global_variable_types(root, arena, types);
 
     let mut stack = vec![root];

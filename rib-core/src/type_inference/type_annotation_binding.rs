@@ -54,7 +54,7 @@ pub fn bind_type_annotations(expr: &mut Expr) {
     }
 }
 
-pub(crate) mod lowered {
+pub mod lowered {
     use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
     use crate::inferred_type::TypeOrigin;
     use crate::type_inference::expr_visitor::arena::visit_pre_order_mut as visit_expr_ids_pre_order_mut;

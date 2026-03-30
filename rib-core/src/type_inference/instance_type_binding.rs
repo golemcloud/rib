@@ -30,7 +30,7 @@ use std::collections::HashMap;
 /// [`ExprId`] in the call node (for example after
 /// [`super::stateful_instance::ensure_stateful_instance_lowered`]).
 /// This pass aligns `TypeTable` with what [`rebuild_expr`] will produce.
-pub(crate) fn sync_embedded_worker_exprs_from_calls(
+pub fn sync_embedded_worker_exprs_from_calls(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
@@ -82,7 +82,7 @@ fn worker_name_expr_id_from_call_node(ct: &CallTypeNode) -> Option<ExprId> {
     }
 }
 
-pub(crate) fn bind_instance_types_lowered(
+pub fn bind_instance_types_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,

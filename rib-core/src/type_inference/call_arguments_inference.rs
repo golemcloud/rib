@@ -69,7 +69,7 @@ pub fn infer_function_call_types(
     Ok(())
 }
 
-pub(crate) fn resolve_call_argument_types(
+pub fn resolve_call_argument_types(
     source_span: &SourceSpan,
     call_type: &mut CallType,
     component_dependency: &ComponentDependencies,
@@ -339,7 +339,7 @@ fn infer_args_and_result_type(
 }
 
 #[derive(Clone)]
-pub(crate) enum FunctionDetails {
+pub enum FunctionDetails {
     ResourceConstructorName {
         resource_constructor_name: String,
     },
@@ -456,7 +456,7 @@ fn tag_argument_types(
 
 
 /// Lowered-tree implementation used by the public `infer_function_call_types` entry when needed from [`crate::expr_arena`].
-pub(crate) fn infer_function_call_types_lowered(
+pub fn infer_function_call_types_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,

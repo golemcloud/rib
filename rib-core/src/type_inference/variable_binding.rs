@@ -244,7 +244,7 @@ fn process_yield_expr_in_reduce(
 
 /// Arena version: assigns local `VariableId`s to `Let` nodes and propagates
 /// them to matching `Identifier` use-sites.
-pub(crate) fn bind_variables_of_let_assignment_lowered(
+pub fn bind_variables_of_let_assignment_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     _types: &TypeTable,
@@ -294,7 +294,7 @@ pub(crate) fn bind_variables_of_let_assignment_lowered(
 // bind_variables_of_list_comprehension
 // -----------------------------------------------------------------------
 
-pub(crate) fn bind_variables_of_list_comprehension_lowered(
+pub fn bind_variables_of_list_comprehension_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     _types: &TypeTable,
@@ -333,7 +333,7 @@ pub(crate) fn bind_variables_of_list_comprehension_lowered(
 // bind_variables_of_list_reduce
 // -----------------------------------------------------------------------
 
-pub(crate) fn bind_variables_of_list_reduce_lowered(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
+pub fn bind_variables_of_list_reduce_lowered(root: ExprId, arena: &mut ExprArena, _types: &TypeTable) {
     let mut order = Vec::new();
     collect_pre_order(root, arena, &mut order);
 
@@ -375,7 +375,7 @@ pub(crate) fn bind_variables_of_list_reduce_lowered(root: ExprId, arena: &mut Ex
 // bind_variables_of_pattern_match
 // -----------------------------------------------------------------------
 
-pub(crate) fn bind_variables_of_pattern_match_lowered(
+pub fn bind_variables_of_pattern_match_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     _types: &TypeTable,
@@ -749,7 +749,7 @@ mod name_binding_tests {
         use crate::{ArmPattern, Expr, InferredType, MatchArm, MatchIdentifier, VariableId};
         use bigdecimal::BigDecimal;
 
-        pub(crate) fn expected_match(index: usize) -> Expr {
+        pub fn expected_match(index: usize) -> Expr {
             Expr::pattern_match(
                 Expr::option(Some(Expr::identifier_global("x", None)))
                     .with_inferred_type(InferredType::option(InferredType::unknown())),

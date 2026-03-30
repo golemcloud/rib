@@ -143,7 +143,7 @@ fn override_type(expr: &mut Expr, type_spec: &GlobalVariableTypeSpec) {
     });
 }
 
-pub(crate) fn bind_global_variable_types_lowered(
+pub fn bind_global_variable_types_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,

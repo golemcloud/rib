@@ -30,7 +30,7 @@ use crate::{
 ///
 /// Converts `SelectField` on an `Instance` type into a resolved `Call`,
 /// and `InvokeMethodLazy` on an `Instance` type into a resolved `Call`.
-pub(crate) fn infer_worker_function_invokes_lowered(
+pub fn infer_worker_function_invokes_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

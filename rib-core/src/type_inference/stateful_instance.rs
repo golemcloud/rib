@@ -19,7 +19,7 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::{visit_post_order_rev_mut, CallType, Expr, InstanceCreationType, InferredType, TypeInternal,
             TypeOrigin};
 
-pub(crate) fn ensure_stateful_instance_lowered(
+pub fn ensure_stateful_instance_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,

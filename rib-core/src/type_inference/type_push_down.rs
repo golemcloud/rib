@@ -92,7 +92,7 @@ fn get_compilation_error_for_ambiguity(
 ///
 /// Pre-order traversal: for each parent node, read its type from
 /// `TypeTable` and push derived types down into child nodes.
-pub(crate) fn push_types_down_lowered(
+pub fn push_types_down_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
