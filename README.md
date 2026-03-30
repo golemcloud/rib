@@ -10,4 +10,4 @@ This work is on it's way.
 
 ## Developing rib-core
 
-Compile-time profiling (optional, env-gated): see [rib-core/README.md](rib-core/README.md#profiling-compile-time).
+[rib-core/README.md](rib-core/README.md).
