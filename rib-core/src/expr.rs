@@ -15,7 +15,7 @@
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::generic_type_parameter::GenericTypeParameter;
-use crate::inferred_type::{DefaultType, TypeOrigin};
+use crate::inferred_type::DefaultType;
 use crate::parser::block::block;
 use crate::parser::type_name::TypeName;
 use crate::rib_source_span::SourceSpan;
@@ -1139,24 +1139,134 @@ impl Expr {
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
-        self.infer_types_initial_phase(
-            component_dependency,
-            global_variable_type_spec,
-            custom_instance_spec,
-        )?;
-        self.bind_instance_types();
-        // Identifying the first fix point with method calls to infer all
-        // worker function invocations as this forms the foundation for the rest of the
-        // compilation. This is compiler doing its best to infer all the calls such
-        // as worker invokes or instance calls etc.
-        type_inference::type_inference_fix_point(Self::resolve_method_calls, self)?;
-        self.infer_function_call_types(component_dependency, custom_instance_spec)?;
-        type_inference::type_inference_fix_point(
-            |x| Self::inference_scan(x, component_dependency, custom_instance_spec),
-            self,
-        )?;
-        self.check_types(component_dependency)?;
-        self.unify_types()?;
+        use crate::type_inference as ti;
+
+        let (mut arena, mut types, root) = {
+            let _p = crate::profile::Scope::new("infer_types: lower");
+            crate::expr_arena::lower(self)
+        };
+
+        {
+            let _p = crate::profile::Scope::new(
+                "infer_types: initial_arena + variants/enums/bind_instance",
+            );
+            ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+                global_variable_type_spec.as_slice(),
+                custom_instance_spec,
+            )?;
+
+            ti::variant_inference::infer_variants_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            );
+            ti::enum_inference::infer_enums_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            );
+            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        }
+
+        {
+            let _p =
+                crate::profile::Scope::new("infer_types: fixpoint 1 (instance + worker invokes)");
+            ti::arena_type_inference_fix_point(
+                |root, arena, types| -> Result<(), RibTypeErrorInternal> {
+                    ti::instance_type_binding::bind_instance_types_lowered(root, arena, types);
+                    ti::worker_function_invocation::infer_worker_function_invokes_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                    )
+                },
+                root,
+                &mut arena,
+                &mut types,
+            )?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: infer_function_call_types_lowered");
+            ti::call_arguments_inference::infer_function_call_types_lowered(
+                root,
+                &arena,
+                &mut types,
+                component_dependency,
+                custom_instance_spec,
+            )
+            .map_err(RibTypeErrorInternal::from)?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: fixpoint 2 (main scan)");
+            ti::arena_type_inference_fix_point(
+                |root, arena, types| -> Result<(), RibTypeErrorInternal> {
+                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                    ti::type_push_down::push_types_down_lowered(root, arena, types)?;
+                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
+                    ti::type_pull_up::type_pull_up_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                    )?;
+                    ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
+                    ti::call_arguments_inference::infer_function_call_types_lowered(
+                        root,
+                        arena,
+                        types,
+                        component_dependency,
+                        custom_instance_spec,
+                    )
+                    .map_err(RibTypeErrorInternal::from)?;
+                    Ok(())
+                },
+                root,
+                &mut arena,
+                &mut types,
+            )?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: final arena refinement + sync/bind");
+            ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
+            ti::type_pull_up::type_pull_up_lowered(
+                root,
+                &mut arena,
+                &mut types,
+                component_dependency,
+            )?;
+            ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
+            ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
+            ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(
+                root, &arena, &mut types,
+            );
+            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: type_check");
+            type_checker::checker::type_check(root, &arena, &mut types, component_dependency)?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: unify_types");
+            type_inference::unify_types_lowered(root, &arena, &mut types)?;
+        }
+
+        {
+            let _p = crate::profile::Scope::new("infer_types: rebuild_expr");
+            *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        }
+
         Ok(())
     }
 
@@ -1166,117 +1276,30 @@ impl Expr {
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
-        self.set_origin();
-        self.bind_global_variable_types(global_variable_type_spec);
-        self.bind_type_annotations();
-        self.bind_variables_of_list_comprehension();
-        self.bind_variables_of_list_reduce();
-        self.bind_variables_of_pattern_match();
-        self.bind_variables_of_let_assignment();
-        self.identify_instance_creation(component_dependency, custom_instance_spec)?;
-        self.ensure_stateful_instance();
-        self.infer_variants(component_dependency);
-        self.infer_enums(component_dependency);
+        use crate::type_inference as ti;
+
+        let (mut arena, mut types, root) = crate::expr_arena::lower(self);
+        ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+            global_variable_type_spec.as_slice(),
+            custom_instance_spec,
+        )?;
+        ti::variant_inference::infer_variants_lowered(
+            root,
+            &mut arena,
+            &mut types,
+            component_dependency,
+        );
+        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
+        *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
-    }
-
-    pub fn resolve_method_calls(&mut self) -> Result<(), RibTypeErrorInternal> {
-        self.bind_instance_types();
-        self.infer_worker_function_invokes()?;
-        Ok(())
-    }
-
-    pub fn set_origin(&mut self) {
-        type_inference::visit_post_order_mut(self, &mut |expr| {
-            let source_location = expr.source_span();
-            let origin = TypeOrigin::OriginatedAt(source_location.clone());
-            let inferred_type = expr.inferred_type();
-            let origin = inferred_type.add_origin(origin);
-            expr.with_inferred_type_mut(origin);
-        });
-    }
-
-    // An inference is a single cycle of to-and-fro scanning of Rib expression, that it takes part in fix point of inference.
-    // Not all phases of compilation will be part of this scan.
-    // Example: function call argument inference based on the worker function hardly needs to be part of the scan.
-    pub fn inference_scan(
-        &mut self,
-        component_dependencies: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        self.infer_all_identifiers();
-        self.push_types_down()?;
-        self.infer_all_identifiers();
-        self.pull_types_up(component_dependencies)?;
-        self.infer_global_inputs();
-        self.infer_function_call_types(component_dependencies, custom_instance_spec)?;
-        Ok(())
-    }
-
-    pub fn infer_worker_function_invokes(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::infer_worker_function_invokes(self)
-    }
-
-    // Make sure the bindings in the arm pattern of a pattern match are given variable-ids.
-    // The same variable-ids will be tagged to the corresponding identifiers in the arm resolution
-    // to avoid conflicts.
-    pub fn bind_variables_of_pattern_match(&mut self) {
-        type_inference::bind_variables_of_pattern_match(self);
-    }
-
-    // Make sure the variable assignment (let binding) are given variable ids,
-    // which will be tagged to the corresponding identifiers to avoid conflicts.
-    // This is done only for local variables and not global variables
-    pub fn bind_variables_of_let_assignment(&mut self) {
-        type_inference::bind_variables_of_let_assignment(self);
-    }
-
-    pub fn bind_variables_of_list_comprehension(&mut self) {
-        type_inference::bind_variables_of_list_comprehension(self);
-    }
-
-    pub fn bind_variables_of_list_reduce(&mut self) {
-        type_inference::bind_variables_of_list_reduce(self);
-    }
-
-    pub fn identify_instance_creation(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::identify_instance_creation(self, component_dependency, custom_instance_spec)
     }
 
     pub fn ensure_stateful_instance(&mut self) {
         type_inference::ensure_stateful_instance(self)
-    }
-
-    pub fn infer_function_call_types(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::infer_function_call_types(
-            self,
-            component_dependency,
-            custom_instance_spec,
-        )?;
-        Ok(())
-    }
-
-    pub fn push_types_down(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::push_types_down(self)
-    }
-
-    pub fn infer_all_identifiers(&mut self) {
-        type_inference::infer_all_identifiers(self)
-    }
-
-    pub fn pull_types_up(
-        &mut self,
-        component_dependencies: &ComponentDependencies,
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_inference::type_pull_up(self, component_dependencies)
     }
 
     pub fn infer_global_inputs(&mut self) {
@@ -1285,18 +1308,6 @@ impl Expr {
 
     pub fn bind_type_annotations(&mut self) {
         type_inference::bind_type_annotations(self);
-    }
-
-    pub fn check_types(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-    ) -> Result<(), RibTypeErrorInternal> {
-        type_checker::type_check(self, component_dependency)
-    }
-
-    pub fn unify_types(&mut self) -> Result<(), RibTypeErrorInternal> {
-        type_inference::unify_types(self)?;
-        Ok(())
     }
 
     pub fn merge_inferred_type(&self, new_inferred_type: InferredType) -> Expr {

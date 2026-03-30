@@ -13,725 +13,606 @@
 // limitations under the License.
 
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::type_inference::type_push_down::internal::{
-    handle_list_comprehension, handle_list_reduce,
+
+use crate::analysis::AnalysedType;
+use crate::expr_arena::{
+    ArmPatternId, ArmPatternNode, ExprArena, ExprId, ExprKind, MatchArmNode, ResultExprKind,
+    TypeTable,
 };
-use crate::{try_visit_post_order_rev_mut, Expr, InferredType, MatchArm, TypeInternal};
+use crate::rib_source_span::SourceSpan;
+use crate::type_inference::expr_visitor::arena::children_of;
+use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
+use crate::type_refinement::precise_types::*;
+use crate::type_refinement::TypeRefinement;
+use crate::{
+    ActualType, AmbiguousTypeError, ExpectedType, InferredType, InvalidPatternMatchError, Path,
+    TypeInternal, TypeMismatchError, VariableId,
+};
 use std::ops::Deref;
 
-pub fn push_types_down(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
-    try_visit_post_order_rev_mut(expr, &mut |outer_expr| {
-        let source_span = outer_expr.source_span();
+// actual_inferred_type: InferredType found in the outer structure
+// expr: The expr corresponding to the outer inferred type. Example: yield expr in a list comprehension
+// push_down_kind: The expected kind of the outer expression before pushing down
+fn get_compilation_error_for_ambiguity(
+    actual_inferred_type: &InferredType,
+    source_span: &SourceSpan,
+    push_down_kind: &TypeHint,
+) -> RibTypeErrorInternal {
+    // First check if the inferred type is a fully valid WIT type
+    // If so, we trust this as this may handle majority of the cases
+    // in compiler's best effort to create precise error message
+    match AnalysedType::try_from(actual_inferred_type) {
+        Ok(analysed_type) => {
+            let type_mismatch_error = TypeMismatchError {
+                source_span: source_span.clone(),
+                expected_type: ExpectedType::AnalysedType(analysed_type),
+                actual_type: ActualType::Hint(push_down_kind.clone()),
+                field_path: Path::default(),
+                additional_error_detail: Vec::new(),
+            };
+            type_mismatch_error.into()
+        }
 
-        match outer_expr {
-            Expr::SelectField {
-                expr,
-                field,
-                inferred_type,
-                ..
+        Err(_) => {
+            // InferredType is not a fully valid WIT type yet
+            // however it has enough information for compiler to trust it over the expected `type_kind`
+            let actual_kind = actual_inferred_type.get_type_hint();
+            match actual_kind {
+                TypeHint::Number | TypeHint::Str | TypeHint::Boolean | TypeHint::Char => {
+                    TypeMismatchError {
+                        source_span: source_span.clone(),
+                        expected_type: ExpectedType::Hint(actual_kind.clone()),
+                        actual_type: ActualType::Hint(push_down_kind.clone()),
+                        field_path: Default::default(),
+                        additional_error_detail: vec![],
+                    }
+                    .into()
+                }
+
+                _ => AmbiguousTypeError::new(actual_inferred_type, source_span, push_down_kind)
+                    .into(),
+            }
+        }
+    }
+}
+
+/// Pre-order traversal: for each parent node, read its type from
+/// `TypeTable` and push derived types down into child nodes.
+pub fn push_types_down_lowered(
+    root: ExprId,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let mut order = Vec::new();
+    collect_pre_order(root, arena, &mut order);
+
+    for id in order {
+        let node = arena.expr(id);
+        let kind = node.kind.clone();
+        let span = node.source_span.clone();
+        let self_type = types.get(id).clone();
+
+        match kind {
+            ExprKind::SelectField {
+                expr: inner_id,
+                ref field,
             } => {
-                let field_type = inferred_type.clone();
-                let record_type = vec![(field.to_string(), field_type)];
-                let inferred_record_type = InferredType::record(record_type);
-
-                expr.add_infer_type_mut(inferred_record_type);
+                let field = field.clone();
+                let record_type = InferredType::record(vec![(field, self_type)]);
+                merge_into(inner_id, record_type, types);
             }
 
-            Expr::SelectIndex {
-                expr,
-                index,
-                inferred_type,
+            ExprKind::SelectIndex {
+                expr: inner_id,
+                index: index_id,
+            } => {
+                let index_type = types.get(index_id).clone();
+                match index_type.inner.deref() {
+                    TypeInternal::Range { .. } => merge_into(inner_id, self_type, types),
+                    _ => merge_into(inner_id, InferredType::list(self_type), types),
+                }
+            }
+
+            ExprKind::Cond {
+                cond: cond_id,
+                lhs: lhs_id,
+                rhs: rhs_id,
+            } => {
+                merge_into(lhs_id, self_type.clone(), types);
+                merge_into(rhs_id, self_type, types);
+                merge_into(cond_id, InferredType::bool(), types);
+            }
+
+            ExprKind::Not { expr: inner_id } => {
+                merge_into(inner_id, self_type, types);
+            }
+
+            ExprKind::Option {
+                expr: Some(inner_id),
+            } => {
+                handle_option_arena(inner_id, &span, &self_type, types)?;
+            }
+
+            ExprKind::Result {
+                expr: ResultExprKind::Ok(inner_id),
+            } => {
+                handle_ok_arena(inner_id, &span, &self_type, types)?;
+            }
+
+            ExprKind::Result {
+                expr: ResultExprKind::Err(inner_id),
+            } => {
+                handle_err_arena(inner_id, &span, &self_type, types)?;
+            }
+
+            ExprKind::PatternMatch {
+                predicate: pred_id,
+                ref match_arms,
+            } => {
+                let pred_type = types.get(pred_id).clone();
+                let arms: Vec<MatchArmNode> = match_arms.clone();
+                for arm in &arms {
+                    update_arm_pattern_type_arena(
+                        arm.arm_pattern,
+                        arena,
+                        types,
+                        &span,
+                        &pred_type,
+                    )?;
+                    merge_into(arm.arm_resolution_expr, self_type.clone(), types);
+                }
+            }
+
+            ExprKind::Tuple { ref exprs } => {
+                let exprs: Vec<ExprId> = exprs.clone();
+                handle_tuple_arena(&exprs, &span, &self_type, types)?;
+            }
+
+            ExprKind::Sequence { ref exprs } => {
+                let exprs: Vec<ExprId> = exprs.clone();
+                handle_sequence_arena(&exprs, &span, &self_type, types)?;
+            }
+
+            ExprKind::Record { ref fields } => {
+                let fields: Vec<(String, ExprId)> = fields.clone();
+                handle_record_arena(&fields, &span, &self_type, types)?;
+            }
+
+            ExprKind::Call {
+                ref call_type,
+                ref args,
                 ..
             } => {
-                let field_type = inferred_type.clone();
-
-                // How to push down here depends on the type of index
-                // If the index is not a range type then the left hand side expression's type becomes list(field_type) similar to
-                // select-index, If the index is range,
-                // since the field type is infact the same as LHS
-                let index_expr_type = index.inferred_type();
-
-                match index_expr_type.inner.deref() {
-                    TypeInternal::Range { .. } => {
-                        expr.add_infer_type_mut(inferred_type.clone());
-                    }
-                    _ => {
-                        // Similar to selectIndex
-                        let new_inferred_type = InferredType::list(field_type);
-                        expr.add_infer_type_mut(new_inferred_type);
+                use crate::expr_arena::CallTypeNode;
+                use crate::TypeInternal;
+                if let CallTypeNode::VariantConstructor(name) = call_type {
+                    if let TypeInternal::Variant(variant) = self_type.inner.deref() {
+                        let variant = variant.clone();
+                        let name = name.clone();
+                        let args: Vec<ExprId> = args.clone();
+                        if let Some((_n, Some(inner_type))) =
+                            variant.iter().find(|(vn, _)| vn == &name)
+                        {
+                            let inner_type = inner_type.clone();
+                            for arg_id in args {
+                                merge_into(arg_id, inner_type.clone(), types);
+                            }
+                        }
                     }
                 }
             }
 
-            Expr::Cond {
-                cond,
-                lhs,
-                rhs,
-                inferred_type,
-                ..
+            ExprKind::ListComprehension {
+                ref iterated_variable,
+                iterable_expr: iterable_id,
+                yield_expr: yield_id,
             } => {
-                lhs.add_infer_type_mut(inferred_type.clone());
-                rhs.add_infer_type_mut(inferred_type.clone());
-
-                cond.add_infer_type_mut(InferredType::bool());
-            }
-            Expr::Not {
-                expr,
-                inferred_type,
-                ..
-            } => {
-                expr.add_infer_type_mut(inferred_type.clone());
-            }
-            Expr::Option {
-                expr: Some(inner_expr),
-                inferred_type,
-                ..
-            } => {
-                internal::handle_option(inner_expr, &source_span, inferred_type)?;
-            }
-
-            Expr::Result {
-                expr: Ok(expr),
-                inferred_type,
-                ..
-            } => {
-                internal::handle_ok(expr, &source_span, inferred_type)?;
-            }
-
-            Expr::Result {
-                expr: Err(expr),
-                inferred_type,
-                ..
-            } => {
-                internal::handle_err(expr, &source_span, inferred_type)?;
-            }
-
-            Expr::PatternMatch {
-                predicate,
-                match_arms,
-                inferred_type,
-                ..
-            } => {
-                for MatchArm {
-                    arm_resolution_expr,
-                    arm_pattern,
-                } in match_arms
-                {
-                    let predicate_type = predicate.inferred_type();
-                    internal::update_arm_pattern_type(&source_span, arm_pattern, &predicate_type)?;
-                    arm_resolution_expr.add_infer_type_mut(inferred_type.clone());
-                }
-            }
-
-            Expr::Tuple {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                internal::handle_tuple(exprs, &source_span, inferred_type)?;
-            }
-            Expr::Sequence {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                internal::handle_sequence(exprs, &source_span, inferred_type)?;
-            }
-
-            Expr::Record {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                internal::handle_record(exprs, &source_span, inferred_type)?;
-            }
-
-            Expr::Call {
-                call_type,
-                args,
-                inferred_type,
-                ..
-            } => {
-                internal::handle_call(call_type, args, inferred_type);
-            }
-
-            Expr::ListComprehension {
-                iterated_variable,
-                iterable_expr,
-                yield_expr,
-                inferred_type,
-                ..
-            } => {
-                handle_list_comprehension(
-                    iterated_variable,
-                    iterable_expr,
-                    yield_expr,
-                    inferred_type,
+                let iterated_var = iterated_variable.clone();
+                handle_list_comprehension_arena(
+                    iterated_var,
+                    iterable_id,
+                    yield_id,
+                    &self_type,
+                    &span,
+                    arena,
+                    types,
                 )?;
             }
 
-            Expr::ListReduce {
-                reduce_variable,
-                iterated_variable,
-                iterable_expr,
-                init_value_expr,
-                yield_expr,
-                inferred_type,
-                ..
+            ExprKind::ListReduce {
+                ref reduce_variable,
+                ref iterated_variable,
+                iterable_expr: iterable_id,
+                init_value_expr: init_id,
+                yield_expr: yield_id,
             } => {
-                handle_list_reduce(
-                    reduce_variable,
-                    iterated_variable,
-                    iterable_expr,
-                    init_value_expr,
-                    yield_expr,
-                    inferred_type,
+                let reduce_var = reduce_variable.clone();
+                let iter_var = iterated_variable.clone();
+                handle_list_reduce_arena(
+                    reduce_var,
+                    iter_var,
+                    iterable_id,
+                    init_id,
+                    yield_id,
+                    &self_type,
+                    &span,
+                    arena,
+                    types,
                 )?;
             }
 
-            Expr::Plus {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                lhs.add_infer_type_mut(rhs.inferred_type());
-                rhs.add_infer_type_mut(lhs.inferred_type());
-                lhs.add_infer_type_mut(inferred_type.clone());
-                rhs.add_infer_type_mut(inferred_type.clone());
-            }
-
-            Expr::Divide {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                lhs.add_infer_type_mut(rhs.inferred_type());
-                rhs.add_infer_type_mut(lhs.inferred_type());
-                lhs.add_infer_type_mut(inferred_type.clone());
-                rhs.add_infer_type_mut(inferred_type.clone());
-            }
-
-            Expr::Minus {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                lhs.add_infer_type_mut(rhs.inferred_type());
-                rhs.add_infer_type_mut(lhs.inferred_type());
-                lhs.add_infer_type_mut(inferred_type.clone());
-                rhs.add_infer_type_mut(inferred_type.clone());
-            }
-
-            Expr::Multiply {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                lhs.add_infer_type_mut(rhs.inferred_type());
-                rhs.add_infer_type_mut(lhs.inferred_type());
-                lhs.add_infer_type_mut(inferred_type.clone());
-                rhs.add_infer_type_mut(inferred_type.clone());
+            ExprKind::Plus { lhs, rhs }
+            | ExprKind::Minus { lhs, rhs }
+            | ExprKind::Multiply { lhs, rhs }
+            | ExprKind::Divide { lhs, rhs } => {
+                let lhs_t = types.get(lhs).clone();
+                let rhs_t = types.get(rhs).clone();
+                let current_lhs = types.get(lhs).clone();
+                types.set(lhs, current_lhs.merge(rhs_t).merge(self_type.clone()));
+                let current_rhs = types.get(rhs).clone();
+                types.set(rhs, current_rhs.merge(lhs_t).merge(self_type));
             }
 
             _ => {}
         }
-        Ok(())
-    })
+    }
+
+    Ok(())
 }
 
-mod internal {
-    use crate::analysis::AnalysedType;
-    use crate::call_type::CallType;
-    use crate::rib_source_span::SourceSpan;
-    use crate::rib_type_error::RibTypeErrorInternal;
-    use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
-    use crate::type_refinement::precise_types::*;
-    use crate::type_refinement::TypeRefinement;
-    use crate::{
-        ActualType, AmbiguousTypeError, ArmPattern, ExpectedType, Expr, InferredType,
-        InvalidPatternMatchError, Path, TypeInternal, TypeMismatchError, VariableId,
-    };
-    use std::collections::VecDeque;
-    use std::ops::Deref;
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
 
-    pub(crate) fn handle_list_comprehension(
-        variable_id: &mut VariableId,
-        iterable_expr: &mut Expr,
-        yield_expr: &mut Expr,
-        comprehension_result_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        update_yield_expr_in_list_comprehension(variable_id, iterable_expr, yield_expr)?;
+fn merge_into(id: ExprId, ty: InferredType, types: &mut TypeTable) {
+    let current = types.get(id).clone();
+    types.set(id, current.merge(ty));
+}
 
-        let refined_list_type = ListType::refine(comprehension_result_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                comprehension_result_type,
-                &yield_expr.source_span(),
-                &TypeHint::List(None),
-            )
+fn handle_option_arena(
+    inner_id: ExprId,
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = OptionalType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(outer_type, span, &TypeHint::Option(None))
+    })?;
+    merge_into(inner_id, refined.inner_type().clone(), types);
+    Ok(())
+}
+
+fn handle_ok_arena(
+    inner_id: ExprId,
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = OkType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(
+            outer_type,
+            span,
+            &TypeHint::Result {
+                ok: None,
+                err: None,
+            },
+        )
+    })?;
+    merge_into(inner_id, refined.inner_type().clone(), types);
+    Ok(())
+}
+
+fn handle_err_arena(
+    inner_id: ExprId,
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = ErrType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(
+            outer_type,
+            span,
+            &TypeHint::Result {
+                ok: None,
+                err: None,
+            },
+        )
+    })?;
+    merge_into(inner_id, refined.inner_type().clone(), types);
+    Ok(())
+}
+
+fn handle_sequence_arena(
+    elems: &[ExprId],
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = ListType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(outer_type, span, &TypeHint::List(None))
+    })?;
+    let inner = refined.inner_type();
+    for &id in elems {
+        merge_into(id, inner.clone(), types);
+    }
+    Ok(())
+}
+
+fn handle_tuple_arena(
+    elems: &[ExprId],
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = TupleType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(outer_type, span, &TypeHint::Tuple(None))
+    })?;
+    for (&id, ty) in elems.iter().zip(refined.inner_types()) {
+        merge_into(id, ty.clone(), types);
+    }
+    Ok(())
+}
+
+fn handle_record_arena(
+    fields: &[(String, ExprId)],
+    span: &crate::rib_source_span::SourceSpan,
+    outer_type: &InferredType,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let refined = RecordType::refine(outer_type).ok_or_else(|| {
+        get_compilation_error_for_ambiguity(outer_type, span, &TypeHint::Record(None))
+    })?;
+    for (field, id) in fields {
+        merge_into(*id, refined.inner_type_by_name(field).clone(), types);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_list_comprehension_arena(
+    variable: VariableId,
+    iterable_id: ExprId,
+    yield_id: ExprId,
+    comprehension_type: &InferredType,
+    _span: &crate::rib_source_span::SourceSpan,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let iterable_type = types.get(iterable_id).clone();
+
+    if !iterable_type.is_unknown() {
+        let elem_type = match ListType::refine(&iterable_type) {
+            Some(l) => l.inner_type(),
+            None => {
+                let r = RangeType::refine(&iterable_type).ok_or_else(|| {
+                    let iterable_span = arena.expr(iterable_id).source_span.clone();
+                    get_compilation_error_for_ambiguity(
+                        &iterable_type,
+                        &iterable_span,
+                        &TypeHint::List(None),
+                    )
+                    .with_additional_error_detail(
+                        "the iterable expression in list comprehension should be of type list or a range",
+                    )
+                })?;
+                r.inner_type()
+            }
+        };
+
+        patch_comprehension_identifiers(yield_id, arena, types, &variable, &elem_type);
+    }
+
+    let refined_result = ListType::refine(comprehension_type).ok_or_else(|| {
+        let yield_span = arena.expr(yield_id).source_span.clone();
+        get_compilation_error_for_ambiguity(comprehension_type, &yield_span, &TypeHint::List(None))
             .with_additional_error_detail("the result of a comprehension should be of type list")
-        })?;
+    })?;
 
-        let inner_type = refined_list_type.inner_type();
+    merge_into(yield_id, refined_result.inner_type().clone(), types);
+    Ok(())
+}
 
-        yield_expr.add_infer_type_mut(inner_type.clone());
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_list_reduce(
-        result_variable_id: &mut VariableId,
-        reduce_variable_id: &mut VariableId,
-        iterable_expr: &mut Expr,
-        init_value_expr: &mut Expr,
-        yield_expr: &mut Expr,
-        aggregation_result_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        // If the iterable_expr is List<Y> , the identifier with the same variable name within yield should be Y
-        update_yield_expr_in_list_reduce(
-            result_variable_id,
-            reduce_variable_id,
-            iterable_expr,
-            yield_expr,
-            init_value_expr,
-        )?;
-
-        // If the outer_expr is X this implies, the yield expression should be X, and therefore initial expression should be X
-        yield_expr.add_infer_type_mut(aggregation_result_type.clone());
-        init_value_expr.add_infer_type_mut(aggregation_result_type.clone());
-
-        Ok(())
-    }
-
-    fn update_yield_expr_in_list_comprehension(
-        variable: &mut VariableId,
-        iterable_expr: &Expr,
-        yield_expr: &mut Expr,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let iterable_type: InferredType = iterable_expr.inferred_type();
-
-        if !iterable_type.is_unknown() {
-            let refined_iterable = ListType::refine(&iterable_type);
-
-            let iterable_variable_type = match refined_iterable {
-                Some(refined_iterable) => refined_iterable.inner_type(),
-                None => {
-                    let refined_range = RangeType::refine(&iterable_type).ok_or_else(||
-                        get_compilation_error_for_ambiguity(&iterable_type, &iterable_expr.source_span(), &TypeHint::List(None))
-                            .with_additional_error_detail(
-                                "the iterable expression in list comprehension should be of type list or a range",
-                            ),
-                    )?;
-
-                    refined_range.inner_type()
+fn patch_comprehension_identifiers(
+    root: ExprId,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+    variable: &VariableId,
+    elem_type: &InferredType,
+) {
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        let kind = arena.expr(id).kind.clone();
+        if let ExprKind::Identifier { variable_id } = kind {
+            if let VariableId::ListComprehension(l) = &variable_id {
+                if l.name == variable.name() {
+                    merge_into(id, elem_type.clone(), types);
                 }
+            }
+        } else {
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_list_reduce_arena(
+    reduce_variable: VariableId,
+    iterated_variable: VariableId,
+    iterable_id: ExprId,
+    init_id: ExprId,
+    yield_id: ExprId,
+    aggregation_type: &InferredType,
+    _span: &crate::rib_source_span::SourceSpan,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+) -> Result<(), RibTypeErrorInternal> {
+    let iterable_type = types.get(iterable_id).clone();
+    let init_type = types.get(init_id).clone();
+
+    if !iterable_type.is_unknown() {
+        let elem_type = match ListType::refine(&iterable_type) {
+            Some(l) => l.inner_type(),
+            None => {
+                let iterable_span = arena.expr(iterable_id).source_span.clone();
+                let r = RangeType::refine(&iterable_type).ok_or_else(|| {
+                    get_compilation_error_for_ambiguity(
+                        &iterable_type,
+                        &iterable_span,
+                        &TypeHint::List(None),
+                    )
+                    .with_additional_error_detail(
+                        "the iterable expression in list comprehension should be of type list or a range",
+                    )
+                })?;
+                r.inner_type()
+            }
+        };
+
+        patch_reduce_identifiers(
+            yield_id,
+            arena,
+            types,
+            &iterated_variable,
+            &elem_type,
+            &reduce_variable,
+            &init_type,
+        );
+    }
+
+    merge_into(yield_id, aggregation_type.clone(), types);
+    merge_into(init_id, aggregation_type.clone(), types);
+    Ok(())
+}
+
+fn patch_reduce_identifiers(
+    root: ExprId,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+    iter_var: &VariableId,
+    elem_type: &InferredType,
+    reduce_var: &VariableId,
+    init_type: &InferredType,
+) {
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        let kind = arena.expr(id).kind.clone();
+        if let ExprKind::Identifier { variable_id } = kind {
+            if let VariableId::ListComprehension(l) = &variable_id {
+                if l.name == iter_var.name() {
+                    merge_into(id, elem_type.clone(), types);
+                }
+            } else if let VariableId::ListReduce(l) = &variable_id {
+                if l.name == reduce_var.name() {
+                    merge_into(id, init_type.clone(), types);
+                }
+            }
+        } else {
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
+        }
+    }
+}
+
+fn update_arm_pattern_type_arena(
+    pat_id: ArmPatternId,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+    span: &crate::rib_source_span::SourceSpan,
+    predicate_type: &InferredType,
+) -> Result<(), RibTypeErrorInternal> {
+    match arena.pattern(pat_id).clone() {
+        ArmPatternNode::Literal(expr_id) => {
+            merge_into(expr_id, predicate_type.clone(), types);
+        }
+        ArmPatternNode::As(_, inner) => {
+            update_arm_pattern_type_arena(inner, arena, types, span, predicate_type)?;
+        }
+        ArmPatternNode::Constructor(name, children) => {
+            let inner_type = if name == "some" || name == "none" {
+                let opt = OptionalType::refine(predicate_type).ok_or_else(|| {
+                    InvalidPatternMatchError::constructor_type_mismatch(span.clone(), &name)
+                })?;
+                opt.inner_type()
+            } else if name == "ok" {
+                match OkType::refine(predicate_type) {
+                    Some(ok) => ok.inner_type(),
+                    None => {
+                        ErrType::refine(predicate_type).ok_or_else(|| {
+                            InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "ok")
+                        })?;
+                        InferredType::unknown()
+                    }
+                }
+            } else if name == "err" {
+                match ErrType::refine(predicate_type) {
+                    Some(err) => err.inner_type(),
+                    None => {
+                        OkType::refine(predicate_type).ok_or_else(|| {
+                            InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "err")
+                        })?;
+                        InferredType::unknown()
+                    }
+                }
+            } else if let Some(vt) = VariantType::refine(predicate_type) {
+                vt.inner_type_by_name(&name)
+            } else {
+                InferredType::unknown()
             };
-
-            let mut queue = VecDeque::new();
-            queue.push_back(yield_expr);
-
-            while let Some(expr) = queue.pop_back() {
-                match expr {
-                    Expr::Identifier {
-                        variable_id,
-                        inferred_type,
-                        ..
-                    } => {
-                        if let VariableId::ListComprehension(l) = variable_id {
-                            if l.name == variable.name() {
-                                *inferred_type = inferred_type.merge(iterable_variable_type.clone())
-                            }
-                        }
-                    }
-                    _ => expr.visit_expr_nodes_lazy(&mut queue),
-                }
+            for child in children {
+                update_arm_pattern_type_arena(child, arena, types, span, &inner_type)?;
             }
         }
-        Ok(())
-    }
-    fn update_yield_expr_in_list_reduce(
-        reduce_variable: &mut VariableId,
-        iterated_variable: &mut VariableId,
-        iterable_expr: &Expr,
-        yield_expr: &mut Expr,
-        init_value_expr: &mut Expr,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let iterable_type = iterable_expr.inferred_type();
-
-        if !iterable_expr.inferred_type().is_unknown() {
-            let refined_iterable = ListType::refine(&iterable_type);
-
-            let iterable_variable_type = match refined_iterable {
-                Some(refined_iterable) => refined_iterable.inner_type(),
-                None => {
-                    let refined_range = RangeType::refine(&iterable_type).ok_or_else(||
-                        get_compilation_error_for_ambiguity(&iterable_type, &iterable_expr.source_span(), &TypeHint::List(None))
-                            .with_additional_error_detail(
-                                "the iterable expression in list comprehension should be of type list or a range",
-                            ),
-                    )?;
-
-                    refined_range.inner_type()
+        ArmPatternNode::TupleConstructor(children) => {
+            let tuple = TupleType::refine(predicate_type).ok_or_else(|| {
+                InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "tuple")
+            })?;
+            let inner_types = tuple.inner_types();
+            if children.len() == inner_types.len() {
+                for (child, inner) in children.iter().zip(inner_types) {
+                    update_arm_pattern_type_arena(*child, arena, types, span, &inner)?;
                 }
-            };
-
-            let init_value_expr_type = init_value_expr.inferred_type();
-            let mut queue = VecDeque::new();
-            queue.push_back(yield_expr);
-
-            while let Some(expr) = queue.pop_back() {
-                match expr {
-                    Expr::Identifier {
-                        variable_id,
-                        inferred_type,
-                        ..
-                    } => {
-                        if let VariableId::ListComprehension(l) = variable_id {
-                            if l.name == iterated_variable.name() {
-                                *inferred_type = inferred_type.merge(iterable_variable_type.clone())
-                            }
-                        } else if let VariableId::ListReduce(l) = variable_id {
-                            if l.name == reduce_variable.name() {
-                                *inferred_type = inferred_type.merge(init_value_expr_type.clone())
-                            }
-                        }
-                    }
-
-                    _ => expr.visit_expr_nodes_lazy(&mut queue),
-                }
+            } else {
+                return Err(InvalidPatternMatchError::arg_size_mismatch(
+                    span.clone(),
+                    "tuple",
+                    inner_types.len(),
+                    children.len(),
+                )
+                .into());
             }
         }
-        Ok(())
-    }
-
-    pub(crate) fn handle_option(
-        inner_expr: &mut Expr,
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_optional_type = OptionalType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::Option(None),
-            )
-        })?;
-
-        let inner_type = refined_optional_type.inner_type();
-
-        inner_expr.add_infer_type_mut(inner_type.clone());
-        Ok(())
-    }
-
-    pub(crate) fn handle_ok(
-        inner_expr: &mut Expr,
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_ok_type = OkType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::Result {
-                    ok: None,
-                    err: None,
-                },
-            )
-        })?;
-
-        let inner_type = refined_ok_type.inner_type();
-
-        inner_expr.add_infer_type_mut(inner_type.clone());
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_err(
-        inner_expr: &mut Expr,
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_err_type = ErrType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::Result {
-                    ok: None,
-                    err: None,
-                },
-            )
-        })?;
-
-        let inner_type = refined_err_type.inner_type();
-
-        inner_expr.add_infer_type_mut(inner_type.clone());
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_sequence(
-        inner_expressions: &mut [Expr],
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_list_type = ListType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::List(None),
-            )
-        })?;
-        let inner_type = refined_list_type.inner_type();
-
-        for expr in inner_expressions.iter_mut() {
-            expr.add_infer_type_mut(inner_type.clone());
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_tuple(
-        inner_expressions: &mut [Expr],
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_tuple_type = TupleType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::Tuple(None),
-            )
-        })?;
-        let inner_types = refined_tuple_type.inner_types();
-
-        for (expr, typ) in inner_expressions.iter_mut().zip(inner_types) {
-            expr.add_infer_type_mut(typ.clone());
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_record(
-        inner_expressions: &mut [(String, Box<Expr>)],
-        source_span: &SourceSpan,
-        outer_inferred_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        let refined_record_type = RecordType::refine(outer_inferred_type).ok_or_else(|| {
-            get_compilation_error_for_ambiguity(
-                outer_inferred_type,
-                source_span,
-                &TypeHint::Record(None),
-            )
-        })?;
-
-        for (field, expr) in inner_expressions {
-            let inner_type = refined_record_type.inner_type_by_name(field);
-            expr.add_infer_type_mut(inner_type.clone());
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_call<'a>(
-        call_type: &'a mut CallType,
-        expressions: &'a mut Vec<Expr>,
-        inferred_type: &'a mut InferredType,
-    ) {
-        if let CallType::VariantConstructor(name) = call_type {
-            if let TypeInternal::Variant(variant) = inferred_type.inner.deref() {
-                let identified_variant = variant
-                    .iter()
-                    .find(|(variant_name, _)| variant_name == name);
-
-                if let Some((_name, Some(inner_type))) = identified_variant {
-                    for expr in expressions {
-                        expr.add_infer_type_mut(inner_type.clone());
-                    }
-                }
+        ArmPatternNode::ListConstructor(children) => {
+            let list = ListType::refine(predicate_type).ok_or_else(|| {
+                InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "list")
+            })?;
+            let elem_type = list.inner_type();
+            for child in children {
+                update_arm_pattern_type_arena(child, arena, types, span, &elem_type)?;
             }
         }
-    }
-
-    pub(crate) fn update_arm_pattern_type(
-        source_span: &SourceSpan,
-        arm_pattern: &mut ArmPattern,
-        predicate_type: &InferredType,
-    ) -> Result<(), RibTypeErrorInternal> {
-        match arm_pattern {
-            ArmPattern::Literal(expr) => {
-                expr.add_infer_type_mut(predicate_type.clone());
+        ArmPatternNode::RecordConstructor(fields) => {
+            let record = RecordType::refine(predicate_type).ok_or_else(|| {
+                InvalidPatternMatchError::constructor_type_mismatch(span.clone(), "record")
+            })?;
+            for (field, child) in fields {
+                let ft = record.inner_type_by_name(&field);
+                update_arm_pattern_type_arena(child, arena, types, span, &ft)?;
             }
-            ArmPattern::As(_, pattern) => {
-                update_arm_pattern_type(source_span, pattern, predicate_type)?;
-            }
-
-            ArmPattern::Constructor(constructor_name, patterns) => {
-                if constructor_name == "some" || constructor_name == "none" {
-                    let resolved = OptionalType::refine(predicate_type).ok_or_else(|| {
-                        InvalidPatternMatchError::constructor_type_mismatch(
-                            source_span.clone(),
-                            constructor_name,
-                        )
-                    })?;
-
-                    let inner = resolved.inner_type();
-
-                    for pattern in patterns {
-                        update_arm_pattern_type(source_span, pattern, &inner)?;
-                    }
-                } else if constructor_name == "ok" {
-                    let resolved = OkType::refine(predicate_type);
-
-                    match resolved {
-                        Some(resolved) => {
-                            let inner = resolved.inner_type();
-
-                            for pattern in patterns {
-                                update_arm_pattern_type(source_span, pattern, &inner)?;
-                            }
-                        }
-
-                        None => {
-                            ErrType::refine(predicate_type).ok_or_else(|| {
-                                InvalidPatternMatchError::constructor_type_mismatch(
-                                    source_span.clone(),
-                                    "ok",
-                                )
-                            })?;
-                        }
-                    }
-                } else if constructor_name == "err" {
-                    let resolved = ErrType::refine(predicate_type);
-
-                    match resolved {
-                        Some(resolved) => {
-                            let inner = resolved.inner_type();
-
-                            for pattern in patterns {
-                                update_arm_pattern_type(source_span, pattern, &inner)?;
-                            }
-                        }
-
-                        None => {
-                            OkType::refine(predicate_type).ok_or_else(|| {
-                                InvalidPatternMatchError::constructor_type_mismatch(
-                                    source_span.clone(),
-                                    "err",
-                                )
-                            })?;
-                        }
-                    }
-                } else if let Some(variant_type) = VariantType::refine(predicate_type) {
-                    let variant_arg_type = variant_type.inner_type_by_name(constructor_name);
-                    for pattern in patterns {
-                        update_arm_pattern_type(source_span, pattern, &variant_arg_type)?;
-                    }
-                }
-            }
-
-            ArmPattern::TupleConstructor(patterns) => {
-                let tuple_type = TupleType::refine(predicate_type).ok_or_else(|| {
-                    InvalidPatternMatchError::constructor_type_mismatch(
-                        source_span.clone(),
-                        "tuple",
-                    )
-                })?;
-
-                let inner_types = tuple_type.inner_types();
-
-                if patterns.len() == inner_types.len() {
-                    for (pattern, inner_type) in patterns.iter_mut().zip(inner_types) {
-                        update_arm_pattern_type(source_span, pattern, &inner_type)?;
-                    }
-                } else {
-                    return Err(InvalidPatternMatchError::arg_size_mismatch(
-                        source_span.clone(),
-                        "tuple",
-                        inner_types.len(),
-                        patterns.len(),
-                    )
-                    .into());
-                }
-            }
-
-            ArmPattern::ListConstructor(patterns) => {
-                let list_type = ListType::refine(predicate_type).ok_or_else(|| {
-                    InvalidPatternMatchError::constructor_type_mismatch(source_span.clone(), "list")
-                })?;
-
-                let list_elem_type = list_type.inner_type();
-
-                for pattern in &mut *patterns {
-                    update_arm_pattern_type(source_span, pattern, &list_elem_type)?;
-                }
-            }
-
-            ArmPattern::RecordConstructor(fields) => {
-                let record_type = RecordType::refine(predicate_type).ok_or_else(|| {
-                    InvalidPatternMatchError::constructor_type_mismatch(
-                        source_span.clone(),
-                        "record",
-                    )
-                })?;
-
-                for (field, pattern) in fields {
-                    let type_of_field = record_type.inner_type_by_name(field);
-                    update_arm_pattern_type(source_span, pattern, &type_of_field)?;
-                }
-            }
-
-            ArmPattern::WildCard => {}
         }
-
-        Ok(())
+        ArmPatternNode::WildCard => {}
     }
+    Ok(())
+}
 
-    // actual_inferred_type: InferredType found in the outer structure
-    // expr: The expr corresponding to the outer inferred type. Example: yield expr in a list comprehension
-    // push_down_kind: The expected kind of the outer expression before pushing down
-    pub fn get_compilation_error_for_ambiguity(
-        actual_inferred_type: &InferredType,
-        source_span: &SourceSpan,
-        push_down_kind: &TypeHint,
-    ) -> RibTypeErrorInternal {
-        // First check if the inferred type is a fully valid WIT type
-        // If so, we trust this as this may handle majority of the cases
-        // in compiler's best effort to create precise error message
-        match AnalysedType::try_from(actual_inferred_type) {
-            Ok(analysed_type) => {
-                let type_mismatch_error = TypeMismatchError {
-                    source_span: source_span.clone(),
-                    expected_type: ExpectedType::AnalysedType(analysed_type),
-                    actual_type: ActualType::Hint(push_down_kind.clone()),
-                    field_path: Path::default(),
-                    additional_error_detail: Vec::new(),
-                };
-                type_mismatch_error.into()
-            }
-
-            Err(_) => {
-                // InferredType is not a fully valid WIT type yet
-                // however it has enough information for compiler to trust it over the expected `type_kind`
-                let actual_kind = actual_inferred_type.get_type_hint();
-                match actual_kind {
-                    TypeHint::Number | TypeHint::Str | TypeHint::Boolean | TypeHint::Char => {
-                        TypeMismatchError {
-                            source_span: source_span.clone(),
-                            expected_type: ExpectedType::Hint(actual_kind.clone()),
-                            actual_type: ActualType::Hint(push_down_kind.clone()),
-                            field_path: Default::default(),
-                            additional_error_detail: vec![],
-                        }
-                        .into()
-                    }
-
-                    _ => AmbiguousTypeError::new(actual_inferred_type, source_span, push_down_kind)
-                        .into(),
-                }
-            }
+fn collect_pre_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        out.push(id);
+        for child in children_of(id, arena).into_iter().rev() {
+            stack.push(child);
         }
     }
 }
@@ -740,8 +621,38 @@ mod internal {
 mod type_push_down_tests {
     use test_r::test;
 
-    use crate::type_inference::type_push_down::type_push_down_tests::internal::strip_spaces;
+    use crate::rib_type_error::RibTypeErrorInternal;
     use crate::{Expr, InferredType, RibCompiler};
+
+    fn push_types_down_via_arena(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
+        let (arena, mut types, root) = crate::expr_arena::lower(expr);
+        super::push_types_down_lowered(root, &arena, &mut types)?;
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        Ok(())
+    }
+
+    fn strip_spaces(input: &str) -> String {
+        let lines = input.lines();
+
+        let first_line = lines
+            .clone()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("");
+        let margin_width = first_line.chars().take_while(|c| c.is_whitespace()).count();
+
+        let result = lines
+            .map(|line| {
+                if line.trim().is_empty() {
+                    String::new()
+                } else {
+                    line[margin_width..].to_string()
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        result.strip_prefix("\n").unwrap_or(&result).to_string()
+    }
 
     #[test]
     fn test_push_down_for_record() {
@@ -754,7 +665,7 @@ mod type_push_down_tests {
             InferredType::record(vec![("titles".to_string(), InferredType::u64())]),
         ]));
 
-        expr.push_types_down().unwrap();
+        push_types_down_via_arena(&mut expr).unwrap();
         let expected = Expr::record(vec![(
             "titles".to_string(),
             Expr::identifier_global("x", None).with_inferred_type(InferredType::u64()),
@@ -780,7 +691,7 @@ mod type_push_down_tests {
             InferredType::list(InferredType::u64()),
         ]));
 
-        expr.push_types_down().unwrap();
+        push_types_down_via_arena(&mut expr).unwrap();
         let expected =
             Expr::sequence(
                 vec![
@@ -820,30 +731,5 @@ mod type_push_down_tests {
         "#;
 
         assert_eq!(error_message, strip_spaces(expected));
-    }
-
-    mod internal {
-        pub(crate) fn strip_spaces(input: &str) -> String {
-            let lines = input.lines();
-
-            let first_line = lines
-                .clone()
-                .find(|line| !line.trim().is_empty())
-                .unwrap_or("");
-            let margin_width = first_line.chars().take_while(|c| c.is_whitespace()).count();
-
-            let result = lines
-                .map(|line| {
-                    if line.trim().is_empty() {
-                        String::new()
-                    } else {
-                        line[margin_width..].to_string()
-                    }
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            result.strip_prefix("\n").unwrap_or(&result).to_string()
-        }
     }
 }

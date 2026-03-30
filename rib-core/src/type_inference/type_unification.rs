@@ -12,82 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::expr_arena::{rebuild_expr, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::inferred_type::UnificationFailureInternal;
 use crate::rib_source_span::SourceSpan;
-use crate::{try_visit_post_order_mut, Expr, InferredType, TypeUnificationError};
-
-pub fn unify_types(expr: &mut Expr) -> Result<(), TypeUnificationError> {
-    // keeping the original expression to lookup source span
-    let original_expr = expr.clone();
-
-    // Visit innermost expressions first (post-order) to find the root cause of type mismatch.
-    try_visit_post_order_mut(expr, &mut |sub_expr| {
-        match sub_expr {
-            Expr::Let { .. } => {}
-            Expr::Boolean { .. } => {}
-            Expr::Concat { .. } => {}
-            Expr::GreaterThan { .. } => {}
-            Expr::And { .. } => {}
-            Expr::Or { .. } => {}
-            Expr::GreaterThanOrEqualTo { .. } => {}
-            Expr::LessThanOrEqualTo { .. } => {}
-            Expr::EqualTo { .. } => {}
-            Expr::LessThan { .. } => {}
-            Expr::InvokeMethodLazy { .. } => {}
-            sub_expr => {
-                unify_inferred_type(&original_expr, sub_expr)?;
-            }
-        }
-        Ok(())
-    })
-}
-
-fn unify_inferred_type(
-    original_expr: &Expr,
-    sub_expr: &mut Expr,
-) -> Result<InferredType, TypeUnificationError> {
-    let unification_result = sub_expr.inferred_type().unify();
-
-    match unification_result {
-        Ok(unified_type) => {
-            sub_expr.with_inferred_type_mut(unified_type.clone());
-            Ok(unified_type)
-        }
-        Err(e) => match e {
-            UnificationFailureInternal::TypeMisMatch { left, right } => Err(
-                get_type_unification_error_from_mismatch(original_expr, sub_expr, left, right),
-            ),
-
-            UnificationFailureInternal::ConflictingTypes {
-                conflicting_types,
-                additional_error_detail,
-            } => {
-                let mut additional_messages = vec![format!(
-                    "conflicting types: {}",
-                    conflicting_types
-                        .iter()
-                        .map(|t| t.printable())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )];
-
-                additional_messages.extend(additional_error_detail);
-
-                Err(TypeUnificationError::unresolved_types_error(
-                    sub_expr.source_span(),
-                    additional_messages,
-                ))
-            }
-
-            UnificationFailureInternal::UnknownType => {
-                Err(TypeUnificationError::unresolved_types_error(
-                    sub_expr.source_span(),
-                    vec!["cannot determine the type".to_string()],
-                ))
-            }
-        },
-    }
-}
+use crate::type_inference::expr_visitor::arena::children_of;
+use crate::{Expr, InferredType, TypeUnificationError};
 
 fn get_type_unification_error_from_mismatch(
     rib: &Expr,
@@ -204,4 +133,93 @@ fn get_error_detail(
     }
 
     details
+}
+
+/// Same semantics as [`unify_types`], but updates a [`TypeTable`] in place. On failure, rebuilds
+/// from `root` for error context (cold path).
+pub fn unify_types_lowered(
+    root: ExprId,
+    arena: &ExprArena,
+    types: &mut TypeTable,
+) -> Result<(), TypeUnificationError> {
+    let mut order = Vec::new();
+    fn post_order(id: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
+        for c in children_of(id, arena) {
+            post_order(c, arena, out);
+        }
+        out.push(id);
+    }
+    post_order(root, arena, &mut order);
+
+    for id in order {
+        let kind = &arena.expr(id).kind;
+        let skip = matches!(
+            kind,
+            ExprKind::Let { .. }
+                | ExprKind::Boolean { .. }
+                | ExprKind::Concat { .. }
+                | ExprKind::GreaterThan { .. }
+                | ExprKind::And { .. }
+                | ExprKind::Or { .. }
+                | ExprKind::GreaterThanOrEqualTo { .. }
+                | ExprKind::LessThanOrEqualTo { .. }
+                | ExprKind::EqualTo { .. }
+                | ExprKind::LessThan { .. }
+                | ExprKind::InvokeMethodLazy { .. }
+        );
+        if skip {
+            continue;
+        }
+
+        let ty = types.get(id).clone();
+        let unification_result = ty.unify();
+        match unification_result {
+            Ok(unified_type) => {
+                types.set(id, unified_type);
+            }
+            Err(e) => {
+                let original_expr = rebuild_expr(root, arena, types);
+                let expr_unified = rebuild_expr(id, arena, types);
+                return Err(match e {
+                    UnificationFailureInternal::TypeMisMatch { left, right } => {
+                        get_type_unification_error_from_mismatch(
+                            &original_expr,
+                            &expr_unified,
+                            left,
+                            right,
+                        )
+                    }
+
+                    UnificationFailureInternal::ConflictingTypes {
+                        conflicting_types,
+                        additional_error_detail,
+                    } => {
+                        let mut additional_messages = vec![format!(
+                            "conflicting types: {}",
+                            conflicting_types
+                                .iter()
+                                .map(|t| t.printable())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )];
+
+                        additional_messages.extend(additional_error_detail);
+
+                        TypeUnificationError::unresolved_types_error(
+                            expr_unified.source_span(),
+                            additional_messages,
+                        )
+                    }
+
+                    UnificationFailureInternal::UnknownType => {
+                        TypeUnificationError::unresolved_types_error(
+                            expr_unified.source_span(),
+                            vec!["cannot determine the type".to_string()],
+                        )
+                    }
+                });
+            }
+        }
+    }
+    Ok(())
 }

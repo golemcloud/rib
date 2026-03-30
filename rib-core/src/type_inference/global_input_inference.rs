@@ -12,57 +12,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{visit_post_order_rev_mut, Expr, InferredType};
+use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
+use crate::type_inference::expr_visitor::arena::children_of;
+use crate::{Expr, InferredType};
 use std::collections::HashMap;
 
-// request.path.user is used as a string in one place
-// request.path.id is used an integer in some other
-// request -> AllOf(path -> user, path -> id)
-pub fn infer_global_inputs(expr: &mut Expr) {
-    let global_variables_dictionary = collect_all_global_variables_type(expr);
-    // Updating the collected types in all positions of input
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } = expr
-        {
-            // We are only interested in global variables
+pub fn infer_global_inputs_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+    let global_vars = collect_global_variable_types(root, arena, types);
+
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        let kind = arena.expr(id).kind.clone();
+        if let ExprKind::Identifier { variable_id } = kind {
             if variable_id.is_global() {
-                if let Some(types) = global_variables_dictionary.get(&variable_id.name()) {
-                    *inferred_type = InferredType::all_of(types.clone())
+                if let Some(type_list) = global_vars.get(&variable_id.name()) {
+                    types.set(id, InferredType::all_of(type_list.clone()));
                 }
             }
+        } else {
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
         }
-    });
+    }
 }
 
-fn collect_all_global_variables_type(expr: &mut Expr) -> HashMap<String, Vec<InferredType>> {
-    let mut all_types_of_global_variables = HashMap::new();
-    visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } = expr
-        {
-            if variable_id.is_global() {
-                match all_types_of_global_variables.get_mut(&variable_id.name().clone()) {
-                    None => {
-                        all_types_of_global_variables
-                            .insert(variable_id.name(), vec![inferred_type.clone()]);
-                    }
+fn collect_global_variable_types(
+    root: ExprId,
+    arena: &ExprArena,
+    types: &TypeTable,
+) -> HashMap<String, Vec<InferredType>> {
+    let mut all_types: HashMap<String, Vec<InferredType>> = HashMap::new();
 
-                    Some(v) => {
-                        if !v.contains(inferred_type) {
-                            v.push(inferred_type.clone())
-                        }
-                    }
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        let kind = arena.expr(id).kind.clone();
+        if let ExprKind::Identifier { variable_id } = kind {
+            if variable_id.is_global() {
+                let ty = types.get(id).clone();
+                let entry = all_types.entry(variable_id.name()).or_default();
+                if !entry.contains(&ty) {
+                    entry.push(ty);
                 }
             }
+        } else {
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push(child);
+            }
         }
-    });
+    }
 
-    all_types_of_global_variables
+    all_types
+}
+
+pub fn infer_global_inputs(expr: &mut Expr) {
+    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
+    infer_global_inputs_lowered(root, &expr_arena, &mut types);
+    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }

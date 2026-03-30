@@ -13,86 +13,99 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::call_type::{CallType, InstanceCreationType};
+use crate::call_type::InstanceCreationType;
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_parameter::TypeParameter;
-use crate::{
-    try_visit_post_order_mut, try_visit_post_order_rev_mut, CustomError, FunctionCallError,
-    InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
-};
 use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
+use crate::{
+    CustomError, FunctionCallError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
+};
 
-// Handling the following and making sure the types are inferred fully at this stage.
-// The expr `Call` will still be expr `Call` itself but CallType will be worker instance creation
-// or resource creation
-// instance;
-// instance[foo]
-// instance("worker-name")
-// instance[foo]("worker-name")
-pub fn identify_instance_creation(
-    expr: &mut Expr,
+use crate::expr_arena::{
+    rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
+};
+use crate::type_inference::expr_visitor::arena::children_of;
+
+/// Arena version of `identify_instance_creation`.
+pub fn identify_instance_creation_lowered(
+    root: ExprId,
+    arena: &mut ExprArena,
+    types: &mut TypeTable,
     component_dependencies: &ComponentDependencies,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
-    search_for_invalid_instance_declarations(expr)?;
-    identify_instance_creation_with_worker(expr, component_dependencies, custom_instance_spec)
+    search_for_invalid_instance_declarations_arena(root, arena, types)?;
+    identify_instance_creation_with_worker_arena(
+        root,
+        arena,
+        types,
+        component_dependencies,
+        custom_instance_spec,
+    )
 }
 
-pub fn search_for_invalid_instance_declarations(
-    expr: &mut Expr,
+fn search_for_invalid_instance_declarations_arena(
+    root: ExprId,
+    arena: &ExprArena,
+    _types: &TypeTable,
 ) -> Result<(), RibTypeErrorInternal> {
-    try_visit_post_order_mut(expr, &mut |expr| {
-        match expr {
-            Expr::Let {
-                variable_id, expr, ..
-            } => {
+    let mut stack = vec![root];
+    while let Some(id) = stack.pop() {
+        let node = arena.expr(id);
+        let span = node.source_span.clone();
+        match &node.kind.clone() {
+            ExprKind::Let { variable_id, .. } => {
                 if variable_id.name() == "instance" {
                     return Err(CustomError::new(
-                        expr.source_span(),
+                        span,
                         "`instance` is a reserved keyword and cannot be used as a variable.",
                     )
                     .into());
                 }
             }
-            Expr::Identifier { variable_id, .. } => {
+            ExprKind::Identifier { variable_id } => {
                 if variable_id.name() == "instance" && variable_id.is_global() {
-                    let err = CustomError::new(
-                            expr.source_span(),
-                             "`instance` is a reserved keyword"
-                        ).with_help_message(
-                            "use `instance()` instead of `instance` to create an ephemeral worker instance."
-                        ).with_help_message(
-                            "for a durable worker, use `instance(\"foo\")` where `\"foo\"` is the worker name"
-                        );
-
-                    return Err(err.into());
+                    return Err(CustomError::new(span, "`instance` is a reserved keyword")
+                        .with_help_message(
+                            "use `instance()` instead of `instance` to create an ephemeral worker instance.",
+                        )
+                        .with_help_message(
+                            "for a durable worker, use `instance(\"foo\")` where `\"foo\"` is the worker name",
+                        )
+                        .into());
                 }
             }
-
             _ => {}
         }
-        Ok(())
-    })
+        for child in children_of(id, arena).into_iter().rev() {
+            stack.push(child);
+        }
+    }
+    Ok(())
 }
 
-// Identifying instance creations out of all parsed function calls.
-// Note that before any global variable related inference stages,
-// this has to go in first to disambiguate global variables with instance creations
-pub fn identify_instance_creation_with_worker(
-    expr: &mut Expr,
+fn identify_instance_creation_with_worker_arena(
+    root: ExprId,
+    arena: &mut ExprArena,
+    types: &mut TypeTable,
     component_dependency: &ComponentDependencies,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
-    try_visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::Call {
-            call_type,
-            generic_type_parameter,
-            args,
-            inferred_type,
-            source_span,
+    // Collect Call nodes bottom-up (post-order)
+    let mut order = Vec::new();
+    collect_post_order(root, arena, &mut order);
+
+    for id in order {
+        let kind = arena.expr(id).kind.clone();
+        let span = arena.expr(id).source_span.clone();
+
+        if let ExprKind::Call {
+            ref call_type,
+            ref generic_type_parameter,
+            ref args,
             ..
-        } = expr
+        } = kind
         {
             let type_parameter = generic_type_parameter
                 .as_ref()
@@ -101,30 +114,33 @@ pub fn identify_instance_creation_with_worker(
                         FunctionCallError::invalid_generic_type_parameter(
                             &gtp.value,
                             err,
-                            source_span.clone(),
+                            span.clone(),
                         )
                     })
                 })
-                .transpose()?;
+                .transpose()
+                .map_err(RibTypeErrorInternal::from)?;
 
-            let (instance_creation_type, new_type_parameter) = get_instance_creation_details(
+            let args_ids: Vec<ExprId> = args.clone();
+
+            let result = get_instance_creation_details_arena(
                 call_type,
-                type_parameter.clone(),
-                args,
+                type_parameter,
+                &args_ids,
+                arena,
+                types,
                 component_dependency,
                 custom_instance_spec,
             )
             .map_err(|err| {
                 RibTypeErrorInternal::from(CustomError::new(
-                    source_span.clone(),
+                    span.clone(),
                     format!("failed to create instance: {err}"),
                 ))
             })?;
 
-            if let Some(instance_creation_type) = instance_creation_type {
+            if let Some((instance_creation_type, new_type_parameter)) = result {
                 let worker_name = instance_creation_type.worker_name();
-
-                *call_type = CallType::InstanceCreation(instance_creation_type);
 
                 let new_instance_type = InstanceType::from(
                     component_dependency,
@@ -133,182 +149,208 @@ pub fn identify_instance_creation_with_worker(
                 )
                 .map_err(|err| {
                     RibTypeErrorInternal::from(CustomError::new(
-                        source_span.clone(),
+                        span.clone(),
                         format!("failed to create instance: {err}"),
                     ))
                 })?;
 
-                *inferred_type = InferredType::new(
+                let new_type = InferredType::new(
                     TypeInternal::Instance {
                         instance_type: Box::new(new_instance_type),
                     },
                     TypeOrigin::NoOrigin,
                 );
+
+                // Convert old InstanceCreationType to arena CallTypeNode
+                let new_call_type =
+                    convert_instance_creation_type(instance_creation_type, arena, types);
+
+                let node_mut = arena.expr_mut(id);
+                if let ExprKind::Call {
+                    call_type: ref mut ct,
+                    ..
+                } = node_mut.kind
+                {
+                    *ct = new_call_type;
+                }
+                types.set(id, new_type);
             }
         }
-        Ok(())
-    })
+    }
+
+    Ok(())
 }
 
-// Returns a new type parameter in certain cases
-fn get_instance_creation_details(
-    call_type: &CallType,
+fn convert_instance_creation_type(
+    ict: InstanceCreationType,
+    arena: &mut ExprArena,
+    types: &mut TypeTable,
+) -> CallTypeNode {
+    match ict {
+        InstanceCreationType::WitWorker {
+            component_info,
+            worker_name,
+        } => {
+            let worker_id = worker_name.map(|wn| lower_expr_into_arena(*wn, arena, types));
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
+                component_info,
+                worker_name: worker_id,
+            })
+        }
+        InstanceCreationType::WitResource {
+            component_info,
+            module,
+            resource_name,
+        } => {
+            use crate::expr_arena::InstanceIdentifierNode;
+            let module_node = module.map(|m| match m {
+                crate::call_type::InstanceIdentifier::WitWorker {
+                    variable_id,
+                    worker_name,
+                } => InstanceIdentifierNode::WitWorker {
+                    variable_id,
+                    worker_name: worker_name.map(|wn| lower_expr_into_arena(*wn, arena, types)),
+                },
+                crate::call_type::InstanceIdentifier::WitResource {
+                    variable_id,
+                    worker_name,
+                    resource_name,
+                } => InstanceIdentifierNode::WitResource {
+                    variable_id,
+                    worker_name: worker_name.map(|wn| lower_expr_into_arena(*wn, arena, types)),
+                    resource_name,
+                },
+            });
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
+                component_info,
+                module: module_node,
+                resource_name,
+            })
+        }
+    }
+}
+
+/// Lower an `Expr` value into the arena, returning its new `ExprId`.
+/// Used when converting `InstanceCreationType` worker name expressions.
+fn lower_expr_into_arena(expr: Expr, arena: &mut ExprArena, types: &mut TypeTable) -> ExprId {
+    crate::expr_arena::lower_into(arena, types, &expr)
+}
+
+fn get_instance_creation_details_arena(
+    call_type: &CallTypeNode,
     type_parameter: Option<TypeParameter>,
-    args: &mut [Expr],
+    args: &[ExprId],
+    arena: &mut ExprArena,
+    types: &mut TypeTable,
     component_dependency: &ComponentDependencies,
     custom_instance_spec: &[CustomInstanceSpec],
-) -> Result<(Option<InstanceCreationType>, Option<TypeParameter>), String> {
+) -> Result<Option<(InstanceCreationType, Option<TypeParameter>)>, String> {
     match call_type {
-        CallType::Function { function_name, .. } => {
-            let function_name = function_name.to_parsed_function_name().function;
-            match function_name {
+        CallTypeNode::Function { function_name, .. } => {
+            let fn_ref = function_name.to_parsed_function_name().function;
+            match fn_ref {
                 ParsedFunctionReference::Function { function } if function == "instance" => {
-                    let optional_worker_name_expression = args.first();
-
-                    let instance_creation = component_dependency.get_worker_instance_type(
-                        type_parameter.clone(),
-                        optional_worker_name_expression.cloned(),
-                    )?;
-
-                    Ok((Some(instance_creation), type_parameter))
+                    // Get the first arg as an optional worker name
+                    let worker_name_expr = args.first().map(|&id| rebuild_expr(id, arena, types));
+                    let instance_creation = component_dependency
+                        .get_worker_instance_type(type_parameter.clone(), worker_name_expr)?;
+                    Ok(Some((instance_creation, type_parameter)))
                 }
-
                 ParsedFunctionReference::Function { function } => {
-                    let custom_instance_spec =
-                        resolve_custom_instance_spec(custom_instance_spec, &function)?;
+                    let spec = custom_instance_spec
+                        .iter()
+                        .find(|s| s.instance_name == function)
+                        .cloned();
+                    match spec {
+                        None => Ok(None),
+                        Some(spec) => {
+                            let prefix = format!("{}(", spec.instance_name);
+                            let mut concat_parts: Vec<Expr> = vec![Expr::literal(prefix)];
 
-                    match custom_instance_spec {
-                        None => Ok((None, None)),
-                        Some(custom_instance_spec) => {
-                            // In a custom instance the worker name is then
-                            // `custom-instance-name(arg1, arg2, ...)`
-                            // Such that arg1, if ends up (after interpretation)
-                            // in a string, then it should be quoted
-                            // while arg2, if not a string, can be kept
-                            // as it is (keeping the wave syntax valid)
-                            let new_worker_name_prefix =
-                                format!("{}(", custom_instance_spec.instance_name);
-
-                            let mut exprs = vec![Expr::literal(new_worker_name_prefix)];
-
-                            if args.len() != custom_instance_spec.parameter_types.len() {
+                            if args.len() != spec.parameter_types.len() {
                                 return Err(format!(
                                     "expected {} arguments, found {}",
-                                    custom_instance_spec.parameter_types.len(),
+                                    spec.parameter_types.len(),
                                     args.len()
                                 ));
                             }
 
-                            let mut args_iter = args
-                                .iter_mut()
-                                .zip(custom_instance_spec.parameter_types)
-                                .peekable();
+                            let mut args_iter =
+                                args.iter().zip(spec.parameter_types.iter()).peekable();
 
-                            while let Some((arg, analysed_type)) = args_iter.next() {
-                                let inferred_type = InferredType::from(&analysed_type);
-                                arg.add_infer_type_mut(inferred_type);
+                            while let Some((&arg_id, analysed_type)) = args_iter.next() {
+                                let inferred = InferredType::from(analysed_type);
+                                let current = types.get(arg_id).clone();
+                                types.set(arg_id, current.merge(inferred));
 
-                                match arg {
-                                    // chances of being a string after interpretation
-                                    Expr::Literal { .. }
-                                    | Expr::Identifier { .. }
-                                    | Expr::SelectField { .. }
-                                    | Expr::SelectIndex { .. }
-                                    | Expr::Concat { .. }
-                                    | Expr::ListReduce { .. }
-                                    | Expr::ExprBlock { .. }
-                                    | Expr::Cond { .. }
-                                    | Expr::PatternMatch { .. }
-                                    | Expr::Call { .. }
-                                    | Expr::GenerateWorkerName { .. }
-                                    | Expr::InvokeMethodLazy { .. } => {
-                                        quote_string(&analysed_type, &mut exprs, arg)
+                                let arg_expr = rebuild_expr(arg_id, arena, types);
+                                match analysed_type {
+                                    AnalysedType::Str(_) => {
+                                        concat_parts.push(Expr::literal("\""));
+                                        concat_parts.push(arg_expr);
+                                        concat_parts.push(Expr::literal("\""));
                                     }
-
-                                    // Can't never be a string
-                                    Expr::Let { .. }
-                                    | Expr::Sequence { .. }
-                                    | Expr::Range { .. }
-                                    | Expr::Record { .. }
-                                    | Expr::Tuple { .. }
-                                    | Expr::Number { .. }
-                                    | Expr::Flags { .. }
-                                    | Expr::Boolean { .. }
-                                    | Expr::Not { .. }
-                                    | Expr::GreaterThan { .. }
-                                    | Expr::And { .. }
-                                    | Expr::Or { .. }
-                                    | Expr::GreaterThanOrEqualTo { .. }
-                                    | Expr::LessThanOrEqualTo { .. }
-                                    | Expr::Plus { .. }
-                                    | Expr::Multiply { .. }
-                                    | Expr::Minus { .. }
-                                    | Expr::Divide { .. }
-                                    | Expr::EqualTo { .. }
-                                    | Expr::LessThan { .. }
-                                    | Expr::Option { .. }
-                                    | Expr::Result { .. }
-                                    | Expr::Unwrap { .. }
-                                    | Expr::Throw { .. }
-                                    | Expr::GetTag { .. }
-                                    | Expr::ListComprehension { .. }
-                                    | Expr::Length { .. } => exprs.push(arg.clone()),
+                                    _ => {
+                                        concat_parts.push(arg_expr);
+                                    }
                                 }
-
                                 if args_iter.peek().is_some() {
-                                    exprs.push(Expr::literal(","));
+                                    concat_parts.push(Expr::literal(","));
                                 }
                             }
-
-                            exprs.push(Expr::literal(")"));
-
-                            let worker_name_expr = Expr::concat(exprs);
-
-                            let type_parameter = custom_instance_spec
-                                .interface_name
-                                .map(TypeParameter::Interface);
-
-                            let instance_creation = component_dependency.get_worker_instance_type(
-                                type_parameter.clone(),
-                                Some(worker_name_expr),
-                            )?;
-
-                            Ok((Some(instance_creation), type_parameter))
+                            concat_parts.push(Expr::literal(")"));
+                            let worker_name_expr = Expr::concat(concat_parts);
+                            let tp = spec.interface_name.map(TypeParameter::Interface);
+                            let instance_creation = component_dependency
+                                .get_worker_instance_type(tp.clone(), Some(worker_name_expr))?;
+                            Ok(Some((instance_creation, tp)))
                         }
                     }
                 }
-
-                _ => Ok((None, None)),
+                _ => Ok(None),
             }
         }
-        CallType::InstanceCreation(instance_creation_type) => {
-            Ok((Some(instance_creation_type.clone()), type_parameter))
+        CallTypeNode::InstanceCreation(creation) => {
+            // Already identified — convert back to old type for InstanceType::from
+            let ict = match creation {
+                InstanceCreationNode::WitWorker {
+                    component_info,
+                    worker_name,
+                } => {
+                    let wn = worker_name.map(|wn_id| Box::new(rebuild_expr(wn_id, arena, types)));
+                    InstanceCreationType::WitWorker {
+                        component_info: component_info.clone(),
+                        worker_name: wn,
+                    }
+                }
+                InstanceCreationNode::WitResource {
+                    component_info,
+                    module: _,
+                    resource_name,
+                } => {
+                    InstanceCreationType::WitResource {
+                        component_info: component_info.clone(),
+                        module: None, // simplified
+                        resource_name: resource_name.clone(),
+                    }
+                }
+            };
+            Ok(Some((ict, type_parameter)))
         }
-        CallType::VariantConstructor(_) => Ok((None, None)),
-        CallType::EnumConstructor(_) => Ok((None, None)),
+        CallTypeNode::VariantConstructor(_) | CallTypeNode::EnumConstructor(_) => Ok(None),
     }
 }
 
-fn quote_string(analysed_type: &AnalysedType, instance_args: &mut Vec<Expr>, arg: &Expr) {
-    match analysed_type {
-        AnalysedType::Str(_) => {
-            instance_args.push(Expr::literal("\""));
-            instance_args.push(arg.clone());
-            instance_args.push(Expr::literal("\""));
-        }
-        _ => {
-            instance_args.push(arg.clone());
+fn collect_post_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
+    let mut stack = vec![(root, false)];
+    while let Some((id, visited)) = stack.pop() {
+        if visited {
+            out.push(id);
+        } else {
+            stack.push((id, true));
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push((child, false));
+            }
         }
     }
-}
-
-fn resolve_custom_instance_spec(
-    custom_instance_spec: &[CustomInstanceSpec],
-    function_name: &str,
-) -> Result<Option<CustomInstanceSpec>, String> {
-    let spec = custom_instance_spec
-        .iter()
-        .find(|spec| spec.instance_name == function_name)
-        .cloned();
-    Ok(spec)
 }

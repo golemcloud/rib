@@ -35,9 +35,12 @@ pub use wasm_wave_text::*;
 
 mod call_type;
 
+mod profile;
+
 pub mod analysis;
 mod compiler;
 mod expr;
+pub mod expr_arena;
 mod function_name;
 mod generic_type_parameter;
 mod inferred_type;

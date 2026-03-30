@@ -12,460 +12,298 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::type_inference::type_hint::TypeHint;
+
+use crate::expr_arena::{
+    CallTypeNode, ExprArena, ExprId, ExprKind, InstanceIdentifierNode, MatchArmNode, RangeKind,
+    ResultExprKind, TypeTable,
+};
+use crate::type_inference::expr_visitor::arena::children_of;
+use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::type_refinement::precise_types::{ListType, RecordType};
 use crate::type_refinement::TypeRefinement;
-use crate::FunctionName;
-use crate::{try_visit_post_order_mut, CustomError, Expr};
 use crate::{
-    ActualType, ComponentDependencies, ExpectedType, FullyQualifiedResourceMethod, GetTypeHint,
-    InferredType, InstanceIdentifier, InterfaceName, MatchArm, PackageName, Path, Range,
-    TypeInternal, TypeMismatchError,
+    ActualType, ComponentDependencies, ExpectedType, FullyQualifiedResourceMethod, FunctionName,
+    InferredType, InterfaceName, PackageName, Path, TypeInternal, TypeMismatchError,
 };
 
-pub fn type_pull_up(
-    expr: &mut Expr,
+/// Post-order traversal: for each node, read the types of its children from
+/// `TypeTable` to compute/update the node's own type.
+pub fn type_pull_up_lowered(
+    root: ExprId,
+    arena: &mut ExprArena,
+    types: &mut TypeTable,
     component_dependencies: &ComponentDependencies,
 ) -> Result<(), RibTypeErrorInternal> {
-    try_visit_post_order_mut(expr, &mut |expr| {
-        match expr {
-            Expr::Tuple {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                handle_tuple(exprs, inferred_type);
+    // Collect post-order first to avoid borrow conflicts.
+    let mut order = Vec::new();
+    collect_post_order(root, arena, &mut order);
+
+    for id in order {
+        let node = arena.expr(id);
+        let kind = node.kind.clone();
+        let span = node.source_span.clone();
+
+        match kind {
+            ExprKind::Tuple { exprs } => {
+                let elem_types: Vec<InferredType> =
+                    exprs.iter().map(|&e| types.get(e).clone()).collect();
+                let new_tuple = InferredType::tuple(elem_types);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(new_tuple));
             }
 
-            Expr::Identifier { .. } => {}
-
-            Expr::Flags { .. } => {}
-
-            Expr::InvokeMethodLazy {
+            ExprKind::InvokeMethodLazy {
                 lhs,
-                method,
-                source_span,
-                args,
-                ..
+                ref method,
+                ref generic_type_parameter,
+                ref args,
             } => {
-                let new_call = handle_residual_method_invokes(
+                let method = method.clone();
+                let gtp = generic_type_parameter.clone();
+                let args_ids: Vec<ExprId> = args.clone();
+                let lhs_type = types.get(lhs).clone();
+                let new_call = handle_residual_method_invokes_arena(
                     lhs,
-                    method,
-                    source_span,
-                    args,
+                    &lhs_type,
+                    &method,
+                    &span,
+                    &args_ids,
                     component_dependencies,
+                    arena,
                 )?;
-                *expr = new_call
+                // Replace this node's ExprKind with the resolved Call
+                let node_mut = arena.expr_mut(id);
+                node_mut.kind = new_call.0;
+                types.set(id, new_call.1);
+                let _ = gtp;
             }
 
-            Expr::SelectField {
-                expr,
-                field,
-                inferred_type,
-                ..
+            ExprKind::SelectField {
+                expr: inner_id,
+                ref field,
             } => {
-                handle_select_field(expr, field, inferred_type)?;
+                let field = field.clone();
+                let inner_type = types.get(inner_id).clone();
+                let inner_span = arena.expr(inner_id).source_span.clone();
+                let result = get_inferred_type_of_selected_field_arena(
+                    &inner_type,
+                    &inner_span,
+                    &field,
+                    arena,
+                    inner_id,
+                )?;
+                let current = types.get(id).clone();
+                types.set(id, current.merge(result));
             }
 
-            Expr::SelectIndex {
-                expr,
-                index,
-                inferred_type,
-                ..
+            ExprKind::SelectIndex {
+                expr: inner_id,
+                index: index_id,
             } => {
-                handle_select_index(expr, index, inferred_type)?;
+                let inner_type = types.get(inner_id).clone();
+                if !inner_type.is_unknown() {
+                    let index_type = types.get(index_id).clone();
+                    let inner_span = arena.expr(inner_id).source_span.clone();
+                    let result = get_inferred_type_of_selection_dynamic_arena(
+                        &inner_type,
+                        &inner_span,
+                        &index_type,
+                        arena,
+                        inner_id,
+                        index_id,
+                    )?;
+                    let current = types.get(id).clone();
+                    types.set(id, current.merge(result));
+                }
             }
 
-            Expr::Result {
-                expr: Ok(expr),
-                inferred_type,
-                ..
+            ExprKind::Result {
+                expr: ResultExprKind::Ok(ok_id),
             } => {
-                handle_result_ok(expr, inferred_type);
+                let ok_type = types.get(ok_id).clone();
+                let result_type = InferredType::result(Some(ok_type), None);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(result_type));
             }
 
-            Expr::Result {
-                expr: Err(expr),
-                inferred_type,
-                ..
+            ExprKind::Result {
+                expr: ResultExprKind::Err(err_id),
             } => {
-                handle_result_error(expr, inferred_type);
+                let err_type = types.get(err_id).clone();
+                let result_type = InferredType::result(None, Some(err_type));
+                let current = types.get(id).clone();
+                types.set(id, current.merge(result_type));
             }
 
-            Expr::Option {
-                expr: Some(expr),
-                inferred_type,
-                ..
+            ExprKind::Option {
+                expr: Some(inner_id),
             } => {
-                handle_option_some(expr, inferred_type);
+                let inner_type = types.get(inner_id).clone();
+                let option_type = InferredType::option(inner_type);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(option_type));
             }
 
-            Expr::Option { .. } => {}
+            ExprKind::Cond { lhs, rhs, .. } => {
+                let lhs_type = types.get(lhs).clone();
+                let rhs_type = types.get(rhs).clone();
+                let current = types.get(id).clone();
+                types.set(id, current.merge(lhs_type.merge(rhs_type)));
+            }
 
-            Expr::Cond {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
+            ExprKind::PatternMatch { ref match_arms, .. } => {
+                let arms: Vec<MatchArmNode> = match_arms.clone();
+                let arm_types: Vec<InferredType> = arms
+                    .iter()
+                    .map(|arm| types.get(arm.arm_resolution_expr).clone())
+                    .collect();
+                let merged = InferredType::all_of(arm_types);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(merged));
+            }
+
+            ExprKind::ExprBlock { ref exprs } => {
+                if let Some(&last_id) = exprs.last() {
+                    let last_type = types.get(last_id).clone();
+                    let current = types.get(id).clone();
+                    types.set(id, current.merge(last_type));
+                }
+            }
+
+            ExprKind::Sequence { ref exprs } => {
+                if let Some(&first_id) = exprs.first() {
+                    let first_type = types.get(first_id).clone();
+                    let list_type = InferredType::list(first_type);
+                    let current = types.get(id).clone();
+                    types.set(id, current.merge(list_type));
+                }
+            }
+
+            ExprKind::Record { ref fields } => {
+                let field_types: Vec<(String, InferredType)> = fields
+                    .iter()
+                    .map(|(name, fid)| (name.clone(), types.get(*fid).clone()))
+                    .collect();
+                let record_type = InferredType::record(field_types);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(record_type));
+            }
+
+            ExprKind::Plus { lhs, rhs }
+            | ExprKind::Minus { lhs, rhs }
+            | ExprKind::Multiply { lhs, rhs }
+            | ExprKind::Divide { lhs, rhs } => {
+                let lhs_type = types.get(lhs).clone();
+                let rhs_type = types.get(rhs).clone();
+                let current = types.get(id).clone();
+                types.set(id, current.merge(lhs_type).merge(rhs_type));
+            }
+
+            ExprKind::Unwrap { expr: inner_id } | ExprKind::GetTag { expr: inner_id } => {
+                let inner_type = types.get(inner_id).clone();
+                let current = types.get(id).clone();
+                types.set(id, current.merge(inner_type));
+            }
+
+            ExprKind::ListComprehension { yield_expr, .. } => {
+                let yield_type = types.get(yield_expr).clone();
+                let list_type = InferredType::list(yield_type);
+                let current = types.get(id).clone();
+                types.set(id, current.merge(list_type));
+            }
+
+            ExprKind::ListReduce {
+                init_value_expr, ..
             } => {
-                handle_if_else(lhs, rhs, inferred_type);
+                let init_type = types.get(init_value_expr).clone();
+                let current = types.get(id).clone();
+                types.set(id, current.merge(init_type));
             }
 
-            Expr::PatternMatch {
-                match_arms,
-                inferred_type,
-                ..
-            } => {
-                handle_pattern_match(match_arms, inferred_type);
+            ExprKind::Range { range } => {
+                let new_type = match range {
+                    RangeKind::Range { from, to } | RangeKind::RangeInclusive { from, to } => {
+                        let from_type = types.get(from).clone();
+                        let to_type = types.get(to).clone();
+                        InferredType::range(from_type, Some(to_type))
+                    }
+                    RangeKind::RangeFrom { from } => {
+                        let from_type = types.get(from).clone();
+                        InferredType::range(from_type, None)
+                    }
+                };
+                types.set(id, new_type);
             }
 
-            Expr::Concat { .. } => {}
-
-            Expr::ExprBlock {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                handle_multiple(exprs, inferred_type);
-            }
-
-            Expr::Not { .. } => {}
-            Expr::GreaterThan { .. } => {}
-            Expr::GreaterThanOrEqualTo { .. } => {}
-            Expr::LessThanOrEqualTo { .. } => {}
-            Expr::EqualTo { .. } => {}
-            Expr::LessThan { .. } => {}
-
-            Expr::Plus {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type
-                    .merge(lhs.inferred_type())
-                    .merge(rhs.inferred_type());
-            }
-
-            Expr::Minus {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type
-                    .merge(lhs.inferred_type())
-                    .merge(rhs.inferred_type());
-            }
-
-            Expr::Multiply {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type
-                    .merge(lhs.inferred_type())
-                    .merge(rhs.inferred_type());
-            }
-
-            Expr::Divide {
-                lhs,
-                rhs,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type
-                    .merge(lhs.inferred_type())
-                    .merge(rhs.inferred_type());
-            }
-
-            Expr::Let { .. } => {}
-
-            Expr::Sequence {
-                exprs,
-                inferred_type,
-                ..
-            } => {
-                handle_sequence(exprs, inferred_type);
-            }
-
-            Expr::Record {
-                exprs,
-                inferred_type,
-                ..
-            } => handle_record(exprs, inferred_type),
-
-            Expr::Literal { .. } => {}
-            Expr::Number { .. } => {}
-            Expr::Boolean { .. } => {}
-            Expr::And { .. } => {}
-            Expr::Or { .. } => {}
-            Expr::Call { .. } => {}
-            Expr::Unwrap {
-                expr,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type.merge(expr.inferred_type());
-            }
-            Expr::Length { .. } => {}
-            Expr::Throw { .. } => {}
-            Expr::GenerateWorkerName { .. } => {}
-            Expr::ListComprehension {
-                yield_expr,
-                inferred_type,
-                ..
-            } => {
-                handle_list_comprehension(yield_expr, inferred_type);
-            }
-
-            Expr::GetTag {
-                expr,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type.merge(expr.inferred_type());
-            }
-
-            Expr::ListReduce {
-                init_value_expr,
-                inferred_type,
-                ..
-            } => {
-                *inferred_type = inferred_type.merge(init_value_expr.inferred_type());
-            }
-
-            Expr::Range {
-                range,
-                inferred_type,
-                ..
-            } => {
-                handle_range(range, inferred_type);
-            }
+            // Leaves and nodes whose type comes purely from children via
+            // other passes (identifiers, flags, literals, comparisons, etc.)
+            ExprKind::Identifier { .. }
+            | ExprKind::Flags { .. }
+            | ExprKind::Concat { .. }
+            | ExprKind::Not { .. }
+            | ExprKind::GreaterThan { .. }
+            | ExprKind::GreaterThanOrEqualTo { .. }
+            | ExprKind::LessThanOrEqualTo { .. }
+            | ExprKind::EqualTo { .. }
+            | ExprKind::LessThan { .. }
+            | ExprKind::And { .. }
+            | ExprKind::Or { .. }
+            | ExprKind::Let { .. }
+            | ExprKind::Literal { .. }
+            | ExprKind::Number { .. }
+            | ExprKind::Boolean { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::Length { .. }
+            | ExprKind::Throw { .. }
+            | ExprKind::GenerateWorkerName { .. }
+            | ExprKind::Option { expr: None } => {}
         }
-        Ok(())
-    })
-}
-
-fn handle_list_comprehension(
-    current_yield_expr: &Expr,
-    current_comprehension_type: &mut InferredType,
-) {
-    let list_expr = InferredType::list(current_yield_expr.inferred_type());
-    *current_comprehension_type = current_comprehension_type.merge(list_expr);
-}
-
-fn handle_tuple(tuple_elems: &[Expr], current_tuple_type: &mut InferredType) {
-    let mut new_inferred_type = vec![];
-
-    for current_tuple_elem in tuple_elems.iter() {
-        new_inferred_type.push(current_tuple_elem.inferred_type());
-    }
-
-    let new_tuple_type = InferredType::tuple(new_inferred_type);
-
-    *current_tuple_type = current_tuple_type.merge(new_tuple_type);
-}
-
-fn handle_select_field(
-    select_from: &Expr,
-    field: &str,
-    current_field_type: &mut InferredType,
-) -> Result<(), RibTypeErrorInternal> {
-    let selection_field_type = get_inferred_type_of_selected_field(select_from, field)?;
-
-    *current_field_type = current_field_type.merge(selection_field_type);
-
-    Ok(())
-}
-
-fn handle_select_index(
-    select_from: &Expr,
-    index: &Expr,
-    current_select_index_type: &mut InferredType,
-) -> Result<(), RibTypeErrorInternal> {
-    let selection_expr_inferred_type = select_from.inferred_type();
-
-    // if select_from is not yet gone through any phase, we cannot guarantee
-    // it is a list type, otherwise continue with the assumption that it is a record
-    if !selection_expr_inferred_type.is_unknown() {
-        let index_type = get_inferred_type_of_selection_dynamic(select_from, index)?;
-
-        *current_select_index_type = current_select_index_type.merge(index_type);
     }
 
     Ok(())
 }
 
-fn handle_result_ok(ok_expr: &mut Expr, current_inferred_type: &mut InferredType) {
-    let inferred_type_of_ok_expr = ok_expr.inferred_type();
-    let result_type = InferredType::result(Some(inferred_type_of_ok_expr.clone()), None);
-    *current_inferred_type = current_inferred_type.merge(result_type);
-}
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
 
-fn handle_result_error(error_expr: &Expr, current_inferred_type: &mut InferredType) {
-    let inferred_type_of_error_expr = error_expr.inferred_type();
-    let result_type = InferredType::result(None, Some(inferred_type_of_error_expr.clone()));
-
-    *current_inferred_type = current_inferred_type.merge(result_type);
-}
-
-fn handle_option_some(some_expr: &Expr, inferred_type: &mut InferredType) {
-    let inferred_type_of_some_expr = some_expr.inferred_type();
-    let option_type = InferredType::option(inferred_type_of_some_expr);
-
-    *inferred_type = inferred_type.merge(option_type);
-}
-
-fn handle_if_else(then_expr: &Expr, else_expr: &Expr, inferred_type: &mut InferredType) {
-    let inferred_type_of_then_expr = then_expr.inferred_type();
-    let inferred_type_of_else_expr = else_expr.inferred_type();
-
-    *inferred_type =
-        inferred_type.merge(inferred_type_of_then_expr.merge(inferred_type_of_else_expr));
-}
-
-pub fn handle_pattern_match(current_match_arms: &[MatchArm], inferred_type: &mut InferredType) {
-    let mut arm_resolution_inferred_types = vec![];
-
-    for arm in current_match_arms {
-        let arm_inferred_type = arm.arm_resolution_expr.inferred_type();
-        arm_resolution_inferred_types.push(arm_inferred_type);
-    }
-
-    let new_inferred_type = InferredType::all_of(arm_resolution_inferred_types);
-
-    *inferred_type = inferred_type.merge(new_inferred_type)
-}
-
-fn handle_multiple(expr_block: &[Expr], inferred_type: &mut InferredType) {
-    let new_inferred_type = expr_block.last().map(|x| x.inferred_type());
-
-    if let Some(new_inferred_type) = new_inferred_type {
-        *inferred_type = inferred_type.merge(new_inferred_type);
-    }
-}
-
-fn handle_sequence(current_expr_list: &[Expr], current_inferred_type: &mut InferredType) {
-    let mut new_inferred_type = vec![];
-
-    for expr in current_expr_list.iter() {
-        let new_type = expr.inferred_type();
-        new_inferred_type.push(new_type);
-    }
-
-    if let Some(first_inferred_type) = new_inferred_type.first() {
-        *current_inferred_type =
-            current_inferred_type.merge(InferredType::list(first_inferred_type.clone()));
-    }
-}
-
-fn handle_record(current_expr_list: &[(String, Box<Expr>)], record_type: &mut InferredType) {
-    let mut field_and_types = vec![];
-
-    for (field, expr) in current_expr_list.iter() {
-        field_and_types.push((field.clone(), expr.inferred_type()));
-    }
-    *record_type = record_type.merge(InferredType::record(field_and_types));
-}
-
-fn handle_range(range: &Range, inferred_type: &mut InferredType) {
-    match range {
-        Range::Range { from, to } => {
-            let rhs = to.inferred_type();
-
-            let lhs = from.inferred_type();
-
-            let new_inferred_type = InferredType::range(lhs, Some(rhs));
-
-            *inferred_type = new_inferred_type;
-        }
-        Range::RangeInclusive { from, to } => {
-            let rhs = to.inferred_type();
-
-            let lhs = from.inferred_type();
-
-            let new_inferred_type = InferredType::range(lhs, Some(rhs));
-
-            *inferred_type = new_inferred_type;
-        }
-        Range::RangeFrom { from } => {
-            let lhs = from.inferred_type();
-
-            let new_inferred_type = InferredType::range(lhs, None);
-
-            *inferred_type = new_inferred_type;
-        }
-    }
-}
-
-fn get_inferred_type_of_selected_field(
-    select_from: &Expr,
-    field: &str,
-) -> Result<InferredType, RibTypeErrorInternal> {
-    let select_from_inferred_type = select_from.inferred_type();
-
-    let refined_record = RecordType::refine(&select_from_inferred_type).ok_or({
-        TypeMismatchError {
-            source_span: select_from.source_span(),
-            expected_type: ExpectedType::Hint(TypeHint::Record(None)),
-            actual_type: ActualType::Inferred(select_from_inferred_type.clone()),
-            field_path: Path::default(),
-            additional_error_detail: vec![
-                format!("cannot select `{}` from `{}`", field, select_from,),
-                format!("if `{}` is a function, pass arguments", field),
-            ],
-        }
-    })?;
-
-    Ok(refined_record.inner_type_by_name(field))
-}
-
-// This is not an ideal logic yet,
-// but alternate solution requires refactoring which can be done later
-fn handle_residual_method_invokes(
-    lhs: &Expr,
+/// Resolves an `InvokeMethodLazy` node into its `Call` equivalent.
+/// Returns the new `ExprKind` and its `InferredType`.
+fn handle_residual_method_invokes_arena(
+    lhs_id: ExprId,
+    lhs_type: &InferredType,
     method: &str,
-    source_span: &SourceSpan,
-    args: &[Expr],
+    source_span: &crate::rib_source_span::SourceSpan,
+    args: &[ExprId],
     component_dependencies: &ComponentDependencies,
-) -> Result<Expr, RibTypeErrorInternal> {
-    let possible_resource = lhs.inferred_type().internal_type().clone();
+    _arena: &ExprArena,
+) -> Result<(ExprKind, InferredType), RibTypeErrorInternal> {
+    match lhs_type.internal_type() {
+        TypeInternal::Resource { name, owner, .. } => {
+            let name = name.clone();
+            let owner = owner.clone();
 
-    match possible_resource {
-        TypeInternal::Resource {
-            name,
-            owner,
-            ..
-        } => {
-
-            let fully_qualified_resource_method = if let Some(owner) = owner {
-                let owner_string : String = owner;
-                let parts: Vec<&str> = owner_string.split('/').collect();
-                let namespace_and_package = parts.first().map(|s| s.to_string());
-
-                let namespace = namespace_and_package
+            let fqrm = if let Some(owner_str) = owner {
+                let parts: Vec<&str> = owner_str.split('/').collect();
+                let ns_pkg = parts.first().map(|s| s.to_string());
+                let namespace = ns_pkg
                     .as_ref()
                     .and_then(|s| s.split(':').next())
                     .map(|s| s.to_string());
-                let package_name = namespace_and_package
+                let pkg = ns_pkg
                     .as_ref()
                     .and_then(|s| s.split(':').nth(1))
                     .map(|s| s.to_string());
-
-                let interface_name = parts.get(1).map(|s| s.to_string());
-
+                let iface = parts.get(1).map(|s| s.to_string());
                 FullyQualifiedResourceMethod {
-                    package_name: namespace.map(|namespace| PackageName {
-                        namespace,
-                        package_name: package_name.unwrap(),
+                    package_name: namespace.map(|ns| PackageName {
+                        namespace: ns,
+                        package_name: pkg.unwrap(),
                         version: None,
                     }),
-                    interface_name: interface_name.map(|name| InterfaceName {
-                        name,
+                    interface_name: iface.map(|n| InterfaceName {
+                        name: n,
                         version: None,
                     }),
                     resource_name: name.clone().unwrap(),
@@ -482,79 +320,115 @@ fn handle_residual_method_invokes(
                 }
             };
 
-            let function_name = FunctionName::ResourceMethod(fully_qualified_resource_method.clone());
-            let (key, function_type) =
-                component_dependencies.get_function_type(&None, &function_name).unwrap();
+            let fn_name = FunctionName::ResourceMethod(fqrm.clone());
+            let (key, fn_type) = component_dependencies
+                .get_function_type(&None, &fn_name)
+                .unwrap();
 
-            let inferred_type = if let Some(new_inferred_type) = function_type.return_type {
-                new_inferred_type
-            } else {
-                InferredType::unit()
+            let inferred = fn_type.return_type.unwrap_or_else(InferredType::unit);
+
+            let dpfn = fqrm.dynamic_parsed_function_name().unwrap();
+
+            // lhs_id is the variable id if the lhs was an Identifier — we
+            // store it as the worker_name inside WitResource.
+            let ii_node = InstanceIdentifierNode::WitResource {
+                variable_id: None, // will be filled by a later pass
+                worker_name: None,
+                resource_name: name.unwrap().to_string(),
             };
 
-            let dynamic_parsed_function_name = fully_qualified_resource_method
-                .dynamic_parsed_function_name().unwrap();
-
-            let variable_id = match &lhs {
-                Expr::Identifier { variable_id, .. } => Some(variable_id),
-                _ => None,
+            let call_kind = ExprKind::Call {
+                call_type: CallTypeNode::Function {
+                    component_info: Some(key),
+                    instance_identifier: Some(ii_node),
+                    function_name: dpfn,
+                },
+                generic_type_parameter: None,
+                args: args.to_vec(),
             };
 
-            let new_call = Expr::call_worker_function(
-                dynamic_parsed_function_name,
-                None,
-                Some(InstanceIdentifier::WitResource {
-                    variable_id: variable_id.cloned(),
-                    worker_name: None,
-                    resource_name: name.unwrap().to_string()
-                }),
-                args.to_vec(),
-                Some(key)
-            )
-                .with_inferred_type(inferred_type)
-                .with_source_span(source_span.clone());
-
-            Ok(new_call)
+            Ok((call_kind, inferred))
         }
-
         _ => {
-            Err(CustomError {
+            // Reconstruct the lhs display name from the arena for a precise error message
+            let lhs_name = {
+                use crate::expr_arena::ExprKind;
+                match &_arena.expr(lhs_id).kind {
+                    ExprKind::Identifier { variable_id } => variable_id.name(),
+                    _ => "lhs".to_string(),
+                }
+            };
+            Err(crate::CustomError {
                 source_span: source_span.clone(),
                 help_message: vec![],
-                message: format!("invalid method invocation `{lhs}.{method}`. make sure `{lhs}` is defined and is a valid instance type (i.e, resource or worker)"),
-            }.into())
+                message: format!(
+                    "invalid method invocation `{lhs_name}.{method}`. make sure `{lhs_name}` is defined and is a valid instance type (i.e, resource or worker)"
+                ),
+            }
+            .into())
         }
     }
 }
 
-fn get_inferred_type_of_selection_dynamic(
-    select_from: &Expr,
-    index: &Expr,
+fn get_inferred_type_of_selected_field_arena(
+    record_type: &InferredType,
+    source_span: &crate::rib_source_span::SourceSpan,
+    field: &str,
+    _arena: &ExprArena,
+    _inner_id: ExprId,
 ) -> Result<InferredType, RibTypeErrorInternal> {
-    let select_from_type = select_from.inferred_type();
-    let select_index_type = index.inferred_type();
+    let refined = RecordType::refine(record_type).ok_or_else(|| TypeMismatchError {
+        source_span: source_span.clone(),
+        expected_type: ExpectedType::Hint(TypeHint::Record(None)),
+        actual_type: ActualType::Inferred(record_type.clone()),
+        field_path: Path::default(),
+        additional_error_detail: vec![
+            format!("cannot select `{field}` from this expression"),
+            format!("if `{field}` is a function, pass arguments"),
+        ],
+    })?;
+    Ok(refined.inner_type_by_name(field))
+}
 
-    let refined_list = ListType::refine(&select_from_type).ok_or({
-        TypeMismatchError {
-            source_span: select_from.source_span(),
-            expected_type: ExpectedType::Hint(TypeHint::List(None)),
-            actual_type: ActualType::Inferred(select_from_type.clone()),
-            field_path: Default::default(),
-            additional_error_detail: vec![format!(
-                "cannot get index {} from {} since it is not a list type. Found: {}",
-                index,
-                select_from,
-                select_from_type.get_type_hint()
-            )],
-        }
+fn get_inferred_type_of_selection_dynamic_arena(
+    list_type: &InferredType,
+    source_span: &crate::rib_source_span::SourceSpan,
+    index_type: &InferredType,
+    _arena: &ExprArena,
+    _inner_id: ExprId,
+    _index_id: ExprId,
+) -> Result<InferredType, RibTypeErrorInternal> {
+    let refined = ListType::refine(list_type).ok_or_else(|| TypeMismatchError {
+        source_span: source_span.clone(),
+        expected_type: ExpectedType::Hint(TypeHint::List(None)),
+        actual_type: ActualType::Inferred(list_type.clone()),
+        field_path: Default::default(),
+        additional_error_detail: vec![format!(
+            "cannot index into this expression since it is not a list type. Found: {}",
+            list_type.get_type_hint()
+        )],
     })?;
 
-    let list_type = refined_list.inner_type();
+    let elem_type = refined.inner_type();
 
-    if select_index_type.contains_only_number() {
-        Ok(list_type)
+    if index_type.contains_only_number() {
+        Ok(elem_type)
     } else {
-        Ok(InferredType::list(list_type))
+        Ok(InferredType::list(elem_type))
+    }
+}
+
+fn collect_post_order(root: ExprId, arena: &ExprArena, out: &mut Vec<ExprId>) {
+    let mut stack = vec![(root, false)];
+    while let Some((id, visited)) = stack.pop() {
+        if visited {
+            out.push(id);
+        } else {
+            stack.push((id, true));
+            for child in children_of(id, arena).into_iter().rev() {
+                stack.push((child, false));
+            }
+        }
     }
 }
 
@@ -564,19 +438,26 @@ mod type_pull_up_tests {
 
     use test_r::test;
 
-    use crate::call_type::CallType;
     use crate::function_name::DynamicParsedFunctionName;
-    use crate::DynamicParsedFunctionReference::Function;
-    use crate::ParsedFunctionSite::PackagedInterface;
-    use crate::{ArmPattern, ComponentDependencies, Expr, InferredType, MatchArm, VariableId};
+    use crate::rib_type_error::RibTypeErrorInternal;
+    use crate::{ArmPattern, ComponentDependencies, Expr, InferredType, MatchArm};
+
+    fn type_pull_up_via_arena(
+        expr: &mut Expr,
+        component_dependencies: &ComponentDependencies,
+    ) -> Result<(), RibTypeErrorInternal> {
+        let (mut arena, mut types, root) = crate::expr_arena::lower(expr);
+        super::type_pull_up_lowered(root, &mut arena, &mut types, component_dependencies)?;
+        *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
+        Ok(())
+    }
 
     #[test]
     pub fn test_pull_up_identifier() {
         let expr = "foo";
         let mut expr = Expr::from_text(expr).unwrap();
         expr.add_infer_type_mut(InferredType::string());
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::string());
     }
 
@@ -589,8 +470,7 @@ mod type_pull_up_tests {
             )]));
         let select_expr = Expr::select_field(record_identifier, "foo", None);
         let mut expr = Expr::select_field(select_expr, "bar", None);
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::u64());
     }
 
@@ -599,8 +479,7 @@ mod type_pull_up_tests {
         let identifier = Expr::identifier_global("foo", None)
             .merge_inferred_type(InferredType::list(InferredType::u64()));
         let mut expr = Expr::select_index(identifier.clone(), Expr::number(BigDecimal::from(0)));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::select_index(identifier, Expr::number(BigDecimal::from(0)))
             .merge_inferred_type(InferredType::u64());
         assert_eq!(expr, expected);
@@ -615,8 +494,7 @@ mod type_pull_up_tests {
 
         let mut expr =
             Expr::sequence(elems.clone(), None).with_inferred_type(InferredType::unknown());
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -631,8 +509,7 @@ mod type_pull_up_tests {
             Expr::number_inferred(BigDecimal::from(1), None, InferredType::u64()),
         ]);
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr.inferred_type(),
@@ -657,8 +534,7 @@ mod type_pull_up_tests {
             ("bar".to_string(), InferredType::unknown()),
         ]));
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -678,8 +554,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_concat() {
         let mut expr = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")]);
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")])
             .with_inferred_type(InferredType::string());
         assert_eq!(expr, expected);
@@ -688,8 +563,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_not() {
         let mut expr = Expr::not(Expr::boolean(true));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -713,8 +587,7 @@ mod type_pull_up_tests {
             select_index4.clone(),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         let expected = Expr::cond(
             Expr::greater_than(
                 Expr::select_index(
@@ -760,8 +633,7 @@ mod type_pull_up_tests {
         let select_field2 = Expr::select_field(inner, "baz", None);
         let mut expr = Expr::greater_than(select_field1.clone(), select_field2.clone());
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let expected = Expr::greater_than(
             select_field1.merge_inferred_type(InferredType::string()),
@@ -780,8 +652,7 @@ mod type_pull_up_tests {
         let select_index2 = Expr::select_index(inner, Expr::number(BigDecimal::from(1)));
         let mut expr = Expr::greater_than_or_equal_to(select_index1.clone(), select_index2.clone());
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let expected = Expr::greater_than_or_equal_to(
             select_index1.merge_inferred_type(InferredType::u64()),
@@ -816,8 +687,7 @@ mod type_pull_up_tests {
             select_field_from_second.clone(),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         let new_select_field_from_first = Expr::select_field(
             Expr::select_index(inner.clone(), Expr::number(BigDecimal::from(0)))
@@ -848,8 +718,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(1)),
             Expr::number(BigDecimal::from(2)),
         );
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -860,8 +729,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(2)),
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
@@ -876,78 +744,9 @@ mod type_pull_up_tests {
             None,
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::unknown());
-    }
-
-    #[test]
-    pub fn test_pull_up_for_dynamic_call() {
-        let rib = r#"
-           let input = { foo: "afs", bar: "al" };
-           golem:it/api.{cart-checkout}(input.foo)
-        "#;
-
-        let mut expr = Expr::from_text(rib).unwrap();
-        let component_dependencies = ComponentDependencies::default();
-
-        expr.infer_types_initial_phase(&component_dependencies, &vec![], &[])
-            .unwrap();
-        expr.infer_all_identifiers();
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
-
-        let expected = Expr::expr_block(vec![
-            Expr::let_binding_with_variable_id(
-                VariableId::local("input", 0),
-                Expr::record(vec![
-                    (
-                        "foo".to_string(),
-                        Expr::literal("afs").with_inferred_type(InferredType::string()),
-                    ),
-                    (
-                        "bar".to_string(),
-                        Expr::literal("al").with_inferred_type(InferredType::string()),
-                    ),
-                ])
-                .with_inferred_type(InferredType::record(vec![
-                    ("foo".to_string(), InferredType::string()),
-                    ("bar".to_string(), InferredType::string()),
-                ])),
-                None,
-            ),
-            Expr::call(
-                CallType::function_call(
-                    DynamicParsedFunctionName {
-                        site: PackagedInterface {
-                            namespace: "golem".to_string(),
-                            package: "it".to_string(),
-                            interface: "api".to_string(),
-                            version: None,
-                        },
-                        function: Function {
-                            function: "cart-checkout".to_string(),
-                        },
-                    },
-                    None,
-                ),
-                None,
-                vec![Expr::select_field(
-                    Expr::identifier_local("input", 0, None).with_inferred_type(
-                        InferredType::record(vec![
-                            ("foo".to_string(), InferredType::string()),
-                            ("bar".to_string(), InferredType::string()),
-                        ]),
-                    ),
-                    "foo",
-                    None,
-                )
-                .with_inferred_type(InferredType::string())],
-            ),
-        ]);
-
-        assert_eq!(expr, expected);
     }
 
     #[test]
@@ -955,8 +754,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::option(Some(number)).unwrap();
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -968,8 +766,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::get_tag(Expr::option(Some(number)));
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -1037,93 +834,88 @@ mod type_pull_up_tests {
             ],
         );
 
-        expr.pull_types_up(&ComponentDependencies::default())
-            .unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
 
-        let expected = internal::expected_pattern_match();
+        let expected = expected_pattern_match();
 
         assert_eq!(expr, expected);
     }
 
-    mod internal {
-        use crate::{ArmPattern, Expr, InferredType, MatchArm};
-
-        pub(crate) fn expected_pattern_match() -> Expr {
-            Expr::pattern_match(
-                Expr::select_field(
-                    Expr::identifier_global("foo", None).with_inferred_type(InferredType::record(
-                        vec![("bar".to_string(), InferredType::string())],
-                    )),
-                    "bar",
-                    None,
-                )
-                .with_inferred_type(InferredType::string()),
-                vec![
-                    MatchArm {
-                        arm_pattern: ArmPattern::Constructor(
-                            "cons1".to_string(),
-                            vec![ArmPattern::Literal(Box::new(
-                                Expr::select_field(
-                                    Expr::identifier_global("foo", None).with_inferred_type(
-                                        InferredType::record(vec![(
-                                            "bar".to_string(),
-                                            InferredType::string(),
-                                        )]),
-                                    ),
-                                    "bar",
-                                    None,
-                                )
-                                .with_inferred_type(InferredType::string()),
-                            ))],
-                        ),
-                        arm_resolution_expr: Box::new(
-                            Expr::select_field(
-                                Expr::identifier_global("baz", None).with_inferred_type(
-                                    InferredType::record(vec![(
-                                        "qux".to_string(),
-                                        InferredType::string(),
-                                    )]),
-                                ),
-                                "qux",
-                                None,
-                            )
-                            .with_inferred_type(InferredType::string()),
-                        ),
-                    },
-                    MatchArm {
-                        arm_pattern: ArmPattern::Constructor(
-                            "cons2".to_string(),
-                            vec![ArmPattern::Literal(Box::new(
-                                Expr::select_field(
-                                    Expr::identifier_global("quux", None).with_inferred_type(
-                                        InferredType::record(vec![(
-                                            "corge".to_string(),
-                                            InferredType::string(),
-                                        )]),
-                                    ),
-                                    "corge",
-                                    None,
-                                )
-                                .with_inferred_type(InferredType::string()),
-                            ))],
-                        ),
-                        arm_resolution_expr: Box::new(
-                            Expr::select_field(
-                                Expr::identifier_global("grault", None).with_inferred_type(
-                                    InferredType::record(vec![(
-                                        "garply".to_string(),
-                                        InferredType::string(),
-                                    )]),
-                                ),
-                                "garply",
-                                None,
-                            )
-                            .with_inferred_type(InferredType::string()),
-                        ),
-                    },
-                ],
+    fn expected_pattern_match() -> Expr {
+        Expr::pattern_match(
+            Expr::select_field(
+                Expr::identifier_global("foo", None).with_inferred_type(InferredType::record(
+                    vec![("bar".to_string(), InferredType::string())],
+                )),
+                "bar",
+                None,
             )
-            .with_inferred_type(InferredType::string())
-        }
+            .with_inferred_type(InferredType::string()),
+            vec![
+                MatchArm {
+                    arm_pattern: ArmPattern::Constructor(
+                        "cons1".to_string(),
+                        vec![ArmPattern::Literal(Box::new(
+                            Expr::select_field(
+                                Expr::identifier_global("foo", None).with_inferred_type(
+                                    InferredType::record(vec![(
+                                        "bar".to_string(),
+                                        InferredType::string(),
+                                    )]),
+                                ),
+                                "bar",
+                                None,
+                            )
+                            .with_inferred_type(InferredType::string()),
+                        ))],
+                    ),
+                    arm_resolution_expr: Box::new(
+                        Expr::select_field(
+                            Expr::identifier_global("baz", None).with_inferred_type(
+                                InferredType::record(vec![(
+                                    "qux".to_string(),
+                                    InferredType::string(),
+                                )]),
+                            ),
+                            "qux",
+                            None,
+                        )
+                        .with_inferred_type(InferredType::string()),
+                    ),
+                },
+                MatchArm {
+                    arm_pattern: ArmPattern::Constructor(
+                        "cons2".to_string(),
+                        vec![ArmPattern::Literal(Box::new(
+                            Expr::select_field(
+                                Expr::identifier_global("quux", None).with_inferred_type(
+                                    InferredType::record(vec![(
+                                        "corge".to_string(),
+                                        InferredType::string(),
+                                    )]),
+                                ),
+                                "corge",
+                                None,
+                            )
+                            .with_inferred_type(InferredType::string()),
+                        ))],
+                    ),
+                    arm_resolution_expr: Box::new(
+                        Expr::select_field(
+                            Expr::identifier_global("grault", None).with_inferred_type(
+                                InferredType::record(vec![(
+                                    "garply".to_string(),
+                                    InferredType::string(),
+                                )]),
+                            ),
+                            "garply",
+                            None,
+                        )
+                        .with_inferred_type(InferredType::string()),
+                    ),
+                },
+            ],
+        )
+        .with_inferred_type(InferredType::string())
     }
 }

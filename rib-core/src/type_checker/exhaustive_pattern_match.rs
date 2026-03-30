@@ -13,26 +13,14 @@
 // limitations under the License.
 
 use crate::rib_source_span::SourceSpan;
-use crate::{try_visit_post_order_rev_mut, ArmPattern, ComponentDependencies, Expr};
+use crate::{ArmPattern, ComponentDependencies, Expr};
 
-// When checking exhaustive pattern match, there is no need to ensure
-// if the pattern aligns with conditions because those checks are done
-// as part of previous phases of compilation. All we need to worry about
-// is whether the arms in the pattern match is exhaustive.
-pub fn check_exhaustive_pattern_match(
-    expr: &mut Expr,
+pub(crate) fn check_exhaustive_pattern_match_with_arms(
+    pattern_match_expr: &Expr,
+    arm_patterns: &[ArmPattern],
     component_dependency: &ComponentDependencies,
 ) -> Result<(), ExhaustivePatternMatchError> {
-    try_visit_post_order_rev_mut(expr, &mut |expr| {
-        if let Expr::PatternMatch { match_arms, .. } = expr {
-            let match_arm = match_arms
-                .iter()
-                .map(|p| p.arm_pattern.clone())
-                .collect::<Vec<_>>();
-            internal::check_exhaustive_pattern_match(expr, &match_arm, component_dependency)?;
-        }
-        Ok(())
-    })
+    internal::check_exhaustive_pattern_match(pattern_match_expr, arm_patterns, component_dependency)
 }
 
 #[derive(Debug, Clone)]

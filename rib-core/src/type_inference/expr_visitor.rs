@@ -1,3 +1,4 @@
+use crate::call_type::{CallType, InstanceCreationType};
 use crate::{Expr, TypeInternal};
 use std::collections::VecDeque;
 
@@ -20,15 +21,6 @@ pub fn visit_pre_order_mut(expr: &mut Expr, f: &mut impl FnMut(&mut Expr)) {
     visit_children_mut(expr, |child| visit_pre_order_mut(child, f));
 }
 
-// Fallible post-order: children first, then parent. Stops on first error.
-pub fn try_visit_post_order_mut<E>(
-    expr: &mut Expr,
-    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    try_visit_children_mut(expr, |child| try_visit_post_order_mut(child, f))?;
-    f(expr)
-}
-
 // Fallible pre-order reversed: parent first, then children right-to-left.
 pub fn try_visit_post_order_rev_mut<E>(
     expr: &mut Expr,
@@ -36,15 +28,6 @@ pub fn try_visit_post_order_rev_mut<E>(
 ) -> Result<(), E> {
     f(expr)?;
     try_visit_children_rev_mut(expr, |child| try_visit_post_order_rev_mut(child, f))
-}
-
-// Fallible pre-order: parent first, then children left-to-right.
-pub fn try_visit_pre_order_mut<E>(
-    expr: &mut Expr,
-    f: &mut impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    f(expr)?;
-    try_visit_children_mut(expr, |child| try_visit_pre_order_mut(child, f))
 }
 
 // Immutable post-order traversal.
@@ -120,7 +103,7 @@ pub fn collect_children_mut<'a>(expr: &'a mut Expr, queue: &mut VecDeque<&'a mut
             inferred_type,
             ..
         } => {
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(exprs) = exprs {
                 queue.extend(exprs.iter_mut())
             }
@@ -254,7 +237,7 @@ fn visit_children_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
             inferred_type,
             ..
         } => {
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(exprs) = exprs {
                 for e in exprs {
                     each(e);
@@ -402,7 +385,7 @@ fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
                     each(worker_expr);
                 }
             }
-            let (exprs, worker) = internal::get_expressions_in_call_type_mut(call_type);
+            let (exprs, worker) = get_expressions_in_call_type_mut(call_type);
             if let Some(worker) = worker {
                 each(worker);
             }
@@ -455,26 +438,6 @@ fn visit_children_rev_mut(expr: &mut Expr, mut each: impl FnMut(&mut Expr)) {
         | Expr::Option { expr: None, .. }
         | Expr::Throw { .. }
         | Expr::GenerateWorkerName { .. } => {}
-    }
-}
-
-fn try_visit_children_mut<E>(
-    expr: &mut Expr,
-    mut each: impl FnMut(&mut Expr) -> Result<(), E>,
-) -> Result<(), E> {
-    // We need to propagate errors properly. Use a Cell to smuggle the
-    // error out of the infallible closure interface.
-    let mut err: Option<E> = None;
-    visit_children_mut(expr, |child| {
-        if err.is_none() {
-            if let Err(e) = each(child) {
-                err = Some(e);
-            }
-        }
-    });
-    match err {
-        Some(e) => Err(e),
-        None => Ok(()),
     }
 }
 
@@ -605,29 +568,225 @@ fn visit_children<'a>(expr: &'a Expr, mut each: impl FnMut(&'a Expr)) {
     }
 }
 
-mod internal {
-    use crate::call_type::{CallType, InstanceCreationType};
-    use crate::Expr;
+// =============================================================================
+// Arena-based traversal
+//
+// These functions mirror the old `Expr`-based visitors above but operate on
+// `(ExprId, &ExprArena, &mut TypeTable)`.  The old visitors are untouched;
+// passes migrate one at a time.
+//
+// Arena traversal currently exposes pre-order mutation and `children_of` for
+// passes that implement their own walk.
+// =============================================================================
 
-    pub(crate) fn get_expressions_in_call_type_mut(
-        call_type: &mut CallType,
-    ) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {
-        match call_type {
-            CallType::Function {
-                instance_identifier: module,
-                ..
-            } => (None, module.as_mut().and_then(|m| m.worker_name_mut())),
+pub mod arena {
+    use crate::expr_arena::{
+        ArmPatternNode, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
+        InstanceIdentifierNode, MatchArmNode, RangeKind, ResultExprKind, TypeTable,
+    };
 
-            CallType::InstanceCreation(instance_creation) => match instance_creation {
-                InstanceCreationType::WitWorker { worker_name, .. } => (None, worker_name.as_mut()),
+    // -------------------------------------------------------------------------
+    // Pre-order (top-down): parent first, then children.
+    // -------------------------------------------------------------------------
 
-                InstanceCreationType::WitResource { module, .. } => {
-                    (None, module.as_mut().and_then(|m| m.worker_name_mut()))
+    pub fn visit_pre_order_mut(
+        id: ExprId,
+        arena: &ExprArena,
+        types: &mut TypeTable,
+        f: &mut impl FnMut(ExprId, &ExprArena, &mut TypeTable),
+    ) {
+        f(id, arena, types);
+        for child in children_of(id, arena) {
+            visit_pre_order_mut(child, arena, types, f);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Child collection — the heart of the traversal.
+    //
+    // Returns the ExprIds of all direct child expressions of `id`, in
+    // left-to-right order.  This mirrors `visit_children_mut` for `Expr` but
+    // is much simpler because every child reference is already an `ExprId`.
+    // -------------------------------------------------------------------------
+
+    pub fn children_of(id: ExprId, arena: &ExprArena) -> Vec<ExprId> {
+        let node = arena.expr(id);
+        match &node.kind {
+            ExprKind::Let { expr, .. } => vec![*expr],
+            ExprKind::SelectField { expr, .. } => vec![*expr],
+            ExprKind::SelectIndex { expr, index } => vec![*expr, *index],
+
+            ExprKind::Sequence { exprs }
+            | ExprKind::Tuple { exprs }
+            | ExprKind::Concat { exprs }
+            | ExprKind::ExprBlock { exprs } => exprs.clone(),
+
+            ExprKind::Record { fields } => fields.iter().map(|(_, id)| *id).collect(),
+
+            ExprKind::Not { expr }
+            | ExprKind::Length { expr }
+            | ExprKind::Unwrap { expr }
+            | ExprKind::GetTag { expr } => vec![*expr],
+
+            ExprKind::GreaterThan { lhs, rhs }
+            | ExprKind::GreaterThanOrEqualTo { lhs, rhs }
+            | ExprKind::LessThanOrEqualTo { lhs, rhs }
+            | ExprKind::EqualTo { lhs, rhs }
+            | ExprKind::LessThan { lhs, rhs }
+            | ExprKind::And { lhs, rhs }
+            | ExprKind::Or { lhs, rhs }
+            | ExprKind::Plus { lhs, rhs }
+            | ExprKind::Minus { lhs, rhs }
+            | ExprKind::Multiply { lhs, rhs }
+            | ExprKind::Divide { lhs, rhs } => vec![*lhs, *rhs],
+
+            ExprKind::Cond { cond, lhs, rhs } => vec![*cond, *lhs, *rhs],
+
+            ExprKind::PatternMatch {
+                predicate,
+                match_arms,
+            } => {
+                let mut ids = vec![*predicate];
+                for arm in match_arms {
+                    ids.extend(arm_pattern_expr_ids(arm, arena));
+                    ids.push(arm.arm_resolution_expr);
                 }
+                ids
+            }
+
+            ExprKind::Range { range } => match range {
+                RangeKind::Range { from, to } => vec![*from, *to],
+                RangeKind::RangeInclusive { from, to } => vec![*from, *to],
+                RangeKind::RangeFrom { from } => vec![*from],
             },
 
-            CallType::VariantConstructor(_) => (None, None),
-            CallType::EnumConstructor(_) => (None, None),
+            ExprKind::Option { expr } => expr.map(|e| vec![e]).unwrap_or_default(),
+
+            ExprKind::Result { expr } => match expr {
+                ResultExprKind::Ok(e) | ResultExprKind::Err(e) => vec![*e],
+            },
+
+            ExprKind::Call {
+                call_type, args, ..
+            } => {
+                let mut ids = call_type_expr_ids(call_type);
+                ids.extend_from_slice(args);
+                ids
+            }
+
+            ExprKind::InvokeMethodLazy { lhs, args, .. } => {
+                let mut ids = vec![*lhs];
+                ids.extend_from_slice(args);
+                ids
+            }
+
+            ExprKind::ListComprehension {
+                iterable_expr,
+                yield_expr,
+                ..
+            } => vec![*iterable_expr, *yield_expr],
+
+            ExprKind::ListReduce {
+                iterable_expr,
+                init_value_expr,
+                yield_expr,
+                ..
+            } => vec![*iterable_expr, *init_value_expr, *yield_expr],
+
+            // Leaf nodes — no children
+            ExprKind::Literal { .. }
+            | ExprKind::Number { .. }
+            | ExprKind::Flags { .. }
+            | ExprKind::Identifier { .. }
+            | ExprKind::Boolean { .. }
+            | ExprKind::Throw { .. }
+            | ExprKind::GenerateWorkerName { .. } => vec![],
         }
+    }
+
+    // Collect ExprIds embedded in an arm pattern (the Literal variants that
+    // hold expression nodes — identifiers, some(..), ok(..) etc.)
+    fn arm_pattern_expr_ids(arm: &MatchArmNode, arena: &ExprArena) -> Vec<ExprId> {
+        collect_pattern_expr_ids(arm.arm_pattern, arena)
+    }
+
+    fn collect_pattern_expr_ids(
+        pat_id: crate::expr_arena::ArmPatternId,
+        arena: &ExprArena,
+    ) -> Vec<ExprId> {
+        match arena.pattern(pat_id) {
+            ArmPatternNode::Literal(expr_id) => vec![*expr_id],
+            ArmPatternNode::WildCard => vec![],
+            ArmPatternNode::As(_, inner) => collect_pattern_expr_ids(*inner, arena),
+            ArmPatternNode::Constructor(_, children)
+            | ArmPatternNode::TupleConstructor(children)
+            | ArmPatternNode::ListConstructor(children) => children
+                .iter()
+                .flat_map(|p| collect_pattern_expr_ids(*p, arena))
+                .collect(),
+            ArmPatternNode::RecordConstructor(fields) => fields
+                .iter()
+                .flat_map(|(_, p)| collect_pattern_expr_ids(*p, arena))
+                .collect(),
+        }
+    }
+
+    // Collect ExprIds embedded in a CallTypeNode (worker-name expressions
+    // inside InstanceIdentifier / InstanceCreation).
+    fn call_type_expr_ids(call_type: &CallTypeNode) -> Vec<ExprId> {
+        match call_type {
+            CallTypeNode::Function {
+                instance_identifier,
+                ..
+            } => instance_identifier
+                .as_ref()
+                .map(instance_identifier_expr_ids)
+                .unwrap_or_default(),
+
+            CallTypeNode::InstanceCreation(creation) => match creation {
+                InstanceCreationNode::WitWorker { worker_name, .. } => {
+                    worker_name.iter().copied().collect()
+                }
+                InstanceCreationNode::WitResource { module, .. } => module
+                    .as_ref()
+                    .map(instance_identifier_expr_ids)
+                    .unwrap_or_default(),
+            },
+
+            CallTypeNode::VariantConstructor(_) | CallTypeNode::EnumConstructor(_) => vec![],
+        }
+    }
+
+    fn instance_identifier_expr_ids(ii: &InstanceIdentifierNode) -> Vec<ExprId> {
+        match ii {
+            InstanceIdentifierNode::WitWorker { worker_name, .. } => {
+                worker_name.iter().copied().collect()
+            }
+            InstanceIdentifierNode::WitResource { worker_name, .. } => {
+                worker_name.iter().copied().collect()
+            }
+        }
+    }
+}
+
+fn get_expressions_in_call_type_mut(
+    call_type: &mut CallType,
+) -> (Option<&mut [Expr]>, Option<&mut Box<Expr>>) {
+    match call_type {
+        CallType::Function {
+            instance_identifier: module,
+            ..
+        } => (None, module.as_mut().and_then(|m| m.worker_name_mut())),
+
+        CallType::InstanceCreation(instance_creation) => match instance_creation {
+            InstanceCreationType::WitWorker { worker_name, .. } => (None, worker_name.as_mut()),
+
+            InstanceCreationType::WitResource { module, .. } => {
+                (None, module.as_mut().and_then(|m| m.worker_name_mut()))
+            }
+        },
+
+        CallType::VariantConstructor(_) => (None, None),
+        CallType::EnumConstructor(_) => (None, None),
     }
 }
