@@ -22,14 +22,15 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::type_parameter::TypeParameter;
 use crate::InstanceType;
 use crate::{
-    CustomError, DynamicParsedFunctionName, Expr, FullyQualifiedResourceConstructor,
-    FunctionCallError, FunctionName, InferredType, TypeInternal, TypeOrigin,
+    CustomError, DynamicParsedFunctionName, FullyQualifiedResourceConstructor, FunctionCallError,
+    FunctionName, InferredType, TypeInternal, TypeOrigin,
 };
 
-/// Arena version of `infer_worker_function_invokes`.
+/// Converts `SelectField` on an `Instance` type into a resolved `Call`, and
+/// `InvokeMethodLazy` on an `Instance` type into a resolved `Call`.
 ///
-/// Converts `SelectField` on an `Instance` type into a resolved `Call`,
-/// and `InvokeMethodLazy` on an `Instance` type into a resolved `Call`.
+/// Run on lowered IR inside the same `lower` / `rebuild_expr` boundary as
+/// [`crate::Expr::infer_types`].
 pub fn infer_worker_function_invokes_lowered(
     root: ExprId,
     arena: &mut ExprArena,
@@ -461,17 +462,3 @@ fn to_instance_identifier_node_with_arena(
     }
 }
 
-// This phase is responsible for identifying the worker function invocations
-// such as `worker.foo("x, y, z")` or `cart-resource.add-item(..)` etc
-// lazy method invocations are converted to actual Expr::Call
-pub fn infer_worker_function_invokes(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
-    let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    infer_worker_function_invokes_lowered(
-        root,
-        &mut expr_arena,
-        &mut types,
-        &crate::ComponentDependencies::default(),
-    )?;
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
-    Ok(())
-}

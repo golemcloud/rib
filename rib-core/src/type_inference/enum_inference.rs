@@ -15,14 +15,11 @@
 use crate::analysis::AnalysedType;
 use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{ComponentDependencies, Expr};
+use crate::ComponentDependencies;
 
-pub fn infer_enums(expr: &mut Expr, component_dependencies: &ComponentDependencies) {
-    let (mut expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    infer_enums_lowered(root, &mut expr_arena, &mut types, component_dependencies);
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
-}
-
+/// Enum constructor rewriting and type merge on lowered IR. Use from [`crate::expr_arena::lower`]
+/// / [`crate::expr_arena::rebuild_expr`] boundaries (e.g. [`Expr::infer_types`](crate::Expr::infer_types));
+/// do not lower/rebuild per pass.
 pub fn infer_enums_lowered(
     root: ExprId,
     arena: &mut ExprArena,

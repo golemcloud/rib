@@ -16,8 +16,8 @@ use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_checker::Path;
 use crate::type_checker::PathElem;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{visit_post_order_mut, InferredType};
-use crate::{Expr, VariableId};
+use crate::{InferredType};
+use crate::{VariableId};
 
 #[derive(Clone, Debug)]
 pub struct GlobalVariableTypeSpec {
@@ -64,83 +64,6 @@ impl GlobalVariableTypeSpec {
             inferred_type,
         }
     }
-}
-
-/// Applies global variable type specifications to an expression tree.
-///
-/// Iterates through all provided `GlobalVariableTypeSpec` entries and overrides
-/// types in the given expression accordingly, enforcing the specified types on
-/// matching variable paths.
-pub fn bind_global_variable_types(expr: &mut Expr, type_pecs: &Vec<GlobalVariableTypeSpec>) {
-    for spec in type_pecs {
-        override_type(expr, spec);
-    }
-}
-
-fn override_type(expr: &mut Expr, type_spec: &GlobalVariableTypeSpec) {
-    // The full path starts from the variable_id and goes through the `path`
-    let full_path = {
-        let mut p = type_spec.path.clone();
-        p.push_front(PathElem::Field(type_spec.variable_id.to_string()));
-        p
-    };
-
-    let mut current_path = full_path.clone();
-    let mut previous_expr_ptr: Option<*const Expr> = None;
-
-    visit_post_order_mut(expr, &mut |expr| match expr {
-        Expr::Identifier {
-            variable_id,
-            inferred_type,
-            ..
-        } => {
-            if variable_id == &type_spec.variable_id {
-                current_path.progress();
-
-                if type_spec.path.is_empty() {
-                    *inferred_type = type_spec.inferred_type.clone();
-                    previous_expr_ptr = None;
-                    current_path = full_path.clone();
-                } else {
-                    previous_expr_ptr = Some(expr as *const _);
-                }
-            } else {
-                previous_expr_ptr = None;
-                current_path = full_path.clone();
-            }
-        }
-
-        Expr::SelectField {
-            expr: inner_expr,
-            field,
-            inferred_type,
-            ..
-        } => {
-            if let Some(prev_ptr) = previous_expr_ptr {
-                if std::ptr::eq(inner_expr.as_ref(), prev_ptr) {
-                    if current_path.is_empty() {
-                        *inferred_type = type_spec.inferred_type.clone();
-                        previous_expr_ptr = None;
-                        current_path = full_path.clone();
-                    } else if current_path.current() == Some(&PathElem::Field(field.to_string())) {
-                        current_path.progress();
-                        previous_expr_ptr = Some(expr as *const _);
-                    } else {
-                        previous_expr_ptr = None;
-                        current_path = full_path.clone();
-                    }
-                } else {
-                    previous_expr_ptr = None;
-                    current_path = full_path.clone();
-                }
-            }
-        }
-
-        _ => {
-            previous_expr_ptr = None;
-            current_path = full_path.clone();
-        }
-    });
 }
 
 pub fn bind_global_variable_types_lowered(
@@ -241,58 +164,8 @@ fn collect_post_order_global_var(root: ExprId, arena: &ExprArena, out: &mut Vec<
 mod tests {
     use super::*;
     use crate::rib_source_span::SourceSpan;
-    use crate::{Id, RibCompiler, RibCompilerConfig, TypeName};
+    use crate::{Expr, Id, RibCompiler, RibCompilerConfig, TypeName};
     use test_r::test;
-
-    #[test]
-    fn test_override_types_1() {
-        let mut expr = Expr::from_text(
-            r#"
-            foo
-        "#,
-        )
-        .unwrap();
-
-        let type_spec = GlobalVariableTypeSpec {
-            variable_id: VariableId::global("foo".to_string()),
-            path: Path::default(),
-            inferred_type: InferredType::string(),
-        };
-
-        expr.bind_global_variable_types(&vec![type_spec]);
-
-        let expected =
-            Expr::identifier_global("foo", None).with_inferred_type(InferredType::string());
-
-        assert_eq!(expr, expected);
-    }
-
-    #[test]
-    fn test_override_types_2() {
-        let mut expr = Expr::from_text(
-            r#"
-            foo.bar.baz
-        "#,
-        )
-        .unwrap();
-
-        let type_spec = GlobalVariableTypeSpec {
-            variable_id: VariableId::global("foo".to_string()),
-            path: Path::from_elems(vec!["bar"]),
-            inferred_type: InferredType::string(),
-        };
-
-        expr.bind_global_variable_types(&vec![type_spec]);
-
-        let expected = Expr::select_field(
-            Expr::select_field(Expr::identifier_global("foo", None), "bar", None),
-            "baz",
-            None,
-        )
-        .with_inferred_type(InferredType::string());
-
-        assert_eq!(expr, expected);
-    }
 
     #[test]
     fn test_override_types_5() {

@@ -18,7 +18,7 @@ use crate::expr_arena::{
 };
 use crate::instance_type::InstanceType;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{Expr, InferredType, TypeInternal, TypeOrigin, VariableId};
+use crate::{InferredType, TypeInternal, TypeOrigin, VariableId};
 use std::collections::HashMap;
 
 /// Copies the worker-name expression from the arena-backed [`CallTypeNode`]
@@ -88,6 +88,8 @@ fn worker_name_expr_id_from_call_node(ct: &CallTypeNode) -> Option<ExprId> {
     }
 }
 
+/// Propagates instance types from `let` rhs to bound identifiers. Use from the same
+/// `lower` / `rebuild_expr` boundary as [`crate::Expr::infer_types`].
 pub fn bind_instance_types_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
     let mut instance_variables: HashMap<VariableId, Box<InstanceType>> = HashMap::new();
 
@@ -132,10 +134,4 @@ fn collect_pre_order_instance(root: ExprId, arena: &ExprArena, out: &mut Vec<Exp
             stack.push(child);
         }
     }
-}
-
-pub fn bind_instance_types(expr: &mut Expr) {
-    let (expr_arena, mut types, root) = crate::expr_arena::lower(expr);
-    bind_instance_types_lowered(root, &expr_arena, &mut types);
-    *expr = crate::expr_arena::rebuild_expr(root, &expr_arena, &types);
 }
