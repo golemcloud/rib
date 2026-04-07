@@ -14,6 +14,11 @@
 
 #![allow(clippy::large_enum_variant)]
 
+// Re-exported for embedders (e.g. Wasmtime CLI) that implement Rib traits without
+// adding their own `anyhow` / `uuid` dependency edges.
+pub use anyhow;
+pub use uuid;
+
 pub use command::*;
 pub use dependency_manager::*;
 pub use invoke::*;
