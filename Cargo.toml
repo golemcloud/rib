@@ -32,4 +32,4 @@ test-r = { version = "3.0.3", default-features = true }
 tokio = { version = "1.44", features = ["macros", "rt-multi-thread", "sync", "io-std", "net", "tracing", "process"] }
 tracing = { version = "0.1.41", features = ["log"] }
 uuid = { version = "1.15.1", features = ["serde", "v4", "v5", "v7"] }
-wasm-wave = "0.244"
+wasm-wave = "0.245.0"
