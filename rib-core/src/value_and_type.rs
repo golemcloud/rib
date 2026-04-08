@@ -1,4 +1,4 @@
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::value::Value;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +49,7 @@ impl<T: IntoValue + Sized> IntoValueAndType for T {
     }
 }
 
-use crate::wit::wit_type;
+use crate::wit_type::wit_type;
 
 impl IntoValue for u8 {
     fn into_value(self) -> Value {

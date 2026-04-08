@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{Clear as TermClear, ClearType},
 };
-use rib::wit::WitType;
+use rib::wit_type::WitType;
 use rib::{CompilerOutput, ComponentDependency, Expr, RibCompilationError};
 use std::io::stdout;
 

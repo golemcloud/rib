@@ -119,7 +119,7 @@ impl RibByteCode {
     }
 }
 mod internal {
-    use crate::wit::{WitType, TypeFlags};
+    use crate::wit_type::{WitType, TypeFlags};
     use crate::compiler::desugar::{desugar_pattern_match, desugar_range_selection};
     use crate::{
         WitTypeWithUnit, DynamicParsedFunctionReference, Expr, FunctionReferenceType,
@@ -128,7 +128,7 @@ mod internal {
     };
     use std::collections::HashSet;
 
-    use crate::wit::wit_type::bool;
+    use crate::wit_type::bool;
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::type_inference::{GetTypeHint, TypeHint};
     use crate::{IntoValueAndType, Value, ValueAndType};
@@ -922,8 +922,8 @@ mod compiler_tests {
     use test_r::test;
 
     use super::*;
-    use crate::wit::wit_type;
-    use crate::wit::wit_type::{field, list, record, s32, str};
+    use crate::wit_type::wit_type;
+    use crate::wit_type::{field, list, record, s32, str};
     use crate::{ArmPattern, InferredType, MatchArm, RibCompiler, VariableId};
     use crate::{IntoValueAndType, Value, ValueAndType};
 
@@ -1427,7 +1427,7 @@ mod compiler_tests {
     mod invalid_function_invoke_tests {
         use test_r::test;
 
-        use crate::wit::wit_type::str;
+        use crate::wit_type::str;
         use crate::compiler::byte_code::compiler_tests::internal;
         use crate::{Expr, RibCompiler, RibCompilerConfig};
 
@@ -1519,7 +1519,7 @@ mod compiler_tests {
     mod global_input_tests {
         use test_r::test;
 
-        use crate::wit::wit_type::{
+        use crate::wit_type::{
             case, field, list, option, r#enum, record, result, str, tuple, u32, u64, unit_case,
             variant,
         };
@@ -1858,8 +1858,8 @@ mod compiler_tests {
     }
 
     mod internal {
-        use crate::wit::wit_type::{case, str, u64, unit_case, variant};
-        use crate::wit::*;
+        use crate::wit_type::{case, str, u64, unit_case, variant};
+        use crate::wit_type::*;
         use crate::{ComponentDependency, ComponentDependencyKey, RibInputTypeInfo};
         use std::collections::HashMap;
         use uuid::Uuid;

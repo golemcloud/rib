@@ -59,7 +59,7 @@ pub enum ExhaustivePatternMatchError {
 }
 
 mod internal {
-    use crate::wit::TypeVariant;
+    use crate::wit_type::TypeVariant;
     use crate::expr_arena::{
         rebuild_arm_pattern, rebuild_expr, ArmPatternId, ArmPatternNode, ExprArena, ExprId,
         ExprKind, TypeTable,

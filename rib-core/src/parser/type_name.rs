@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::{WitType, TypeResult};
+use crate::wit_type::{WitType, TypeResult};
 use crate::parser::errors::RibParseError;
 use crate::rib_source_span::GetSourcePosition;
 use crate::{InferredNumber, InferredType, TypeInternal};

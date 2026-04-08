@@ -14,7 +14,7 @@
 
 use std::fmt::Display;
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
@@ -429,7 +429,7 @@ fn merge_into(id: ExprId, ty: InferredType, types: &mut TypeTable) {
 mod function_parameters_inference_tests {
     use test_r::test;
 
-    use crate::wit::{
+    use crate::wit_type::{
         WitType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
     };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};

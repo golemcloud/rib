@@ -14,7 +14,7 @@
 
 use crate::repl_state::ReplState;
 use async_trait::async_trait;
-use rib::wit::WitType;
+use rib::wit_type::WitType;
 use rib::ValueAndType;
 use rib::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,

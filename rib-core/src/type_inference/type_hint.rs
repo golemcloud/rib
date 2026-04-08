@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::{InferredType, TypeInternal};
 use std::fmt;
 use std::ops::Deref;

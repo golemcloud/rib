@@ -1,4 +1,4 @@
-use crate::wit::{
+use crate::wit_type::{
     WitType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord, TypeResult, TypeTuple,
     TypeVariant, WitFunction,
 };

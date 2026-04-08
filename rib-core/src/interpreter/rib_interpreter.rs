@@ -346,8 +346,8 @@ impl Interpreter {
 }
 
 mod internal {
-    use crate::wit::WitType;
-    use crate::wit::TypeResult;
+    use crate::wit_type::WitType;
+    use crate::wit_type::TypeResult;
     use crate::interpreter::env::{EnvironmentKey, InterpreterEnv};
     use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
     use crate::interpreter::literal::LiteralValue;
@@ -362,7 +362,7 @@ mod internal {
     };
     use crate::{IntoValueAndType, Value, ValueAndType};
 
-    use crate::wit::wit_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
+    use crate::wit_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
     use crate::interpreter::instruction_cursor::RibByteCodeCursor;
     use crate::interpreter::rib_runtime_error::{
         cast_error_custom, empty_stack, exhausted_iterator, field_not_found, function_invoke_fail,
@@ -1525,11 +1525,11 @@ mod tests {
     use test_r::test;
 
     use super::*;
-    use crate::wit::wit_type::{
+    use crate::wit_type::{
         bool, case, f32, field, list, option, r#enum, record, result, result_err, result_ok, s32,
         str, tuple, u32, u64, u8, unit_case, variant,
     };
-    use crate::wit::WitType;
+    use crate::wit_type::WitType;
     use crate::interpreter::rib_interpreter::tests::test_utils::{
         get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
     };
@@ -4258,11 +4258,11 @@ mod tests {
     }
 
     mod test_utils {
-        use crate::wit::wit_type::{
+        use crate::wit_type::{
             case, f32, field, handle, list, option, r#enum, record, result, s32, str, tuple, u32,
             u64, unit_case, variant,
         };
-        use crate::wit::{
+        use crate::wit_type::{
             AnalysedResourceId, AnalysedResourceMode, WitType, TypeHandle, WitExport,
             WitFunction, WitFunctionParameter, WitFunctionResult, WitInterface,
         };

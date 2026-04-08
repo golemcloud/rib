@@ -2,8 +2,8 @@ test_r::enable!();
 
 use test_r::test;
 
-use rib::wit::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
-use rib::wit::WitType;
+use rib::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
+use rib::wit_type::WitType;
 use rib::ValueAndType;
 use rib::{
     EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, Expr, Interpreter, RibCompiler,
@@ -699,7 +699,7 @@ mod component_metadata {
 
 mod function_metadata {
     use crate::{data_types, test_utils};
-    use rib::wit::WitExport;
+    use rib::wit_type::WitExport;
 
     pub(crate) fn function_unit_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
@@ -1156,11 +1156,11 @@ mod function_metadata {
 }
 
 mod data_types {
-    use rib::wit::wit_type::{
+    use rib::wit_type::{
         bool, case, chr, f32, f64, field, flags, list, option, r#enum, record, result, s16, s32,
         s64, s8, str, tuple, u16, u32, u64, u8, unit_case, variant,
     };
-    use rib::wit::*;
+    use rib::wit_type::*;
 
     // Result
     pub(crate) fn result_of_str_type() -> WitType {
@@ -1716,8 +1716,8 @@ mod mock_interpreter {
     };
     use async_trait::async_trait;
 
-    use rib::wit::wit_type::{field, record, str};
-    use rib::wit::WitType;
+    use rib::wit_type::{field, record, str};
+    use rib::wit_type::WitType;
     use rib::ValueAndType;
     use rib::{ComponentDependencyKey, DefaultWorkerNameGenerator, InstructionId};
     use std::collections::HashMap;
@@ -1940,7 +1940,7 @@ mod mock_interpreter {
 }
 
 mod test_utils {
-    use rib::wit::*;
+    use rib::wit_type::*;
     use rib::ValueAndType;
 
     pub(crate) fn get_value_and_type(

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::{InferredType, Path, PathElem};

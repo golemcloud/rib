@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::wit_type::{list, option, record, str, tuple, variant};
-use crate::wit::{
+use crate::wit_type::{list, option, record, str, tuple, variant};
+use crate::wit_type::{
     WitType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
 };
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;

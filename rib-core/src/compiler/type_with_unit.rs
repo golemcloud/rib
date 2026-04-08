@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::wit_type::{bool, field, record, str, tuple};
-use crate::wit::{
+use crate::wit_type::{bool, field, record, str, tuple};
+use crate::wit_type::{
     AnalysedResourceId, AnalysedResourceMode, WitType, NameOptionTypePair, NameTypePair,
     TypeBool, TypeChr, TypeEnum, TypeF32, TypeF64, TypeFlags, TypeHandle, TypeList, TypeOption,
     TypeRecord, TypeResult, TypeS16, TypeS32, TypeS64, TypeS8, TypeStr, TypeTuple, TypeU16,

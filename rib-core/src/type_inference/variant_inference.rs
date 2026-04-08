@@ -179,7 +179,7 @@ fn convert_call_nodes(root: ExprId, arena: &mut ExprArena, variants_with_args: &
     }
 }
 
-fn merge_variant_types(type_variants: &[crate::wit::TypeVariant]) -> InferredType {
+fn merge_variant_types(type_variants: &[crate::wit_type::TypeVariant]) -> InferredType {
     let inferred: Vec<InferredType> = type_variants
         .iter()
         .map(InferredType::from_type_variant)

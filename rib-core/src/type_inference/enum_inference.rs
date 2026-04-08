@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_inference::expr_visitor::arena::children_of;
 use crate::ComponentDependency;

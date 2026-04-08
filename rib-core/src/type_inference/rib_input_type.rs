@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::{try_visit_post_order_rev_mut, Expr, InferredExpr, RibCompilationError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

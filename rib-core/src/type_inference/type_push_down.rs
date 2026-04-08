@@ -14,7 +14,7 @@
 
 use crate::rib_type_error::RibTypeErrorInternal;
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::expr_arena::{
     ArmPatternId, ArmPatternNode, ExprArena, ExprId, ExprKind, MatchArmNode, ResultExprKind,
     TypeTable,

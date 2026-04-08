@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::TypeEnum;
-use crate::wit::{TypeVariant, WitExport};
+use crate::wit_type::TypeEnum;
+use crate::wit_type::{TypeVariant, WitExport};
 use crate::{
     ComponentDependencyKey, Expr, FunctionDictionary, FunctionName, FunctionType,
     FunctionTypeRegistry, InstanceCreationType,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rib::wit::WitType;
+use rib::wit_type::WitType;
 use rib::Value;
 
 pub fn generate_value(analysed_tpe: &WitType) -> Value {

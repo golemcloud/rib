@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::wit_type::tuple;
-use crate::wit::WitType;
+use crate::wit_type::tuple;
+use crate::wit_type::WitType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::{GetLiteralValue, LiteralValue};
 use crate::{Value, ValueAndType};

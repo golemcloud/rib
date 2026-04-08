@@ -23,7 +23,7 @@ mod type_internal;
 mod type_origin;
 mod unification;
 
-use crate::wit::*;
+use crate::wit_type::*;
 use crate::instance_type::InstanceType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::GetTypeHint;

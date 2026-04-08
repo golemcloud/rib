@@ -18,7 +18,7 @@ pub use ir::*;
 pub use type_with_unit::*;
 pub use worker_functions_in_rib::*;
 
-use crate::wit::{TypeEnum, TypeVariant};
+use crate::wit_type::{TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
 use crate::{
     ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredExpr,
@@ -840,10 +840,10 @@ mod compiler_error_tests {
     }
 
     mod test_utils {
-        use crate::wit::wit_type::{
+        use crate::wit_type::{
             case, f32, field, handle, list, record, s32, str, tuple, u32, u64, variant,
         };
-        use crate::wit::{
+        use crate::wit_type::{
             AnalysedResourceId, AnalysedResourceMode, NameTypePair, WitExport, WitFunction,
             WitFunctionParameter, WitFunctionResult, WitInterface,
         };

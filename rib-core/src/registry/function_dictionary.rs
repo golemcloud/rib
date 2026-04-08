@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::{WitType, TypeEnum, TypeVariant, WitExport};
+use crate::wit_type::{WitType, TypeEnum, TypeVariant, WitExport};
 use crate::expr_arena::CallTypeNode;
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;

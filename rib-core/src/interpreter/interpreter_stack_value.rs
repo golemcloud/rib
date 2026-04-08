@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+use crate::wit_type::WitType;
 use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
 use crate::interpreter::rib_runtime_error::{
     arithmetic_error, invalid_comparison, RibRuntimeError,
@@ -240,7 +240,7 @@ impl fmt::Debug for RibInterpreterStackValue {
 }
 
 mod internal {
-    use crate::wit::{WitType, TypeVariant};
+    use crate::wit_type::{WitType, TypeVariant};
     use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
     use crate::interpreter::rib_runtime_error::invalid_comparison;
     use crate::{internal_corrupted_state, RibInterpreterResult};
