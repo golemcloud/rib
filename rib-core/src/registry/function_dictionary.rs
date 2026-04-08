@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::{WitType, TypeEnum, TypeVariant, WitExport};
 use crate::expr_arena::CallTypeNode;
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
+use crate::wit_type::{TypeEnum, TypeVariant, WitExport, WitType};
 use crate::{
     CallType, DynamicParsedFunctionName, DynamicParsedFunctionReference, FunctionTypeRegistry,
     InferredType, ParsedFunctionSite, RegistryKey, RegistryValue, SemVer,

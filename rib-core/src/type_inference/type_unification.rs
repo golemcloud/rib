@@ -137,7 +137,7 @@ fn get_error_detail(
 
 /// Same semantics as [`unify_types`], but updates a [`TypeTable`] in place. On failure, rebuilds
 /// from `root` for error context (cold path).
-pub fn unify_types_lowered(
+pub fn unify_types(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,

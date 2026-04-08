@@ -400,7 +400,7 @@ pub struct WitFunctionResult {
 }
 
 /// Helper constructors for building `WitType` values in tests and metadata.
-pub mod wit_type {
+pub mod builders {
     use super::*;
 
     pub fn field(name: &str, typ: WitType) -> NameTypePair {
@@ -587,5 +587,4 @@ pub mod wit_type {
 
 // Re-export helper constructors at module root for ergonomic imports like
 // `use crate::wit_type::{record, option, str, ...}`.
-pub use wit_type::*;
-
+pub use builders::*;

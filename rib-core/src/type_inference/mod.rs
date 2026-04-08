@@ -23,6 +23,7 @@ pub use identifier_inference::*;
 pub use identify_instance_creation::*;
 pub use inference_fix_point::*;
 pub use inferred_expr::*;
+pub use initial_phase::*;
 pub use instance_type_binding::*;
 pub use rib_input_type::*;
 pub use rib_output_type::*;
@@ -37,35 +38,34 @@ pub use variable_binding::*;
 pub use variant_inference::*;
 pub use worker_function_invocation::*;
 
-pub(crate) mod call_arguments_inference;
+mod call_arguments_inference;
 mod custom_instance_spec;
-pub(crate) mod enum_inference;
+mod enum_inference;
 mod errors;
 mod expr_visitor;
-pub(crate) mod global_input_inference;
-pub(crate) mod global_variable_type_binding;
-pub(crate) mod identifier_inference;
-pub(crate) mod identify_instance_creation;
+mod global_input_inference;
+mod global_variable_type_binding;
+mod identifier_inference;
+mod identify_instance_creation;
 mod inference_fix_point;
 mod inferred_expr;
-pub(crate) mod initial_arena_phase;
-pub(crate) mod instance_type_binding;
+mod initial_phase;
+mod instance_type_binding;
 mod rib_input_type;
 mod rib_output_type;
-pub(crate) mod stateful_instance;
-pub(crate) mod type_annotation_binding;
+mod stateful_instance;
+mod type_annotation_binding;
 mod type_hint;
-pub(crate) mod type_pull_up;
-pub(crate) mod type_push_down;
+mod type_pull_up;
+mod type_push_down;
 mod type_reset;
 mod type_unification;
-pub(crate) mod variable_binding;
-pub(crate) mod variant_inference;
-pub(crate) mod worker_function_invocation;
+mod variable_binding;
+mod variant_inference;
+mod worker_function_invocation;
 
 #[cfg(test)]
 mod tests {
-    use crate::wit_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::call_type::CallType;
     use crate::type_checker::Path;
     use crate::type_inference::global_variable_type_binding::GlobalVariableTypeSpec;
@@ -75,6 +75,7 @@ mod tests {
         number, option, pattern_match, plus, record, result, select_dynamic, select_field,
         sequence, tuple,
     };
+    use crate::wit_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::{
         ArmPattern, ComponentDependency, DynamicParsedFunctionName, DynamicParsedFunctionReference,
         Expr, InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
@@ -83,7 +84,7 @@ mod tests {
     use bigdecimal::BigDecimal;
     use std::sync::Arc;
 
-    use crate::wit_type::wit_type;
+    use crate::wit_type::builders as wit_type;
     use test_r::test;
 
     #[test]
@@ -2432,14 +2433,14 @@ mod tests {
     }
 
     mod test_utils {
-        use crate::wit_type::u64;
-        use crate::wit_type::{
-            WitType, TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
-        };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
         use crate::parser::type_name::TypeName;
         use crate::rib_source_span::SourceSpan;
+        use crate::wit_type::u64;
+        use crate::wit_type::{
+            TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult, WitType,
+        };
         use crate::{
             ArmPattern, ComponentDependency, ComponentDependencyKey, Expr, InferredType,
             InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm, MatchIdentifier,
@@ -2733,10 +2734,7 @@ mod tests {
         }
 
         pub fn create_none(typ: &WitType) -> ValueAndType {
-            ValueAndType::new(
-                Value::Option(None),
-                crate::wit_type::option(typ.clone()),
-            )
+            ValueAndType::new(Value::Option(None), crate::wit_type::option(typ.clone()))
         }
 
         pub fn get_test_rib_compiler_with(

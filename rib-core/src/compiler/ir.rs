@@ -14,7 +14,7 @@
 
 use crate::wit_type::WitType;
 use crate::ValueAndType;
-use crate::{WitTypeWithUnit, ComponentDependencyKey, ParsedFunctionSite, VariableId};
+use crate::{ComponentDependencyKey, ParsedFunctionSite, VariableId, WitTypeWithUnit};
 use serde::{Deserialize, Serialize};
 
 // To create any type, example, CreateOption, you have to feed a fully formed WitType

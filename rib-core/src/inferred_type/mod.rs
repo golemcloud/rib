@@ -23,10 +23,10 @@ mod type_internal;
 mod type_origin;
 mod unification;
 
-use crate::wit_type::*;
 use crate::instance_type::InstanceType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::GetTypeHint;
+use crate::wit_type::*;
 use crate::TypeName;
 use bigdecimal::BigDecimal;
 use std::fmt::{Display, Formatter};
@@ -678,9 +678,7 @@ impl From<&WitType> for InferredType {
             WitType::Chr(_) => InferredType::char(),
             WitType::Str(_) => InferredType::string(),
             WitType::List(t) => InferredType::list(t.inner.as_ref().into()),
-            WitType::Tuple(ts) => {
-                InferredType::tuple(ts.items.iter().map(|t| t.into()).collect())
-            }
+            WitType::Tuple(ts) => InferredType::tuple(ts.items.iter().map(|t| t.into()).collect()),
             WitType::Record(fs) => InferredType::record(
                 fs.fields
                     .iter()

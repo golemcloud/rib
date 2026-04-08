@@ -14,7 +14,6 @@
 
 use crate::rib_type_error::RibTypeErrorInternal;
 
-use crate::wit_type::WitType;
 use crate::expr_arena::{
     ArmPatternId, ArmPatternNode, ExprArena, ExprId, ExprKind, MatchArmNode, ResultExprKind,
     TypeTable,
@@ -24,6 +23,7 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::type_refinement::precise_types::*;
 use crate::type_refinement::TypeRefinement;
+use crate::wit_type::WitType;
 use crate::{
     ActualType, AmbiguousTypeError, ExpectedType, InferredType, InvalidPatternMatchError, Path,
     TypeInternal, TypeMismatchError, VariableId,
@@ -78,7 +78,7 @@ fn get_compilation_error_for_ambiguity(
 
 /// Pre-order traversal: for each parent node, read its type from
 /// `TypeTable` and push derived types down into child nodes.
-pub fn push_types_down_lowered(
+pub fn push_types_down(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
@@ -626,7 +626,7 @@ mod type_push_down_tests {
 
     fn push_types_down_via_arena(expr: &mut Expr) -> Result<(), RibTypeErrorInternal> {
         let (arena, mut types, root) = crate::expr_arena::lower(expr);
-        super::push_types_down_lowered(root, &arena, &mut types)?;
+        super::push_types_down(root, &arena, &mut types)?;
         *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
     }

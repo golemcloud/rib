@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::WitType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
+use crate::wit_type::WitType;
 use crate::ValueAndType;
 use crate::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
@@ -122,8 +122,8 @@ impl EnvironmentKey {
 }
 
 mod internal {
-    use crate::wit_type::WitType;
     use crate::interpreter::env::RibComponentFunctionInvoke;
+    use crate::wit_type::WitType;
     use crate::{
         ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
         RibFunctionInvokeResult,

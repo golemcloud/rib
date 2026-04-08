@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::{WitType, TypeResult};
+use crate::wit_type::{TypeResult, WitType};
 use crate::wit_type::{TypeVariant, WitExport};
 use crate::DynamicParsedFunctionName;
 use std::fmt::{Display, Formatter};

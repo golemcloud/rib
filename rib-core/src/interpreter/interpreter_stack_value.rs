@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::WitType;
 use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
 use crate::interpreter::rib_runtime_error::{
     arithmetic_error, invalid_comparison, RibRuntimeError,
 };
+use crate::wit_type::WitType;
 use crate::{internal_corrupted_state, CoercedNumericValue, RibInterpreterResult};
 use crate::{IntoValueAndType, Value, ValueAndType};
 use std::fmt;
@@ -240,9 +240,9 @@ impl fmt::Debug for RibInterpreterStackValue {
 }
 
 mod internal {
-    use crate::wit_type::{WitType, TypeVariant};
     use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
     use crate::interpreter::rib_runtime_error::invalid_comparison;
+    use crate::wit_type::{TypeVariant, WitType};
     use crate::{internal_corrupted_state, RibInterpreterResult};
     use crate::{IntoValueAndType, Value, ValueAndType};
 

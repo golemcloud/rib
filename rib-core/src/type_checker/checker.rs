@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::WitType;
 use crate::expr_arena::{
     ArmPatternNode, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
     InstanceIdentifierNode, MatchArmNode, RangeKind, ResultExprKind, TypeTable,
@@ -25,6 +24,7 @@ use crate::type_checker::exhaustive_pattern_match::{
 };
 use crate::type_checker::{Path, PathElem};
 use crate::type_inference::arena::children_of;
+use crate::wit_type::WitType;
 use crate::{
     ComponentDependency, FunctionCallError, FunctionName, InvalidWorkerName, UnResolvedTypesError,
 };
@@ -41,8 +41,7 @@ pub fn type_check(
     // One post-order walk; reuse the same `Vec` for all later passes so we do not
     // traverse the expression tree four extra times (pass order and error precedence
     // stay identical to separate full-tree passes).
-    let mut order = Vec::new();
-    order.reserve(arena.exprs.len());
+    let mut order = Vec::with_capacity(arena.exprs.len());
     post_order_collect(root, arena, &mut order);
 
     let exhaustive_fallback = build_fallback_constructor_details(component_dependency);

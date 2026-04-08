@@ -29,7 +29,7 @@ use crate::{
 
 /// Post-order traversal: for each node, read the types of its children from
 /// `TypeTable` to compute/update the node's own type.
-pub fn type_pull_up_lowered(
+pub fn pull_types_up(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
@@ -441,7 +441,7 @@ mod type_pull_up_tests {
         component_dependencies: &ComponentDependency,
     ) -> Result<(), RibTypeErrorInternal> {
         let (mut arena, mut types, root) = crate::expr_arena::lower(expr);
-        super::type_pull_up_lowered(root, &mut arena, &mut types, component_dependencies)?;
+        super::pull_types_up(root, &mut arena, &mut types, component_dependencies)?;
         *expr = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
     }

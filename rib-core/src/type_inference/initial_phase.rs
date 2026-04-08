@@ -35,7 +35,7 @@ pub fn run_initial_binding_and_instance_phases(
         types,
         global_variable_type_spec,
     );
-    ti::type_annotation_binding::lowered::bind_type_annotations(root, arena, types);
+    ti::type_annotation_binding::bind_type_annotations(root, arena, types);
     ti::variable_binding::bind_variables_of_list_comprehension(root, arena, types);
     ti::variable_binding::bind_variables_of_list_reduce(root, arena, types);
     ti::variable_binding::bind_variables_of_pattern_match(root, arena, types);
@@ -48,6 +48,6 @@ pub fn run_initial_binding_and_instance_phases(
         custom_instance_spec,
     )?;
     ti::stateful_instance::ensure_stateful_instance(root, arena, types);
-    ti::type_annotation_binding::lowered::set_origin(root, arena, types);
+    ti::type_annotation_binding::set_origin(root, arena, types);
     Ok(())
 }

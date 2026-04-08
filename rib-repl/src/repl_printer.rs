@@ -15,7 +15,7 @@
 use crate::ReplBootstrapError;
 use colored::Colorize;
 use rib::wit_type::{record, str, u64};
-use rib::wit_type::{AnalysedResourceMode, WitType, NameTypePair, TypeHandle};
+use rib::wit_type::{AnalysedResourceMode, NameTypePair, TypeHandle, WitType};
 use rib::*;
 use rib::{Value, ValueAndType};
 use std::collections::BTreeMap;

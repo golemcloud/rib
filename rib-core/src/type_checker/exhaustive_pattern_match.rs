@@ -59,13 +59,13 @@ pub enum ExhaustivePatternMatchError {
 }
 
 mod internal {
-    use crate::wit_type::TypeVariant;
     use crate::expr_arena::{
         rebuild_arm_pattern, rebuild_expr, ArmPatternId, ArmPatternNode, ExprArena, ExprId,
         ExprKind, TypeTable,
     };
     use crate::rib_source_span::SourceSpan;
     use crate::type_checker::exhaustive_pattern_match::ExhaustivePatternMatchError;
+    use crate::wit_type::TypeVariant;
     use crate::{ArmPattern, ComponentDependency, InferredType, TypeInternal};
     use std::borrow::Cow;
     use std::collections::HashMap;
@@ -135,105 +135,75 @@ mod internal {
         }
     }
 
+    struct PatternCollectState<'a> {
+        arena: &'a ExprArena,
+        with_arg_constructors: &'a [String],
+        no_arg_constructors: &'a [String],
+        constructor_map_result: &'a mut HashMap<String, Vec<PatternView>>,
+        constructors_with_arg: &'a mut ConstructorsWithArgTracker,
+        constructors_with_no_arg: &'a mut NoArgConstructorsTracker,
+        detected_wild_card_or_identifier: &'a mut Vec<PatternView>,
+    }
+
     fn handle_literal_expr(
         eid: ExprId,
         literal_pattern_id: Option<ArmPatternId>,
-        arena: &ExprArena,
-        with_arg_constructors: &[String],
-        no_arg_constructors: &[String],
-        constructor_map_result: &mut HashMap<String, Vec<PatternView>>,
-        constructors_with_arg: &mut ConstructorsWithArgTracker,
-        constructors_with_no_arg: &mut NoArgConstructorsTracker,
-        detected_wild_card_or_identifier: &mut Vec<PatternView>,
+        state: &mut PatternCollectState<'_>,
     ) {
-        if let ExprKind::Call { call_type, args } = &arena.expr(eid).kind {
+        if let ExprKind::Call { call_type, args } = &state.arena.expr(eid).kind {
             let ctor_name = call_type.to_string();
             let arm_patterns: Vec<PatternView> =
                 args.iter().map(|&a| PatternView::ArgLiteral(a)).collect();
-            if with_arg_constructors.contains(&ctor_name) {
-                constructor_map_result
+            if state.with_arg_constructors.contains(&ctor_name) {
+                state
+                    .constructor_map_result
                     .entry(ctor_name.clone())
                     .or_default()
                     .extend(arm_patterns);
-                constructors_with_arg.register(ctor_name.as_str());
-            } else if no_arg_constructors.contains(&ctor_name) {
-                constructors_with_no_arg.register(ctor_name.as_str());
+                state.constructors_with_arg.register(ctor_name.as_str());
+            } else if state.no_arg_constructors.contains(&ctor_name) {
+                state.constructors_with_no_arg.register(ctor_name.as_str());
             }
-        } else if expr_is_identifier(eid, arena) {
+        } else if expr_is_identifier(eid, state.arena) {
             let pv = if let Some(pid) = literal_pattern_id {
                 PatternView::Node(pid)
             } else {
                 PatternView::ArgLiteral(eid)
             };
-            detected_wild_card_or_identifier.push(pv);
+            state.detected_wild_card_or_identifier.push(pv);
         }
     }
 
-    fn process_pattern_view(
-        pv: &PatternView,
-        arena: &ExprArena,
-        with_arg_constructors: &[String],
-        no_arg_constructors: &[String],
-        constructor_map_result: &mut HashMap<String, Vec<PatternView>>,
-        constructors_with_arg: &mut ConstructorsWithArgTracker,
-        constructors_with_no_arg: &mut NoArgConstructorsTracker,
-        detected_wild_card_or_identifier: &mut Vec<PatternView>,
-    ) {
+    fn process_pattern_view(pv: &PatternView, state: &mut PatternCollectState<'_>) {
         match pv {
             PatternView::ArgLiteral(eid) => {
-                handle_literal_expr(
-                    *eid,
-                    None,
-                    arena,
-                    with_arg_constructors,
-                    no_arg_constructors,
-                    constructor_map_result,
-                    constructors_with_arg,
-                    constructors_with_no_arg,
-                    detected_wild_card_or_identifier,
-                );
+                handle_literal_expr(*eid, None, state);
             }
-            PatternView::Node(id) => match arena.pattern(*id) {
+            PatternView::Node(id) => match state.arena.pattern(*id) {
                 ArmPatternNode::WildCard => {
-                    detected_wild_card_or_identifier.push(PatternView::Node(*id));
+                    state
+                        .detected_wild_card_or_identifier
+                        .push(PatternView::Node(*id));
                 }
                 ArmPatternNode::As(_, inner) => {
-                    process_pattern_view(
-                        &PatternView::Node(*inner),
-                        arena,
-                        with_arg_constructors,
-                        no_arg_constructors,
-                        constructor_map_result,
-                        constructors_with_arg,
-                        constructors_with_no_arg,
-                        detected_wild_card_or_identifier,
-                    );
+                    process_pattern_view(&PatternView::Node(*inner), state);
                 }
                 ArmPatternNode::Constructor(ctor_name, arm_patterns) => {
                     let mapped: Vec<PatternView> =
                         arm_patterns.iter().map(|&c| PatternView::Node(c)).collect();
-                    if with_arg_constructors.contains(ctor_name) {
-                        constructor_map_result
+                    if state.with_arg_constructors.contains(ctor_name) {
+                        state
+                            .constructor_map_result
                             .entry(ctor_name.clone())
                             .or_default()
                             .extend(mapped);
-                        constructors_with_arg.register(ctor_name);
-                    } else if no_arg_constructors.contains(ctor_name) {
-                        constructors_with_no_arg.register(ctor_name);
+                        state.constructors_with_arg.register(ctor_name);
+                    } else if state.no_arg_constructors.contains(ctor_name) {
+                        state.constructors_with_no_arg.register(ctor_name);
                     }
                 }
                 ArmPatternNode::Literal(eid) => {
-                    handle_literal_expr(
-                        *eid,
-                        Some(*id),
-                        arena,
-                        with_arg_constructors,
-                        no_arg_constructors,
-                        constructor_map_result,
-                        constructors_with_arg,
-                        constructors_with_no_arg,
-                        detected_wild_card_or_identifier,
-                    );
+                    handle_literal_expr(*eid, Some(*id), state);
                 }
                 ArmPatternNode::TupleConstructor(_)
                 | ArmPatternNode::RecordConstructor(_)
@@ -427,25 +397,27 @@ mod internal {
         constructors_with_arg.initialise(with_arg_constructors.clone());
         constructors_with_no_arg.initialise(no_arg_constructors.clone());
 
+        let mut collect_state = PatternCollectState {
+            arena,
+            with_arg_constructors: &with_arg_constructors,
+            no_arg_constructors: &no_arg_constructors,
+            constructor_map_result: &mut constructor_map_result,
+            constructors_with_arg: &mut constructors_with_arg,
+            constructors_with_no_arg: &mut constructors_with_no_arg,
+            detected_wild_card_or_identifier: &mut detected_wild_card_or_identifier,
+        };
+
         for pattern in patterns {
-            if !detected_wild_card_or_identifier.is_empty() {
-                let cause = detected_wild_card_or_identifier
+            if !collect_state.detected_wild_card_or_identifier.is_empty() {
+                let cause = collect_state
+                    .detected_wild_card_or_identifier
                     .last()
                     .map(|pv| pattern_view_to_arm_pattern(pv, arena, types))
                     .unwrap_or(ArmPattern::WildCard);
                 let dead = pattern_view_to_arm_pattern(pattern, arena, types);
                 return ExhaustiveCheckResult::dead_code(match_source_span.clone(), cause, dead);
             }
-            process_pattern_view(
-                pattern,
-                arena,
-                &with_arg_constructors,
-                &no_arg_constructors,
-                &mut constructor_map_result,
-                &mut constructors_with_arg,
-                &mut constructors_with_no_arg,
-                &mut detected_wild_card_or_identifier,
-            );
+            process_pattern_view(pattern, &mut collect_state);
         }
 
         if constructors_with_arg.registered_any() || constructors_with_no_arg.registered_any() {

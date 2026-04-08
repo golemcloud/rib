@@ -2,8 +2,8 @@ test_r::enable!();
 
 use test_r::test;
 
-use rib::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
 use rib::wit_type::WitType;
+use rib::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
 use rib::ValueAndType;
 use rib::{
     EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, Expr, Interpreter, RibCompiler,
@@ -1156,11 +1156,11 @@ mod function_metadata {
 }
 
 mod data_types {
+    use rib::wit_type::*;
     use rib::wit_type::{
         bool, case, chr, f32, f64, field, flags, list, option, r#enum, record, result, s16, s32,
         s64, s8, str, tuple, u16, u32, u64, u8, unit_case, variant,
     };
-    use rib::wit_type::*;
 
     // Result
     pub(crate) fn result_of_str_type() -> WitType {
@@ -1716,8 +1716,8 @@ mod mock_interpreter {
     };
     use async_trait::async_trait;
 
-    use rib::wit_type::{field, record, str};
     use rib::wit_type::WitType;
+    use rib::wit_type::{field, record, str};
     use rib::ValueAndType;
     use rib::{ComponentDependencyKey, DefaultWorkerNameGenerator, InstructionId};
     use std::collections::HashMap;
@@ -1943,10 +1943,7 @@ mod test_utils {
     use rib::wit_type::*;
     use rib::ValueAndType;
 
-    pub(crate) fn get_value_and_type(
-        analysed_type: &WitType,
-        wasm_wave_str: &str,
-    ) -> ValueAndType {
+    pub(crate) fn get_value_and_type(analysed_type: &WitType, wasm_wave_str: &str) -> ValueAndType {
         let result = rib::parse_value_and_type(analysed_type, wasm_wave_str);
 
         match result {

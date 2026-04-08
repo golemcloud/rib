@@ -18,8 +18,8 @@ pub use ir::*;
 pub use type_with_unit::*;
 pub use worker_functions_in_rib::*;
 
-use crate::wit_type::{TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
+use crate::wit_type::{TypeEnum, TypeVariant};
 use crate::{
     ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredExpr,
     RibInputTypeInfo, RibOutputTypeInfo,

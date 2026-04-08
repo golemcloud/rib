@@ -14,13 +14,13 @@
 
 use std::fmt::Display;
 
-use crate::wit_type::WitType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
 };
 use crate::inferred_type::TypeOrigin;
 use crate::type_inference::expr_visitor::arena::children_of;
+use crate::wit_type::WitType;
 use crate::{
     ComponentDependency, CustomInstanceSpec, DynamicParsedFunctionName,
     FullyQualifiedResourceMethod, FunctionCallError, FunctionName, InferredType, TypeInternal,
@@ -84,7 +84,7 @@ impl Display for FunctionDetails {
 }
 
 /// Arena-based function-call argument typing (used from [`crate::expr_arena`] inference).
-pub fn infer_function_call_types_lowered(
+pub fn infer_function_call_types(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
@@ -429,11 +429,11 @@ fn merge_into(id: ExprId, ty: InferredType, types: &mut TypeTable) {
 mod function_parameters_inference_tests {
     use test_r::test;
 
-    use crate::wit_type::{
-        WitType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
-    };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
+    use crate::wit_type::{
+        TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter, WitType,
+    };
     use crate::{
         ComponentDependency, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
         InferredType, ParsedFunctionSite,
@@ -447,7 +447,7 @@ mod function_parameters_inference_tests {
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), FunctionCallError> {
         let (arena, mut types, root) = crate::expr_arena::lower(expr);
-        super::infer_function_call_types_lowered(
+        super::infer_function_call_types(
             root,
             &arena,
             &mut types,

@@ -346,23 +346,22 @@ impl Interpreter {
 }
 
 mod internal {
-    use crate::wit_type::WitType;
-    use crate::wit_type::TypeResult;
     use crate::interpreter::env::{EnvironmentKey, InterpreterEnv};
     use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
     use crate::interpreter::literal::LiteralValue;
     use crate::interpreter::stack::InterpreterStack;
+    use crate::wit_type::TypeResult;
+    use crate::wit_type::WitType;
     use crate::{
-        bail_corrupted_state, internal_corrupted_state, WitTypeWithUnit, CoercedNumericValue,
+        bail_corrupted_state, internal_corrupted_state, CoercedNumericValue,
         ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName,
         FunctionReferenceType, GetLiteralValue, InstanceVariable, InstructionId, Interpreter,
         ParsedFunctionName, ParsedFunctionReference, ParsedFunctionSite,
         RibComponentFunctionInvoke, RibFunctionInvokeResult, RibInterpreterResult, TypeHint,
-        VariableId,
+        VariableId, WitTypeWithUnit,
     };
     use crate::{IntoValueAndType, Value, ValueAndType};
 
-    use crate::wit_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
     use crate::interpreter::instruction_cursor::RibByteCodeCursor;
     use crate::interpreter::rib_runtime_error::{
         cast_error_custom, empty_stack, exhausted_iterator, field_not_found, function_invoke_fail,
@@ -371,6 +370,7 @@ mod internal {
         RibRuntimeError,
     };
     use crate::type_inference::GetTypeHint;
+    use crate::wit_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
     use async_trait::async_trait;
     use std::ops::Deref;
 
@@ -1525,13 +1525,13 @@ mod tests {
     use test_r::test;
 
     use super::*;
+    use crate::interpreter::rib_interpreter::tests::test_utils::{
+        get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
+    };
+    use crate::wit_type::WitType;
     use crate::wit_type::{
         bool, case, f32, field, list, option, r#enum, record, result, result_err, result_ok, s32,
         str, tuple, u32, u64, u8, unit_case, variant,
-    };
-    use crate::wit_type::WitType;
-    use crate::interpreter::rib_interpreter::tests::test_utils::{
-        get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
     };
     use crate::{
         ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredType,
@@ -4258,16 +4258,16 @@ mod tests {
     }
 
     mod test_utils {
+        use crate::interpreter::rib_interpreter::internal::NoopRibFunctionInvoke;
+        use crate::interpreter::rib_interpreter::Interpreter;
         use crate::wit_type::{
             case, f32, field, handle, list, option, r#enum, record, result, s32, str, tuple, u32,
             u64, unit_case, variant,
         };
         use crate::wit_type::{
-            AnalysedResourceId, AnalysedResourceMode, WitType, TypeHandle, WitExport,
-            WitFunction, WitFunctionParameter, WitFunctionResult, WitInterface,
+            AnalysedResourceId, AnalysedResourceMode, TypeHandle, WitExport, WitFunction,
+            WitFunctionParameter, WitFunctionResult, WitInterface, WitType,
         };
-        use crate::interpreter::rib_interpreter::internal::NoopRibFunctionInvoke;
-        use crate::interpreter::rib_interpreter::Interpreter;
         use crate::{print_value_and_type, IntoValueAndType, Value, ValueAndType};
         use crate::{
             ComponentDependency, ComponentDependencyKey, DefaultWorkerNameGenerator,

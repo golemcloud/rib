@@ -19,10 +19,7 @@ use std::collections::HashSet;
 use wasm_wave::wasm::{WasmType, WasmTypeKind, WasmValue, WasmValueError};
 use wasm_wave::{from_str, to_string};
 
-pub fn parse_value_and_type(
-    analysed_type: &WitType,
-    input: &str,
-) -> Result<ValueAndType, String> {
+pub fn parse_value_and_type(analysed_type: &WitType, input: &str) -> Result<ValueAndType, String> {
     let parsed: ValueAndType = from_str(analysed_type, input).map_err(|err| err.to_string())?;
     Ok(parsed)
 }
@@ -382,12 +379,10 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_option(&self) -> Option<Cow<'_, Self>> {
         match (&self.value, &self.typ) {
-            (Value::Option(Some(val)), WitType::Option(typ)) => {
-                Some(Cow::Owned(ValueAndType {
-                    value: *val.clone(),
-                    typ: (*typ.inner).clone(),
-                }))
-            }
+            (Value::Option(Some(val)), WitType::Option(typ)) => Some(Cow::Owned(ValueAndType {
+                value: *val.clone(),
+                typ: (*typ.inner).clone(),
+            })),
             (Value::Option(None), WitType::Option(_)) => None,
             _ => panic!("Expected option, found {self:?}"),
         }

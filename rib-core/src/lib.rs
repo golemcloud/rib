@@ -37,7 +37,6 @@ mod call_type;
 
 mod profile;
 
-pub mod wit_type;
 mod compiler;
 mod expr;
 pub mod expr_arena;
@@ -60,6 +59,7 @@ pub mod value_and_type;
 mod variable_id;
 mod wasm_wave_text;
 mod wave;
+pub mod wit_type;
 
 #[cfg(test)]
 test_r::enable!();

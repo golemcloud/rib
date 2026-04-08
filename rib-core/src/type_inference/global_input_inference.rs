@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Global-input typing runs on lowered IR; use [`infer_global_inputs_lowered`] from the same
+//! Global-input typing runs on lowered IR; use [`infer_global_inputs`] from the same
 //! `lower` / `rebuild_expr` boundary as [`crate::Expr::infer_types`].
 
 use crate::expr_arena::{ExprArena, ExprId, ExprKind, TypeTable};
@@ -20,7 +20,7 @@ use crate::type_inference::expr_visitor::arena::children_of;
 use crate::InferredType;
 use std::collections::HashMap;
 
-pub fn infer_global_inputs_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+pub fn infer_global_inputs(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
     let global_vars = collect_global_variable_types(root, arena, types);
 
     let mut stack = vec![root];

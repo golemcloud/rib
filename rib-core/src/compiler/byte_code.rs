@@ -119,18 +119,18 @@ impl RibByteCode {
     }
 }
 mod internal {
-    use crate::wit_type::{WitType, TypeFlags};
     use crate::compiler::desugar::{desugar_pattern_match, desugar_range_selection};
+    use crate::wit_type::{TypeFlags, WitType};
     use crate::{
-        WitTypeWithUnit, DynamicParsedFunctionReference, Expr, FunctionReferenceType,
-        InferredType, InstanceIdentifier, InstanceVariable, InstructionId, Range,
-        RibByteCodeGenerationError, RibIR, TypeInternal, VariableId,
+        DynamicParsedFunctionReference, Expr, FunctionReferenceType, InferredType,
+        InstanceIdentifier, InstanceVariable, InstructionId, Range, RibByteCodeGenerationError,
+        RibIR, TypeInternal, VariableId, WitTypeWithUnit,
     };
     use std::collections::HashSet;
 
-    use crate::wit_type::bool;
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::type_inference::{GetTypeHint, TypeHint};
+    use crate::wit_type::bool;
     use crate::{IntoValueAndType, Value, ValueAndType};
     use std::ops::Deref;
 
@@ -421,10 +421,7 @@ mod internal {
                         let function_result_type = if inferred_type.is_unit() {
                             WitTypeWithUnit::Unit
                         } else {
-                            WitTypeWithUnit::Type(convert_to_analysed_type(
-                                expr,
-                                inferred_type,
-                            )?)
+                            WitTypeWithUnit::Type(convert_to_analysed_type(expr, inferred_type)?)
                         };
 
                         let module = module
@@ -922,7 +919,7 @@ mod compiler_tests {
     use test_r::test;
 
     use super::*;
-    use crate::wit_type::wit_type;
+    use crate::wit_type::builders as wit_type;
     use crate::wit_type::{field, list, record, s32, str};
     use crate::{ArmPattern, InferredType, MatchArm, RibCompiler, VariableId};
     use crate::{IntoValueAndType, Value, ValueAndType};
@@ -1427,8 +1424,8 @@ mod compiler_tests {
     mod invalid_function_invoke_tests {
         use test_r::test;
 
-        use crate::wit_type::str;
         use crate::compiler::byte_code::compiler_tests::internal;
+        use crate::wit_type::str;
         use crate::{Expr, RibCompiler, RibCompilerConfig};
 
         #[test]
@@ -1519,11 +1516,11 @@ mod compiler_tests {
     mod global_input_tests {
         use test_r::test;
 
+        use crate::compiler::byte_code::compiler_tests::internal;
         use crate::wit_type::{
             case, field, list, option, r#enum, record, result, str, tuple, u32, u64, unit_case,
             variant,
         };
-        use crate::compiler::byte_code::compiler_tests::internal;
         use crate::{Expr, RibCompiler, RibCompilerConfig};
 
         #[test]
@@ -1858,8 +1855,8 @@ mod compiler_tests {
     }
 
     mod internal {
-        use crate::wit_type::{case, str, u64, unit_case, variant};
         use crate::wit_type::*;
+        use crate::wit_type::{case, str, u64, unit_case, variant};
         use crate::{ComponentDependency, ComponentDependencyKey, RibInputTypeInfo};
         use std::collections::HashMap;
         use uuid::Uuid;

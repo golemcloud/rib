@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit_type::{list, option, record, str, tuple, variant};
-use crate::wit_type::{
-    WitType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
-};
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::interpreter::rib_runtime_error::{
     empty_stack, insufficient_stack_items, type_mismatch_with_value,
+};
+use crate::wit_type::{list, option, record, str, tuple, variant};
+use crate::wit_type::{
+    NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult, WitType,
 };
 use crate::{internal_corrupted_state, GetLiteralValue, RibInterpreterResult, TypeHint};
 use crate::{Value, ValueAndType};

@@ -1,6 +1,6 @@
 use crate::wit_type::{
-    WitType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord, TypeResult, TypeTuple,
-    TypeVariant, WitFunction,
+    TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord, TypeResult, TypeTuple, TypeVariant,
+    WitFunction, WitType,
 };
 use std::borrow::Cow;
 use wasm_wave::wasm::{WasmFunc, WasmType, WasmTypeKind};
