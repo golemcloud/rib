@@ -14,15 +14,15 @@
 
 use std::fmt::Display;
 
-use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
 };
 use crate::inferred_type::TypeOrigin;
 use crate::type_inference::expr_visitor::arena::children_of;
+use crate::wit_type::WitType;
 use crate::{
-    ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName,
+    ComponentDependency, CustomInstanceSpec, DynamicParsedFunctionName,
     FullyQualifiedResourceMethod, FunctionCallError, FunctionName, InferredType, TypeInternal,
 };
 
@@ -84,11 +84,11 @@ impl Display for FunctionDetails {
 }
 
 /// Arena-based function-call argument typing (used from [`crate::expr_arena`] inference).
-pub fn infer_function_call_types_lowered(
+pub fn infer_function_call_types(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), FunctionCallError> {
     let mut stack = vec![root];
@@ -133,7 +133,7 @@ fn resolve_call_argument_types_arena(
     span: &crate::rib_source_span::SourceSpan,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), FunctionCallError> {
     match call_type {
@@ -243,7 +243,7 @@ fn infer_resource_method_args_arena(
     span: &crate::rib_source_span::SourceSpan,
     fqrm: &FullyQualifiedResourceMethod,
     function_name: &crate::DynamicParsedFunctionName,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     args: &[ExprId],
     call_id: ExprId,
     arena: &ExprArena,
@@ -270,25 +270,25 @@ fn infer_resource_method_args_arena(
 fn infer_args_and_result_type_arena(
     span: &crate::rib_source_span::SourceSpan,
     function_details: &FunctionDetails,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     key: &FunctionName,
     args: &[ExprId],
     result_id: Option<ExprId>,
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
-    let (_, function_type) = component_dependency
-        .get_function_type(&None, key)
-        .map_err(|err| FunctionCallError::InvalidFunctionCall {
+    let (_, function_type) = component_dependency.get_function_type(key).map_err(|err| {
+        FunctionCallError::InvalidFunctionCall {
             function_name: function_details.to_string(),
             source_span: span.clone(),
             message: err.to_string(),
-        })?;
+        }
+    })?;
 
-    let mut parameter_types: Vec<AnalysedType> = function_type
+    let mut parameter_types: Vec<WitType> = function_type
         .parameter_types
         .iter()
-        .map(|t| AnalysedType::try_from(t).unwrap())
+        .map(|t| WitType::try_from(t).unwrap())
         .collect();
 
     match key {
@@ -340,7 +340,7 @@ fn infer_args_and_result_type_arena(
         }
 
         FunctionName::ResourceMethod(_) => {
-            if let Some(AnalysedType::Handle(_)) = parameter_types.first() {
+            if let Some(WitType::Handle(_)) = parameter_types.first() {
                 parameter_types.remove(0);
             }
             let return_type = function_type.return_type.clone();
@@ -366,13 +366,13 @@ fn infer_args_and_result_type_arena(
 fn tag_argument_types_arena(
     function_details: &FunctionDetails,
     args: &[ExprId],
-    parameter_types: &[AnalysedType],
+    parameter_types: &[WitType],
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
     for (&arg_id, param_type) in args.iter().zip(parameter_types) {
         // Variant conflict workaround: update Variant TypeInternal in place
-        if let AnalysedType::Variant(type_variant) = param_type {
+        if let WitType::Variant(type_variant) = param_type {
             let current = types.get(arg_id).clone();
             let mut current_inner = current.inner.as_ref().clone();
             if let TypeInternal::Variant(ref mut collections) = current_inner {
@@ -403,7 +403,7 @@ fn tag_argument_types_arena(
                 argument_source_span: arg_span.clone(),
                 error: TypeMismatchError {
                     source_span: arg_span,
-                    expected_type: ExpectedType::AnalysedType(param_type.clone()),
+                    expected_type: ExpectedType::WitType(param_type.clone()),
                     actual_type: ActualType::Inferred(arg_type),
                     field_path: Default::default(),
                     additional_error_detail: vec![],
@@ -429,13 +429,13 @@ fn merge_into(id: ExprId, ty: InferredType, types: &mut TypeTable) {
 mod function_parameters_inference_tests {
     use test_r::test;
 
-    use crate::analysis::{
-        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
-    };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
+    use crate::wit_type::{
+        TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter, WitType,
+    };
     use crate::{
-        ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
+        ComponentDependency, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
         InferredType, ParsedFunctionSite,
     };
     use bigdecimal::BigDecimal;
@@ -443,11 +443,11 @@ mod function_parameters_inference_tests {
 
     fn infer_function_call_types_via_arena(
         expr: &mut Expr,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), FunctionCallError> {
         let (arena, mut types, root) = crate::expr_arena::lower(expr);
-        super::infer_function_call_types_lowered(
+        super::infer_function_call_types(
             root,
             &arena,
             &mut types,
@@ -458,21 +458,21 @@ mod function_parameters_inference_tests {
         Ok(())
     }
 
-    fn get_component_dependencies() -> ComponentDependencies {
+    fn get_component_dependency() -> ComponentDependency {
         let metadata = vec![
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "foo".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U64(TypeU64),
+                    typ: WitType::U64(TypeU64),
                 }],
                 result: None,
             }),
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "baz".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U32(TypeU32),
+                    typ: WitType::U32(TypeU32),
                 }],
                 result: None,
             }),
@@ -486,7 +486,7 @@ mod function_parameters_inference_tests {
             root_package_version: None,
         };
 
-        ComponentDependencies::from_raw(vec![(component_info, metadata.as_ref())])
+        ComponentDependency::from_wit_metadata(component_info, metadata.as_slice())
             .expect("Failed to create component dependencies")
     }
 
@@ -497,7 +497,7 @@ mod function_parameters_inference_tests {
           foo(x)
         "#;
 
-        let function_type_registry = get_component_dependencies();
+        let function_type_registry = get_component_dependency();
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
         infer_function_call_types_via_arena(&mut expr, &function_type_registry, &[]).unwrap();

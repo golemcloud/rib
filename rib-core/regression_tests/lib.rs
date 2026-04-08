@@ -2,8 +2,8 @@ test_r::enable!();
 
 use test_r::test;
 
-use rib::analysis::analysed_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
-use rib::analysis::AnalysedType;
+use rib::wit_type::WitType;
+use rib::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
 use rib::ValueAndType;
 use rib::{
     EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, Expr, Interpreter, RibCompiler,
@@ -11,7 +11,7 @@ use rib::{
 };
 
 #[test]
-async fn test_rib_regression() {
+async fn rib_compiler_interpreter_end_to_end_worker_metadata_matrix() {
     let expr = r#"
               let worker = instance();
               let str1: string = request.body.name;
@@ -568,7 +568,7 @@ fn expected_value_and_type() -> ValueAndType {
     test_utils::get_value_and_type(&expected_analysed_type(), wasm_wave_str)
 }
 
-fn expected_analysed_type() -> AnalysedType {
+fn expected_analysed_type() -> WitType {
     record(vec![
         field("a", str()),
         field("aa", u64()),
@@ -629,7 +629,7 @@ mod component_metadata {
     use rib::{ComponentDependency, ComponentDependencyKey};
     use uuid::Uuid;
 
-    pub(crate) fn component_metadata() -> Vec<ComponentDependency> {
+    pub(crate) fn component_metadata() -> ComponentDependency {
         let mut exports = vec![];
         exports.extend(function_metadata::function_unit_response());
         exports.extend(function_metadata::function_no_arg());
@@ -693,15 +693,15 @@ mod component_metadata {
             root_package_version: None,
         };
 
-        vec![ComponentDependency::new(component_info, exports)]
+        ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
     }
 }
 
 mod function_metadata {
     use crate::{data_types, test_utils};
-    use rib::analysis::AnalysedExport;
+    use rib::wit_type::WitExport;
 
-    pub(crate) fn function_unit_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_unit_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-unit-response",
             vec![data_types::str_type()],
@@ -709,7 +709,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_no_arg() -> Vec<AnalysedExport> {
+    pub(crate) fn function_no_arg() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-no-arg",
             vec![],
@@ -717,11 +717,11 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_no_arg_unit() -> Vec<AnalysedExport> {
+    pub(crate) fn function_no_arg_unit() -> Vec<WitExport> {
         test_utils::get_function_component_metadata("function-no-arg-unit", vec![], None)
     }
 
-    pub(crate) fn function_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-str-response",
             vec![data_types::str_type()],
@@ -729,7 +729,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-number-response",
             vec![data_types::str_type()],
@@ -737,7 +737,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-str-response",
             vec![data_types::str_type()],
@@ -745,7 +745,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-str-response",
             vec![data_types::str_type()],
@@ -753,7 +753,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-number-response",
             vec![data_types::str_type()],
@@ -761,7 +761,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-number-response",
             vec![data_types::str_type()],
@@ -769,7 +769,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_option_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_option_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-option-response",
             vec![data_types::str_type()],
@@ -777,7 +777,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_option_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_option_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-option-response",
             vec![data_types::str_type()],
@@ -785,7 +785,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-variant-response",
             vec![data_types::str_type()],
@@ -793,7 +793,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-variant-response",
             vec![data_types::str_type()],
@@ -801,7 +801,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-enum-response",
             vec![data_types::str_type()],
@@ -809,7 +809,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-enum-response",
             vec![data_types::str_type()],
@@ -817,7 +817,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-tuple-response",
             vec![data_types::str_type()],
@@ -825,7 +825,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-tuple-response",
             vec![data_types::str_type()],
@@ -833,7 +833,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-record-response",
             vec![data_types::str_type()],
@@ -841,7 +841,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-record-response",
             vec![data_types::str_type()],
@@ -849,7 +849,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_some_of_list_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_some_of_list_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-some-list-response",
             vec![data_types::str_type()],
@@ -857,7 +857,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_none_of_list_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_none_of_list_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-none-list-response",
             vec![data_types::str_type()],
@@ -865,7 +865,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-number-response",
             vec![data_types::str_type()],
@@ -873,7 +873,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-str-response",
             vec![data_types::str_type()],
@@ -881,7 +881,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_option_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_option_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-option-response",
             vec![data_types::str_type()],
@@ -889,7 +889,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_list_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_list_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-list-response",
             vec![data_types::str_type()],
@@ -897,7 +897,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-variant-response",
             vec![data_types::str_type()],
@@ -905,7 +905,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-enum-response",
             vec![data_types::str_type()],
@@ -913,7 +913,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-tuple-response",
             vec![data_types::str_type()],
@@ -921,7 +921,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_list_of_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_list_of_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-list-record-response",
             vec![data_types::str_type()],
@@ -929,7 +929,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-str-response",
             vec![data_types::str_type()],
@@ -937,7 +937,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_str_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_str_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-str-response",
             vec![data_types::str_type()],
@@ -945,7 +945,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-number-response",
             vec![data_types::str_type()],
@@ -953,7 +953,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_number_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_number_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-number-response",
             vec![data_types::str_type()],
@@ -961,7 +961,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_option_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_option_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-option-response",
             vec![data_types::str_type()],
@@ -969,7 +969,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_option_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_option_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-option-response",
             vec![data_types::str_type()],
@@ -977,7 +977,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-variant-response",
             vec![data_types::str_type()],
@@ -985,7 +985,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-variant-response",
             vec![data_types::str_type()],
@@ -993,7 +993,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-enum-response",
             vec![data_types::str_type()],
@@ -1001,7 +1001,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-enum-response",
             vec![data_types::str_type()],
@@ -1009,7 +1009,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-tuple-response",
             vec![data_types::str_type()],
@@ -1017,7 +1017,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-tuple-response",
             vec![data_types::str_type()],
@@ -1025,7 +1025,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_flag_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_flag_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-flag-response",
             vec![data_types::str_type()],
@@ -1033,7 +1033,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_flag_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_flag_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-flag-response",
             vec![data_types::str_type()],
@@ -1041,7 +1041,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-record-response",
             vec![data_types::str_type()],
@@ -1049,7 +1049,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-record-response",
             vec![data_types::str_type()],
@@ -1057,7 +1057,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_ok_of_list_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_ok_of_list_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-ok-list-response",
             vec![data_types::str_type()],
@@ -1065,7 +1065,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_err_of_list_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_err_of_list_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-err-list-response",
             vec![data_types::str_type()],
@@ -1073,7 +1073,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_tuple_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_tuple_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-tuple-response",
             vec![data_types::str_type()],
@@ -1081,7 +1081,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_enum_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_enum_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-enum-response",
             vec![data_types::str_type()],
@@ -1089,7 +1089,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_flag_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_flag_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-flag-response",
             vec![data_types::str_type()],
@@ -1097,7 +1097,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_variant_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_variant_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-variant-response",
             vec![data_types::str_type()],
@@ -1105,7 +1105,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_record_response() -> Vec<AnalysedExport> {
+    pub(crate) fn function_record_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-record-response",
             vec![data_types::str_type()],
@@ -1113,7 +1113,7 @@ mod function_metadata {
         )
     }
 
-    pub(crate) fn function_all_inputs() -> Vec<AnalysedExport> {
+    pub(crate) fn function_all_inputs() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
             "function-all-inputs",
             vec![
@@ -1156,117 +1156,117 @@ mod function_metadata {
 }
 
 mod data_types {
-    use rib::analysis::analysed_type::{
+    use rib::wit_type::*;
+    use rib::wit_type::{
         bool, case, chr, f32, f64, field, flags, list, option, r#enum, record, result, s16, s32,
         s64, s8, str, tuple, u16, u32, u64, u8, unit_case, variant,
     };
-    use rib::analysis::*;
 
     // Result
-    pub(crate) fn result_of_str_type() -> AnalysedType {
+    pub(crate) fn result_of_str_type() -> WitType {
         result(str(), str())
     }
 
-    pub(crate) fn result_of_number_type() -> AnalysedType {
+    pub(crate) fn result_of_number_type() -> WitType {
         result(u64(), u64())
     }
 
-    pub(crate) fn result_of_option_type() -> AnalysedType {
+    pub(crate) fn result_of_option_type() -> WitType {
         result(option_of_str_type(), option_of_str_type())
     }
 
-    pub(crate) fn result_of_variant_type() -> AnalysedType {
+    pub(crate) fn result_of_variant_type() -> WitType {
         result(variant_type(), variant_type())
     }
 
-    pub(crate) fn result_of_enum_type() -> AnalysedType {
+    pub(crate) fn result_of_enum_type() -> WitType {
         result(enum_type(), enum_type())
     }
 
-    pub(crate) fn result_of_tuple_type() -> AnalysedType {
+    pub(crate) fn result_of_tuple_type() -> WitType {
         result(tuple_type(), tuple_type())
     }
 
-    pub(crate) fn result_of_flag_type() -> AnalysedType {
+    pub(crate) fn result_of_flag_type() -> WitType {
         result(flag_type(), flag_type())
     }
 
-    pub(crate) fn result_of_record_type() -> AnalysedType {
+    pub(crate) fn result_of_record_type() -> WitType {
         result(record_type(), record_type())
     }
 
-    pub(crate) fn result_of_list_type() -> AnalysedType {
+    pub(crate) fn result_of_list_type() -> WitType {
         result(list_of_str_type(), list_of_str_type())
     }
 
     // List
-    pub(crate) fn list_of_number_type_type() -> AnalysedType {
+    pub(crate) fn list_of_number_type_type() -> WitType {
         list(u64())
     }
 
-    pub(crate) fn list_of_str_type() -> AnalysedType {
+    pub(crate) fn list_of_str_type() -> WitType {
         list(str())
     }
 
-    pub(crate) fn list_of_option_type() -> AnalysedType {
+    pub(crate) fn list_of_option_type() -> WitType {
         list(option(str()))
     }
 
-    pub(crate) fn list_of_list_type() -> AnalysedType {
+    pub(crate) fn list_of_list_type() -> WitType {
         list(list(str()))
     }
 
-    pub(crate) fn list_of_variant_type() -> AnalysedType {
+    pub(crate) fn list_of_variant_type() -> WitType {
         list(variant_type())
     }
 
-    pub(crate) fn list_of_enum_type() -> AnalysedType {
+    pub(crate) fn list_of_enum_type() -> WitType {
         list(enum_type())
     }
 
-    pub(crate) fn list_of_tuple() -> AnalysedType {
+    pub(crate) fn list_of_tuple() -> WitType {
         list(tuple_type())
     }
 
-    pub(crate) fn list_of_record_type() -> AnalysedType {
+    pub(crate) fn list_of_record_type() -> WitType {
         list(record_type())
     }
 
-    pub(crate) fn option_of_number_type() -> AnalysedType {
+    pub(crate) fn option_of_number_type() -> WitType {
         option(u64())
     }
 
     // Option
-    pub(crate) fn option_of_str_type() -> AnalysedType {
+    pub(crate) fn option_of_str_type() -> WitType {
         option(str())
     }
 
-    pub(crate) fn option_of_option_type() -> AnalysedType {
+    pub(crate) fn option_of_option_type() -> WitType {
         option(option(str()))
     }
 
-    pub(crate) fn option_of_variant_type() -> AnalysedType {
+    pub(crate) fn option_of_variant_type() -> WitType {
         option(variant_type())
     }
 
-    pub(crate) fn option_of_enum_type() -> AnalysedType {
+    pub(crate) fn option_of_enum_type() -> WitType {
         option(enum_type())
     }
 
-    pub(crate) fn option_of_tuple() -> AnalysedType {
+    pub(crate) fn option_of_tuple() -> WitType {
         option(tuple_type())
     }
 
-    pub(crate) fn option_of_record_type() -> AnalysedType {
+    pub(crate) fn option_of_record_type() -> WitType {
         option(record_type())
     }
 
-    pub(crate) fn option_of_list() -> AnalysedType {
+    pub(crate) fn option_of_list() -> WitType {
         option(list(str()))
     }
 
     // Record
-    pub(crate) fn record_type() -> AnalysedType {
+    pub(crate) fn record_type() -> WitType {
         record(vec![
             field(
                 "string-headers",
@@ -1354,7 +1354,7 @@ mod data_types {
     }
 
     // Tuple
-    pub(crate) fn tuple_type() -> AnalysedType {
+    pub(crate) fn tuple_type() -> WitType {
         tuple(vec![
             str(),
             u64(),
@@ -1372,27 +1372,27 @@ mod data_types {
     }
 
     // Enum
-    pub(crate) fn enum_type() -> AnalysedType {
+    pub(crate) fn enum_type() -> WitType {
         r#enum(&["enum-a", "enum-b", "enum-c"])
     }
 
     // Str
-    pub(crate) fn str_type() -> AnalysedType {
+    pub(crate) fn str_type() -> WitType {
         str()
     }
 
     // Number
-    pub(crate) fn number_type() -> AnalysedType {
+    pub(crate) fn number_type() -> WitType {
         u64()
     }
 
     // Flag
-    pub(crate) fn flag_type() -> AnalysedType {
+    pub(crate) fn flag_type() -> WitType {
         flags(&["featurex", "featurey", "featurez"])
     }
 
     // Variant
-    pub(crate) fn variant_type() -> AnalysedType {
+    pub(crate) fn variant_type() -> WitType {
         variant(vec![
             unit_case("case-none"),
             case("case-str", str()),
@@ -1716,8 +1716,8 @@ mod mock_interpreter {
     };
     use async_trait::async_trait;
 
-    use rib::analysis::analysed_type::{field, record, str};
-    use rib::analysis::AnalysedType;
+    use rib::wit_type::WitType;
+    use rib::wit_type::{field, record, str};
     use rib::ValueAndType;
     use rib::{ComponentDependencyKey, DefaultWorkerNameGenerator, InstructionId};
     use std::collections::HashMap;
@@ -1924,7 +1924,7 @@ mod mock_interpreter {
             _worker_name: EvaluatedWorkerName,
             function_name: EvaluatedFqFn,
             _args: EvaluatedFnArgs,
-            _return_type: Option<AnalysedType>,
+            _return_type: Option<WitType>,
         ) -> RibFunctionInvokeResult {
             let function_name = FunctionName(function_name.0);
 
@@ -1940,13 +1940,10 @@ mod mock_interpreter {
 }
 
 mod test_utils {
-    use rib::analysis::*;
+    use rib::wit_type::*;
     use rib::ValueAndType;
 
-    pub(crate) fn get_value_and_type(
-        analysed_type: &AnalysedType,
-        wasm_wave_str: &str,
-    ) -> ValueAndType {
+    pub(crate) fn get_value_and_type(analysed_type: &WitType, wasm_wave_str: &str) -> ValueAndType {
         let result = rib::parse_value_and_type(analysed_type, wasm_wave_str);
 
         match result {
@@ -1961,21 +1958,21 @@ mod test_utils {
 
     pub(crate) fn get_function_component_metadata(
         function_name: &str,
-        input_types: Vec<AnalysedType>,
-        output: Option<AnalysedType>,
-    ) -> Vec<AnalysedExport> {
+        input_types: Vec<WitType>,
+        output: Option<WitType>,
+    ) -> Vec<WitExport> {
         let analysed_function_parameters = input_types
             .into_iter()
             .enumerate()
-            .map(|(index, typ)| AnalysedFunctionParameter {
+            .map(|(index, typ)| WitFunctionParameter {
                 name: format!("param{index}"),
                 typ,
             })
             .collect();
 
-        let result = output.map(|typ| AnalysedFunctionResult { typ });
+        let result = output.map(|typ| WitFunctionResult { typ });
 
-        vec![AnalysedExport::Function(AnalysedFunction {
+        vec![WitExport::Function(WitFunction {
             name: function_name.to_string(),
             parameters: analysed_function_parameters,
             result,

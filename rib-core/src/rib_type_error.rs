@@ -164,7 +164,7 @@ impl From<TypeUnificationError> for RibTypeErrorInternal {
 impl From<TypeMismatchError> for RibTypeErrorInternal {
     fn from(value: TypeMismatchError) -> Self {
         let expected = match value.expected_type {
-            ExpectedType::AnalysedType(analysed_type) => TypeName::try_from(analysed_type)
+            ExpectedType::WitType(analysed_type) => TypeName::try_from(analysed_type)
                 .map(|x| format!("expected {x}"))
                 .ok(),
             ExpectedType::Hint(kind) => Some(format!("expected {kind}")),

@@ -15,7 +15,7 @@
 use std::fmt::{Display, Formatter};
 use uuid::Uuid;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
+#[derive(Debug, Default, Hash, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub struct ComponentDependencyKey {
     pub component_name: String,
     pub component_id: Uuid,

@@ -13,32 +13,12 @@
 // limitations under the License.
 
 use crate::expr_arena::{ExprArena, ExprId, TypeTable};
-use crate::{visit_post_order, Expr, InferredType, TypeInternal};
 
 // Given `f` executes inference, find expr where `f(expr) = expr`
-pub fn type_inference_fix_point<F, E>(mut scan_and_infer: F, expr: &mut Expr) -> Result<(), E>
-where
-    F: FnMut(&mut Expr) -> Result<(), E>,
-{
-    loop {
-        let mut original = expr.clone();
-
-        scan_and_infer(expr)?;
-
-        if compare_expr_types(&mut original, expr) {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-// Arena-based fix-point: no tree clone.
-//
 // The pass `scan_and_infer` receives `(root, &arena, &mut type_table)` and
 // updates `type_table` in place.  Convergence is detected by comparing a
 // cheap snapshot of the type table before and after each iteration.
-pub fn arena_type_inference_fix_point<F, E>(
+pub fn type_inference_fix_point<F, E>(
     mut scan_and_infer: F,
     root: ExprId,
     arena: &mut ExprArena,
@@ -60,165 +40,6 @@ where
     Ok(())
 }
 
-fn compare_expr_types(left: &mut Expr, right: &mut Expr) -> bool {
-    let mut left_types = Vec::new();
-    let mut right_types = Vec::new();
-
-    visit_post_order(left, &mut |expr| {
-        left_types.push(expr.inferred_type());
-    });
-    visit_post_order(right, &mut |expr| {
-        right_types.push(expr.inferred_type());
-    });
-
-    if left_types.len() != right_types.len() {
-        return false;
-    }
-
-    left_types
-        .iter()
-        .zip(right_types.iter())
-        .all(|(l, r)| compare_inferred_types(l, r))
-}
-
-fn compare_inferred_types(left: &InferredType, right: &InferredType) -> bool {
-    compare_inferred_types_internal(left.internal_type(), right.internal_type(), true)
-}
-
-fn compare_inferred_types_internal(left: &TypeInternal, right: &TypeInternal, bool: bool) -> bool {
-    match (left, right) {
-        // AlLOf(AllOf(Str, Int), Unknown)
-        (TypeInternal::AllOf(left), TypeInternal::AllOf(right)) => {
-            left.iter().all(|left| {
-                right.iter().any(|right| {
-                    compare_inferred_types_internal(
-                        left.internal_type(),
-                        right.internal_type(),
-                        false,
-                    )
-                })
-            }) && right.iter().all(|right| {
-                left.iter().any(|left| {
-                    compare_inferred_types_internal(
-                        left.internal_type(),
-                        right.internal_type(),
-                        false,
-                    )
-                })
-            })
-        }
-
-        // More precision this time and therefore false
-        (TypeInternal::AllOf(left), inferred_type) => {
-            if bool {
-                left.iter().all(|left| {
-                    compare_inferred_types_internal(left.internal_type(), inferred_type, true)
-                })
-            } else {
-                left.iter().any(|left| {
-                    compare_inferred_types_internal(left.internal_type(), inferred_type, true)
-                })
-            }
-        }
-
-        // Less precision this time and therefore false
-        (inferred_type, TypeInternal::AllOf(right)) => {
-            if bool {
-                right.iter().all(|left| {
-                    compare_inferred_types_internal(left.internal_type(), inferred_type, true)
-                })
-            } else {
-                right.iter().any(|left| {
-                    compare_inferred_types_internal(left.internal_type(), inferred_type, true)
-                })
-            }
-        }
-
-        (TypeInternal::Record(left), TypeInternal::Record(right)) => {
-            left.iter().all(|(key, value)| {
-                if let Some(right_value) = right
-                    .iter()
-                    .find(|(right_key, _)| key == right_key)
-                    .map(|(_, value)| value)
-                {
-                    compare_inferred_types_internal(
-                        value.internal_type(),
-                        right_value.internal_type(),
-                        true,
-                    )
-                } else {
-                    true
-                }
-            }) && right.iter().all(|(key, value)| {
-                if let Some(left_value) = left
-                    .iter()
-                    .find(|(left_key, _)| key == left_key)
-                    .map(|(_, value)| value)
-                {
-                    compare_inferred_types_internal(
-                        value.internal_type(),
-                        left_value.internal_type(),
-                        true,
-                    )
-                } else {
-                    true
-                }
-            })
-        }
-
-        (TypeInternal::Tuple(left), TypeInternal::Tuple(right)) => {
-            left.iter().zip(right.iter()).all(|(left, right)| {
-                compare_inferred_types_internal(left.internal_type(), right.internal_type(), true)
-            })
-        }
-
-        (TypeInternal::List(left), TypeInternal::List(right)) => {
-            compare_inferred_types_internal(left.internal_type(), right.internal_type(), true)
-        }
-
-        (TypeInternal::Option(left), TypeInternal::Option(right)) => {
-            compare_inferred_types_internal(left.internal_type(), right.internal_type(), true)
-        }
-
-        (
-            TypeInternal::Result {
-                ok: left_ok,
-                error: left_error,
-            },
-            TypeInternal::Result {
-                ok: right_ok,
-                error: right_error,
-            },
-        ) => {
-            let ok = match (left_ok, right_ok) {
-                (Some(left_ok), Some(right_ok)) => compare_inferred_types_internal(
-                    left_ok.internal_type(),
-                    right_ok.internal_type(),
-                    true,
-                ),
-                (None, None) => true,
-                _ => false,
-            };
-
-            let error = match (left_error, right_error) {
-                (Some(left_error), Some(right_error)) => compare_inferred_types_internal(
-                    left_error.internal_type(),
-                    right_error.internal_type(),
-                    true,
-                ),
-                (None, None) => true,
-                _ => false,
-            };
-
-            ok && error
-        }
-
-        (TypeInternal::Flags(left), TypeInternal::Flags(right)) => left == right,
-
-        (left, right) => left == right,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use bigdecimal::BigDecimal;
@@ -226,149 +47,7 @@ mod tests {
     use test_r::test;
 
     use crate::parser::type_name::TypeName;
-    use crate::type_inference::inference_fix_point::{compare_expr_types, compare_inferred_types};
-    use crate::{ComponentDependencies, Expr, InferredType, VariableId};
-
-    #[test]
-    fn test_inferred_type_equality_1() {
-        let left = InferredType::string();
-        let right = InferredType::string();
-        assert!(compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_2() {
-        let left = InferredType::unknown();
-        let right = InferredType::unknown();
-        assert!(compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_3() {
-        let left = InferredType::unknown();
-        let right = InferredType::string();
-        assert!(!compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_4() {
-        let left = InferredType::string();
-        let right = InferredType::unknown();
-        assert!(!compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_5() {
-        let left = InferredType::unknown();
-        let right = InferredType::all_of(vec![InferredType::string()]);
-
-        assert!(!compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_6() {
-        let left = InferredType::unknown();
-        let right = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-
-        assert!(!compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_7() {
-        let left = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-        let right = InferredType::all_of(vec![InferredType::all_of(vec![
-            InferredType::string(),
-            InferredType::unknown(),
-        ])]);
-
-        assert!(compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_8() {
-        let left = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-        let right = InferredType::all_of(vec![
-            InferredType::u64(),
-            InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]),
-        ]);
-
-        assert!(!compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_9() {
-        let left = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-
-        let right = InferredType::all_of(vec![
-            InferredType::string(),
-            InferredType::unknown(),
-            InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]),
-        ]);
-
-        assert!(compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_inferred_type_equality_10() {
-        let left = InferredType::all_of(vec![
-            InferredType::string(),
-            InferredType::unknown(),
-            InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]),
-        ]);
-
-        let right = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-
-        assert!(compare_inferred_types(&left, &right));
-    }
-
-    #[test]
-    fn test_expr_comparison_1() {
-        let mut left = Expr::identifier_global("x", None);
-        let mut right = Expr::identifier_global("x", None);
-
-        assert!(compare_expr_types(&mut left, &mut right));
-    }
-
-    #[test]
-    fn test_expr_comparison_2() {
-        let left = InferredType::all_of(vec![
-            InferredType::string(),
-            InferredType::unknown(),
-            InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]),
-        ]);
-
-        let right = InferredType::all_of(vec![InferredType::string(), InferredType::unknown()]);
-
-        let mut left = Expr::identifier_global("x", None).merge_inferred_type(left);
-        let mut right = Expr::identifier_global("x", None).merge_inferred_type(right);
-
-        assert!(compare_expr_types(&mut left, &mut right));
-    }
-
-    #[test]
-    fn test_expr_comparison_4() {
-        let left_identifier = Expr::identifier_global("x", None);
-        let right_identifier = Expr::identifier_global("x", None);
-
-        let mut left = Expr::let_binding("x", left_identifier, None);
-        let mut right = Expr::let_binding("x", right_identifier, None);
-
-        assert!(compare_expr_types(&mut left, &mut right));
-    }
-
-    #[test]
-    fn test_expr_comparison_5() {
-        let left_identifier = Expr::identifier_global("x", None);
-        let right_identifier = Expr::identifier_global("x", None);
-        let cond = Expr::greater_than(left_identifier, right_identifier);
-        let then_ = Expr::identifier_global("x", None);
-        let else_ = Expr::identifier_global("x", None);
-
-        let mut left = Expr::cond(cond.clone(), then_.clone(), else_.clone());
-        let mut right = Expr::cond(cond, then_, else_);
-
-        assert!(compare_expr_types(&mut left, &mut right));
-    }
+    use crate::{ComponentDependency, Expr, InferredType, VariableId};
 
     #[test]
     fn test_fix_point() {
@@ -379,7 +58,7 @@ mod tests {
 
         let mut expr = Expr::from_text(expr).unwrap();
 
-        expr.infer_types(&ComponentDependencies::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
             .unwrap();
         let expected = Expr::expr_block(vec![
             Expr::let_binding_with_variable_id(

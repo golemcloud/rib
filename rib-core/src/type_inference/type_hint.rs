@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit_type::WitType;
 use crate::{InferredType, TypeInternal};
 use std::fmt;
 use std::ops::Deref;
@@ -191,10 +191,10 @@ impl fmt::Display for TypeHint {
     }
 }
 
-impl GetTypeHint for AnalysedType {
+impl GetTypeHint for WitType {
     fn get_type_hint(&self) -> TypeHint {
         match self {
-            AnalysedType::Record(fields) => {
+            WitType::Record(fields) => {
                 let fields = fields
                     .fields
                     .iter()
@@ -202,42 +202,42 @@ impl GetTypeHint for AnalysedType {
                     .collect();
                 TypeHint::Record(Some(fields))
             }
-            AnalysedType::Tuple(elems) => {
+            WitType::Tuple(elems) => {
                 let elems = elems.items.iter().map(|tpe| tpe.get_type_hint()).collect();
                 TypeHint::Tuple(Some(elems))
             }
-            AnalysedType::Flags(flags) => {
+            WitType::Flags(flags) => {
                 let flags = flags.names.clone();
                 TypeHint::Flag(Some(flags))
             }
-            AnalysedType::Str(_) => TypeHint::Str,
-            AnalysedType::S8(_) => TypeHint::Number,
-            AnalysedType::U8(_) => TypeHint::Number,
-            AnalysedType::S16(_) => TypeHint::Number,
-            AnalysedType::U16(_) => TypeHint::Number,
-            AnalysedType::S32(_) => TypeHint::Number,
-            AnalysedType::U32(_) => TypeHint::Number,
-            AnalysedType::S64(_) => TypeHint::Number,
-            AnalysedType::U64(_) => TypeHint::Number,
-            AnalysedType::F32(_) => TypeHint::Number,
-            AnalysedType::F64(_) => TypeHint::Number,
-            AnalysedType::Chr(_) => TypeHint::Char,
-            AnalysedType::List(tpe) => {
+            WitType::Str(_) => TypeHint::Str,
+            WitType::S8(_) => TypeHint::Number,
+            WitType::U8(_) => TypeHint::Number,
+            WitType::S16(_) => TypeHint::Number,
+            WitType::U16(_) => TypeHint::Number,
+            WitType::S32(_) => TypeHint::Number,
+            WitType::U32(_) => TypeHint::Number,
+            WitType::S64(_) => TypeHint::Number,
+            WitType::U64(_) => TypeHint::Number,
+            WitType::F32(_) => TypeHint::Number,
+            WitType::F64(_) => TypeHint::Number,
+            WitType::Chr(_) => TypeHint::Char,
+            WitType::List(tpe) => {
                 let inner = tpe.inner.get_type_hint();
                 TypeHint::List(Some(Box::new(inner)))
             }
-            AnalysedType::Bool(_) => TypeHint::Boolean,
-            AnalysedType::Option(tpe) => {
+            WitType::Bool(_) => TypeHint::Boolean,
+            WitType::Option(tpe) => {
                 let inner = tpe.inner.get_type_hint();
                 TypeHint::Option(Some(Box::new(inner)))
             }
-            AnalysedType::Enum(tpe) => {
+            WitType::Enum(tpe) => {
                 let variants = tpe.cases.clone();
                 TypeHint::Enum(Some(variants))
             }
-            AnalysedType::Result(tpe_result) => {
-                let ok: &Option<Box<AnalysedType>> = &tpe_result.ok;
-                let err: &Option<Box<AnalysedType>> = &tpe_result.err;
+            WitType::Result(tpe_result) => {
+                let ok: &Option<Box<WitType>> = &tpe_result.ok;
+                let err: &Option<Box<WitType>> = &tpe_result.err;
                 let ok = ok.as_ref().map(|tpe| tpe.get_type_hint());
                 let err = err.as_ref().map(|tpe| tpe.get_type_hint());
                 TypeHint::Result {
@@ -245,8 +245,8 @@ impl GetTypeHint for AnalysedType {
                     err: err.map(Box::new),
                 }
             }
-            AnalysedType::Handle(_) => TypeHint::Resource,
-            AnalysedType::Variant(variants) => {
+            WitType::Handle(_) => TypeHint::Resource,
+            WitType::Variant(variants) => {
                 let variants = variants
                     .cases
                     .iter()

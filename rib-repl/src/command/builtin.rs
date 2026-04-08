@@ -5,8 +5,8 @@ use crossterm::{
     execute,
     terminal::{Clear as TermClear, ClearType},
 };
-use rib::analysis::AnalysedType;
-use rib::{CompilerOutput, ComponentDependencies, Expr, RibCompilationError};
+use rib::wit_type::WitType;
+use rib::{CompilerOutput, ComponentDependency, Expr, RibCompilationError};
 use std::io::stdout;
 
 #[derive(Parser, Debug)]
@@ -28,7 +28,7 @@ pub struct TypeInfo;
 
 impl Command for TypeInfo {
     type Input = TypeInfoInput;
-    type Output = AnalysedType;
+    type Output = WitType;
     type InputParseError = clap::Error;
     type ExecutionError = RibCompilationError;
 
@@ -130,7 +130,7 @@ pub struct ExportPrintConfig {
 }
 
 pub struct ExportOutput {
-    pub component_dependencies: ComponentDependencies,
+    pub component: ComponentDependency,
     pub printer_config: ExportPrintConfig,
 }
 
@@ -166,10 +166,10 @@ impl Command for Exports {
         input: Self::Input,
         repl_context: &mut ReplContext,
     ) -> Result<Self::Output, Self::ExecutionError> {
-        let dependencies = repl_context.get_rib_compiler().get_component_dependencies();
+        let dependencies = repl_context.get_rib_compiler().get_component_dependency();
 
         Ok(ExportOutput {
-            component_dependencies: dependencies,
+            component: dependencies,
             printer_config: input,
         })
     }
@@ -177,7 +177,7 @@ impl Command for Exports {
     fn print_output(&self, output: Self::Output, repl_context: &ReplContext) {
         let printer = repl_context.get_printer();
         printer.print_components_and_exports(
-            &output.component_dependencies,
+            &output.component,
             &FunctionSignaturePrintConfig {
                 print_args: !output.printer_config.skip_function_args,
                 print_return_type: !output.printer_config.skip_function_return_type,
@@ -198,7 +198,7 @@ pub struct ExportsConcise;
 
 impl Command for ExportsConcise {
     type Input = ();
-    type Output = ComponentDependencies;
+    type Output = ComponentDependency;
     type InputParseError = ();
     type ExecutionError = RibCompilationError;
 
@@ -215,7 +215,7 @@ impl Command for ExportsConcise {
         _input: Self::Input,
         repl_context: &mut ReplContext,
     ) -> Result<Self::Output, Self::ExecutionError> {
-        let dependencies = repl_context.get_rib_compiler().get_component_dependencies();
+        let dependencies = repl_context.get_rib_compiler().get_component_dependency();
         Ok(dependencies)
     }
 

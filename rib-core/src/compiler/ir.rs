@@ -12,25 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit_type::WitType;
 use crate::ValueAndType;
-use crate::{AnalysedTypeWithUnit, ComponentDependencyKey, ParsedFunctionSite, VariableId};
+use crate::{ComponentDependencyKey, ParsedFunctionSite, VariableId, WitTypeWithUnit};
 use serde::{Deserialize, Serialize};
 
-// To create any type, example, CreateOption, you have to feed a fully formed AnalysedType
+// To create any type, example, CreateOption, you have to feed a fully formed WitType
 #[derive(Debug, Clone, PartialEq)]
 pub enum RibIR {
     PushLit(ValueAndType),
     AssignVar(VariableId),
     LoadVar(VariableId),
-    CreateAndPushRecord(AnalysedType),
+    CreateAndPushRecord(WitType),
     UpdateRecord(String),
-    PushList(AnalysedType, usize),
-    PushTuple(AnalysedType, usize),
-    PushSome(AnalysedType),
-    PushNone(Option<AnalysedType>), // In certain cases, we don't need the type info
-    PushOkResult(AnalysedType),
-    PushErrResult(AnalysedType),
+    PushList(WitType, usize),
+    PushTuple(WitType, usize),
+    PushSome(WitType),
+    PushNone(Option<WitType>), // In certain cases, we don't need the type info
+    PushOkResult(WitType),
+    PushErrResult(WitType),
     PushFlag(ValueAndType), // More or less like a literal, compiler can form the value directly
     SelectField(String),
     SelectIndex(usize), // Kept for backward compatibility. Cannot read old SelectIndex(usize) as a SelectIndexV1
@@ -52,20 +52,20 @@ pub enum RibIR {
         ComponentDependencyKey,
         InstanceVariable,
         usize,
-        AnalysedTypeWithUnit,
+        WitTypeWithUnit,
     ),
-    PushVariant(String, AnalysedType), // There is no arg size since the type of each variant case is only 1 from beginning
-    PushEnum(String, AnalysedType),
+    PushVariant(String, WitType), // There is no arg size since the type of each variant case is only 1 from beginning
+    PushEnum(String, WitType),
     Throw(String),
     GetTag,
     Concat(usize),
-    Plus(AnalysedType),
-    Minus(AnalysedType),
-    Divide(AnalysedType),
-    Multiply(AnalysedType),
+    Plus(WitType),
+    Minus(WitType),
+    Divide(WitType),
+    Multiply(WitType),
     Negate,
     ToIterator,
-    CreateSink(AnalysedType),
+    CreateSink(WitType),
     AdvanceIterator,
     PushToSink,
     SinkToList,

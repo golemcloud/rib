@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
-use crate::call_type::CallType;
 use crate::expr_arena::{
-    rebuild_arm_pattern, rebuild_call_type, rebuild_expr, ArmPatternNode, CallTypeNode, ExprArena,
-    ExprId, ExprKind, InstanceCreationNode, InstanceIdentifierNode, MatchArmNode, RangeKind,
-    ResultExprKind, TypeTable,
+    ArmPatternNode, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
+    InstanceIdentifierNode, MatchArmNode, RangeKind, ResultExprKind, TypeTable,
 };
+use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_checker::exhaustive_pattern_match::{
-    check_exhaustive_pattern_match_with_arms, ExhaustivePatternMatchError,
+    build_fallback_constructor_details, check_exhaustive_pattern_match_with_arms,
+    ConstructorDetail, ExhaustivePatternMatchError,
 };
 use crate::type_checker::{Path, PathElem};
 use crate::type_inference::arena::children_of;
+use crate::wit_type::WitType;
 use crate::{
-    ComponentDependencies, Expr, FunctionCallError, FunctionName, InvalidWorkerName,
-    UnResolvedTypesError,
+    ComponentDependency, FunctionCallError, FunctionName, InvalidWorkerName, UnResolvedTypesError,
 };
 use std::collections::VecDeque;
 
@@ -35,13 +34,31 @@ pub fn type_check(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
     check_unresolved_types_lowered(root, arena, types)?;
-    check_invalid_function_args_lowered(root, arena, types, component_dependency)?;
-    check_invalid_worker_name_lowered(root, arena, types)?;
-    check_exhaustive_pattern_match_lowered(root, arena, types, component_dependency)?;
-    check_invalid_function_calls_lowered(root, arena, types)?;
+
+    // One post-order walk; reuse the same `Vec` for all later passes so we do not
+    // traverse the expression tree four extra times (pass order and error precedence
+    // stay identical to separate full-tree passes).
+    let mut order = Vec::with_capacity(arena.exprs.len());
+    post_order_collect(root, arena, &mut order);
+
+    let exhaustive_fallback = build_fallback_constructor_details(component_dependency);
+
+    for &id in &order {
+        try_invalid_function_args_for_node(id, arena, types, component_dependency)?;
+    }
+    for &id in &order {
+        try_invalid_worker_name_for_node(id, arena, types)?;
+    }
+    for &id in &order {
+        try_exhaustive_pattern_match_for_node(id, arena, types, &exhaustive_fallback)
+            .map_err(RibTypeErrorInternal::from)?;
+    }
+    for &id in &order {
+        try_invalid_function_calls_for_node(id, arena, types)?;
+    }
     Ok(())
 }
 
@@ -50,11 +67,11 @@ pub fn type_check(
 fn find_missing_fields_in_record_lowered(
     expr_id: ExprId,
     arena: &ExprArena,
-    expected: &AnalysedType,
+    expected: &WitType,
 ) -> Vec<Path> {
     let mut missing_paths = Vec::new();
 
-    if let AnalysedType::Record(expected_record) = expected {
+    if let WitType::Record(expected_record) = expected {
         for (field_name, expected_type_of_field) in expected_record
             .fields
             .iter()
@@ -67,11 +84,11 @@ fn find_missing_fields_in_record_lowered(
                     .map(|(_, id)| *id);
 
                 if let Some(actual_id) = actual_value_opt {
-                    if let AnalysedType::Record(record) = expected_type_of_field {
+                    if let WitType::Record(record) = expected_type_of_field {
                         let nested_paths = find_missing_fields_in_record_lowered(
                             actual_id,
                             arena,
-                            &AnalysedType::Record(record.clone()),
+                            &WitType::Record(record.clone()),
                         );
                         for mut nested_path in nested_paths {
                             nested_path.push_front(PathElem::Field(field_name.clone()));
@@ -90,64 +107,55 @@ fn find_missing_fields_in_record_lowered(
 
 // --- invalid function args --------------------------------------------------
 
-fn check_invalid_function_args_lowered(
-    root: ExprId,
+fn try_invalid_function_args_for_node(
+    id: ExprId,
     arena: &ExprArena,
-    types: &TypeTable,
-    component_dependency: &ComponentDependencies,
+    _types: &TypeTable,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut order = Vec::new();
-    post_order_collect(root, arena, &mut order);
+    let node = arena.expr(id);
+    let ExprKind::Call {
+        call_type, args, ..
+    } = &node.kind
+    else {
+        return Ok(());
+    };
 
-    for id in order {
-        let node = arena.expr(id);
-        let ExprKind::Call {
-            call_type, args, ..
-        } = &node.kind
-        else {
-            continue;
-        };
-
-        if matches!(call_type, CallTypeNode::InstanceCreation(_)) {
-            continue;
-        }
-
-        let call_ty = rebuild_call_type(call_type, arena, types);
-        let function_call_expr = rebuild_expr(id, arena, types);
-        get_missing_record_keys_lowered(
-            &call_ty,
-            args,
-            component_dependency,
-            arena,
-            types,
-            &function_call_expr,
-        )?;
+    if matches!(call_type, CallTypeNode::InstanceCreation(_)) {
+        return Ok(());
     }
 
-    Ok(())
+    get_missing_record_keys_lowered(
+        call_type,
+        args,
+        component_dependency,
+        arena,
+        node.source_span.clone(),
+    )
+    .map_err(Into::into)
 }
 
 #[allow(clippy::result_large_err)]
 fn get_missing_record_keys_lowered(
-    call_type: &CallType,
+    call_type: &CallTypeNode,
     args: &[ExprId],
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     arena: &ExprArena,
-    types: &TypeTable,
-    function_call_expr: &Expr,
+    call_source_span: SourceSpan,
 ) -> Result<(), FunctionCallError> {
-    let function_name =
-        FunctionName::from_call_type(call_type).ok_or(FunctionCallError::InvalidFunctionCall {
+    let function_name = FunctionName::from_call_type_node(call_type).ok_or(
+        FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
-            source_span: function_call_expr.source_span(),
+            source_span: call_source_span.clone(),
             message: "invalid function call type".to_string(),
-        })?;
+        },
+    )?;
 
     let (_, function_type) = component_dependency
-        .get_function_type(&None, &function_name)
+        .get_function_type(&function_name)
         .map_err(|err| FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
-            source_span: function_call_expr.source_span(),
+            source_span: call_source_span,
             message: err.to_string(),
         })?;
 
@@ -155,7 +163,7 @@ fn get_missing_record_keys_lowered(
 
     let mut filtered_expected_types = expected_arg_types
         .iter()
-        .map(|x| AnalysedType::try_from(x).unwrap())
+        .map(|x| WitType::try_from(x).unwrap())
         .collect::<Vec<_>>();
 
     if call_type.is_resource_method() {
@@ -167,10 +175,9 @@ fn get_missing_record_keys_lowered(
             find_missing_fields_in_record_lowered(*actual_arg_id, arena, &expected_arg_type);
 
         if !missing_fields.is_empty() {
-            let actual_expr = rebuild_expr(*actual_arg_id, arena, types);
             return Err(FunctionCallError::MissingRecordFields {
                 function_name: call_type.to_string(),
-                argument_source_span: actual_expr.source_span(),
+                argument_source_span: arena.expr(*actual_arg_id).source_span.clone(),
                 missing_fields,
             });
         }
@@ -181,42 +188,34 @@ fn get_missing_record_keys_lowered(
 
 // --- invalid worker name ----------------------------------------------------
 
-fn check_invalid_worker_name_lowered(
-    root: ExprId,
+fn try_invalid_worker_name_for_node(
+    id: ExprId,
     arena: &ExprArena,
     types: &TypeTable,
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut order = Vec::new();
-    post_order_collect(root, arena, &mut order);
+    let node = arena.expr(id);
+    let ExprKind::Call { call_type, .. } = &node.kind else {
+        return Ok(());
+    };
 
-    for id in order {
-        let node = arena.expr(id);
-        let ExprKind::Call { call_type, .. } = &node.kind else {
-            continue;
-        };
-
-        match call_type {
-            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
-                worker_name, ..
-            }) => {
-                check_worker_name_opt(*worker_name, arena, types)?;
-            }
-            CallTypeNode::Function {
-                instance_identifier: Some(ii),
-                ..
-            } => {
-                check_worker_name_from_instance_id(ii, arena, types)?;
-            }
-            CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
-                module: Some(m),
-                ..
-            }) => {
-                check_worker_name_from_instance_id(m, arena, types)?;
-            }
-            _ => {}
+    match call_type {
+        CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker { worker_name, .. }) => {
+            check_worker_name_opt(*worker_name, arena, types)?;
         }
+        CallTypeNode::Function {
+            instance_identifier: Some(ii),
+            ..
+        } => {
+            check_worker_name_from_instance_id(ii, arena, types)?;
+        }
+        CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
+            module: Some(m),
+            ..
+        }) => {
+            check_worker_name_from_instance_id(m, arena, types)?;
+        }
+        _ => {}
     }
-
     Ok(())
 }
 
@@ -265,71 +264,61 @@ fn check_worker_name_opt(
 
 // --- invalid function calls (component bound) -------------------------------
 
-fn check_invalid_function_calls_lowered(
-    root: ExprId,
+fn try_invalid_function_calls_for_node(
+    id: ExprId,
     arena: &ExprArena,
     _types: &TypeTable,
 ) -> Result<(), RibTypeErrorInternal> {
-    let mut order = Vec::new();
-    post_order_collect(root, arena, &mut order);
-
-    for id in order {
-        let node = arena.expr(id);
-        if let ExprKind::Call {
-            call_type:
-                CallTypeNode::Function {
-                    component_info,
-                    function_name,
-                    ..
-                },
-            ..
-        } = &node.kind
-        {
-            if component_info.is_none() {
-                return Err(
-                    FunctionCallError::InvalidFunctionCall {
-                        function_name: function_name.function.name_pretty().to_string(),
-                        source_span: node.source_span.clone(),
-                        message: "function call is not associated with a wasm component. make sure component functions are called after creating an instance using `instance(<optional-worker-name>)`".to_string(),
-                    }
-                    .into(),
-                );
-            }
+    let node = arena.expr(id);
+    if let ExprKind::Call {
+        call_type:
+            CallTypeNode::Function {
+                component_info,
+                function_name,
+                ..
+            },
+        ..
+    } = &node.kind
+    {
+        if component_info.is_none() {
+            return Err(
+                FunctionCallError::InvalidFunctionCall {
+                    function_name: function_name.function.name_pretty().to_string(),
+                    source_span: node.source_span.clone(),
+                    message: "function call is not associated with a wasm component. make sure component functions are called after creating an instance using `instance(<optional-worker-name>)`".to_string(),
+                }
+                .into(),
+            );
         }
     }
-
     Ok(())
 }
 
 // --- exhaustive pattern match -----------------------------------------------
 
-fn check_exhaustive_pattern_match_lowered(
-    root: ExprId,
+fn try_exhaustive_pattern_match_for_node(
+    id: ExprId,
     arena: &ExprArena,
     types: &TypeTable,
-    component_dependency: &ComponentDependencies,
+    exhaustive_fallback: &[ConstructorDetail],
 ) -> Result<(), ExhaustivePatternMatchError> {
-    let mut order = Vec::new();
-    post_order_collect(root, arena, &mut order);
-
-    for id in order {
-        let node = arena.expr(id);
-        if let ExprKind::PatternMatch { match_arms, .. } = &node.kind {
-            // Match tree `check_exhaustive_pattern_match`: internal uses this for `source_span`
-            // on errors, so pass the full `PatternMatch` expression, not only the predicate.
-            let match_expr = rebuild_expr(id, arena, types);
-            let arm_patterns: Vec<_> = match_arms
-                .iter()
-                .map(|arm| rebuild_arm_pattern(arm.arm_pattern, arena, types))
-                .collect();
-            check_exhaustive_pattern_match_with_arms(
-                &match_expr,
-                &arm_patterns,
-                component_dependency,
-            )?;
-        }
+    let node = arena.expr(id);
+    if let ExprKind::PatternMatch {
+        predicate,
+        match_arms,
+    } = &node.kind
+    {
+        let scrutinee_type = types.get(*predicate);
+        let arm_pattern_ids: Vec<_> = match_arms.iter().map(|arm| arm.arm_pattern).collect();
+        check_exhaustive_pattern_match_with_arms(
+            node.source_span.clone(),
+            scrutinee_type,
+            &arm_pattern_ids,
+            arena,
+            types,
+            exhaustive_fallback,
+        )?;
     }
-
     Ok(())
 }
 

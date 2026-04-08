@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
-use crate::{ComponentDependencies, FunctionName, InferredExpr, RibCompilationError};
+use crate::wit_type::WitType;
+use crate::{ComponentDependency, FunctionName, InferredExpr, RibCompilationError};
 
 // An easier data type that focus just on the side effecting function calls in Rib script.
 // These will not include variant or enum calls, that were originally
@@ -30,7 +30,7 @@ pub struct WorkerFunctionsInRib {
 impl WorkerFunctionsInRib {
     pub fn from_inferred_expr(
         inferred_expr: &InferredExpr,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
     ) -> Result<Option<WorkerFunctionsInRib>, RibCompilationError> {
         let worker_invoke_registry_keys = inferred_expr.worker_invoke_registry_keys();
 
@@ -38,7 +38,7 @@ impl WorkerFunctionsInRib {
 
         for key in worker_invoke_registry_keys {
             let (_, function_type) = component_dependency
-                .get_function_type(&None, &key)
+                .get_function_type(&key)
                 .map_err(|e| RibCompilationError::RibStaticAnalysisError(e.to_string()))?;
 
             let function_call_in_rib = WorkerFunctionType {
@@ -46,12 +46,12 @@ impl WorkerFunctionsInRib {
                 parameter_types: function_type
                     .parameter_types
                     .iter()
-                    .map(|param| AnalysedType::try_from(param).unwrap())
+                    .map(|param| WitType::try_from(param).unwrap())
                     .collect(),
                 return_type: function_type
                     .return_type
                     .as_ref()
-                    .map(|return_type| AnalysedType::try_from(return_type).unwrap()),
+                    .map(|return_type| WitType::try_from(return_type).unwrap()),
             };
 
             function_calls.push(function_call_in_rib)
@@ -69,6 +69,6 @@ impl WorkerFunctionsInRib {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerFunctionType {
     pub function_name: FunctionName,
-    pub parameter_types: Vec<AnalysedType>,
-    pub return_type: Option<AnalysedType>,
+    pub parameter_types: Vec<WitType>,
+    pub return_type: Option<WitType>,
 }

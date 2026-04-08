@@ -39,7 +39,7 @@ impl IdentifierTypeState {
     }
 }
 
-pub fn infer_all_identifiers_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+pub fn infer_all_identifiers(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
     infer_all_identifiers_bottom_up(root, arena, types);
     infer_all_identifiers_top_down(root, arena, types);
     infer_match_binding_variables(root, arena, types);

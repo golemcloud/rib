@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit_type::WitType;
 use crate::{try_visit_post_order_rev_mut, Expr, InferredExpr, RibCompilationError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -22,10 +22,10 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RibInputTypeInfo {
-    pub types: HashMap<String, AnalysedType>,
+    pub types: HashMap<String, WitType>,
 }
 impl RibInputTypeInfo {
-    pub fn get(&self, key: &str) -> Option<&AnalysedType> {
+    pub fn get(&self, key: &str) -> Option<&WitType> {
         self.types.get(key)
     }
 
@@ -50,7 +50,7 @@ impl RibInputTypeInfo {
             } = &*expr
             {
                 if variable_id.is_global() {
-                    let analysed_type = AnalysedType::try_from(inferred_type).map_err(|e| {
+                    let analysed_type = WitType::try_from(inferred_type).map_err(|e| {
                         RibCompilationError::RibStaticAnalysisError(format!(
                             "failed to convert inferred type to analysed type: {e}"
                         ))

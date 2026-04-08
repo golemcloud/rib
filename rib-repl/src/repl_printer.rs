@@ -14,8 +14,8 @@
 
 use crate::ReplBootstrapError;
 use colored::Colorize;
-use rib::analysis::analysed_type::{record, str, u64};
-use rib::analysis::{AnalysedResourceMode, AnalysedType, NameTypePair, TypeHandle};
+use rib::wit_type::{record, str, u64};
+use rib::wit_type::{AnalysedResourceMode, NameTypePair, TypeHandle, WitType};
 use rib::*;
 use rib::{Value, ValueAndType};
 use std::collections::BTreeMap;
@@ -40,47 +40,50 @@ pub trait ReplPrinter {
 
     fn print_components_and_exports(
         &self,
-        exports: &ComponentDependencies,
+        exports: &ComponentDependency,
         function_signature_print_config: &FunctionSignaturePrintConfig,
     ) {
-        for (component_dependency_key, component) in &exports.dependencies {
-            let mut indent = Indent::new();
+        let component_dependency_key = &exports.key;
+        let mut indent = Indent::new();
 
+        println!(
+            "{} {}",
+            "📦 Component:".bold().bright_yellow(),
+            component_dependency_key
+                .component_name
+                .bold()
+                .truecolor(180, 180, 180)
+        );
+
+        indent.add();
+
+        if let Some(root_package) = &component_dependency_key.root_package_name {
             println!(
-                "{} {}",
-                "📦 Component:".bold().bright_yellow(),
-                component_dependency_key
-                    .component_name
-                    .bold()
-                    .truecolor(180, 180, 180)
+                "{} {} {}",
+                indent,
+                "Root Package:".bold().bright_cyan(),
+                root_package.bold().truecolor(180, 180, 180)
             );
 
             indent.add();
-
-            if let Some(root_package) = &component_dependency_key.root_package_name {
-                println!(
-                    "{} {} {}",
-                    indent,
-                    "Root Package:".bold().bright_cyan(),
-                    root_package.bold().truecolor(180, 180, 180)
-                );
-
-                indent.add();
-            }
-
-            if let Some(root_interface) = &component_dependency_key.root_package_version {
-                println!(
-                    "{} {} {}",
-                    indent,
-                    "Root Package Version:".bold().bright_cyan(),
-                    root_interface.bold().truecolor(180, 180, 180)
-                );
-
-                indent.add();
-            }
-
-            print_function_dictionary(&mut indent, component, function_signature_print_config);
         }
+
+        if let Some(root_interface) = &component_dependency_key.root_package_version {
+            println!(
+                "{} {} {}",
+                indent,
+                "Root Package Version:".bold().bright_cyan(),
+                root_interface.bold().truecolor(180, 180, 180)
+            );
+
+            indent.add();
+        }
+
+        print_function_dictionary(
+            &mut indent,
+            &exports.function_dictionary,
+            function_signature_print_config,
+        );
     }
 
     fn print_rib_compilation_error(&self, error: &RibCompilationError) {
@@ -105,9 +108,9 @@ pub trait ReplPrinter {
         println!("{} {}", "[runtime error]".red(), error.to_string().white());
     }
 
-    fn print_wasm_value_type(&self, analysed_type: &AnalysedType) {
+    fn print_wasm_value_type(&self, analysed_type: &WitType) {
         match analysed_type {
-            AnalysedType::Handle(type_handle) => {
+            WitType::Handle(type_handle) => {
                 let text = display_for_resource_handle_type(type_handle);
                 println!("{} {}", "[warn]".magenta(), "the syntax below to show the resource-handle type is only used for display purposes".to_string().white());
 
@@ -356,7 +359,7 @@ fn format_type_list(types: &[InferredType]) -> String {
     } else {
         types
             .iter()
-            .map(|t| wasm_wave::wasm::DisplayType(&AnalysedType::try_from(t).unwrap()).to_string())
+            .map(|t| wasm_wave::wasm::DisplayType(&WitType::try_from(t).unwrap()).to_string())
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -364,7 +367,7 @@ fn format_type_list(types: &[InferredType]) -> String {
 
 fn format_return_type(typ: &Option<InferredType>) -> String {
     typ.as_ref()
-        .map(|t| wasm_wave::wasm::DisplayType(&AnalysedType::try_from(t).unwrap()).to_string())
+        .map(|t| wasm_wave::wasm::DisplayType(&WitType::try_from(t).unwrap()).to_string())
         .unwrap_or_else(|| "()".to_string())
 }
 
@@ -543,7 +546,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         Value::String(_) => value_and_type.to_string(),
         Value::List(values) => {
             let inner_type = match &value_and_type.typ {
-                AnalysedType::List(inner_type) => inner_type.inner.as_ref(),
+                WitType::List(inner_type) => inner_type.inner.as_ref(),
                 _ => panic!("Expected a list type"),
             };
 
@@ -563,7 +566,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         }
         Value::Tuple(tuple) => {
             let inner_types = match &value_and_type.typ {
-                AnalysedType::Tuple(inner_types) => inner_types.items.clone(),
+                WitType::Tuple(inner_types) => inner_types.items.clone(),
                 _ => panic!("Expected a tuple type"),
             };
 
@@ -582,7 +585,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         }
         Value::Record(values) => {
             let inner_types = match &value_and_type.typ {
-                AnalysedType::Record(inner_types) => inner_types.fields.clone(),
+                WitType::Record(inner_types) => inner_types.fields.clone(),
                 _ => panic!("Expected a record type"),
             };
 
@@ -608,7 +611,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
             case_value,
         } => {
             let variant_type = match &value_and_type.typ {
-                AnalysedType::Variant(variant_type) => variant_type,
+                WitType::Variant(variant_type) => variant_type,
                 _ => panic!("Expected a variant type"),
             };
 
@@ -636,7 +639,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         }
         Value::Enum(case_index) => {
             let enum_type = match &value_and_type.typ {
-                AnalysedType::Enum(enum_type) => enum_type,
+                WitType::Enum(enum_type) => enum_type,
                 _ => panic!("Expected an enum type"),
             };
 
@@ -650,7 +653,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         }
         Value::Flags(bool_list) => {
             let flags_type = match &value_and_type.typ {
-                AnalysedType::Flags(flags_type) => flags_type,
+                WitType::Flags(flags_type) => flags_type,
                 _ => panic!("Expected a flags type"),
             };
 
@@ -673,7 +676,7 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         }
         Value::Option(option) => {
             let inner_type = match &value_and_type.typ {
-                AnalysedType::Option(inner_type) => inner_type.inner.as_ref(),
+                WitType::Option(inner_type) => inner_type.inner.as_ref(),
                 _ => panic!("Expected an option type"),
             };
 
@@ -690,13 +693,13 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
         Value::Result(result) => {
             let x: &Result<Option<Box<Value>>, Option<Box<Value>>> = result;
 
-            let ok_inner_type: Option<&Box<AnalysedType>> = match &value_and_type.typ {
-                AnalysedType::Result(inner_type) => inner_type.ok.as_ref(),
+            let ok_inner_type: Option<&Box<WitType>> = match &value_and_type.typ {
+                WitType::Result(inner_type) => inner_type.ok.as_ref(),
                 _ => panic!("Expected a result type"),
             };
 
-            let err_inner_type: Option<&Box<AnalysedType>> = match &value_and_type.typ {
-                AnalysedType::Result(inner_type) => inner_type.err.as_ref(),
+            let err_inner_type: Option<&Box<WitType>> = match &value_and_type.typ {
+                WitType::Result(inner_type) => inner_type.err.as_ref(),
                 _ => panic!("Expected a result type"),
             };
 

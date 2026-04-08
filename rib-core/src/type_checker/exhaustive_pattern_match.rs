@@ -12,15 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::expr_arena::{ArmPatternId, ExprArena, TypeTable};
 use crate::rib_source_span::SourceSpan;
-use crate::{ArmPattern, ComponentDependencies, Expr};
+use crate::{ArmPattern, ComponentDependency, InferredType};
+
+pub(crate) use internal::ConstructorDetail;
+
+/// Precomputed list used when exhaustive checking must consider every WIT variant
+/// (option, result, and all component variants). Built once per [`type_check`](crate::type_checker::checker::type_check)
+/// and shared across all `match` expressions and recursive inner checks.
+pub(crate) fn build_fallback_constructor_details(
+    component_dependency: &ComponentDependency,
+) -> Vec<ConstructorDetail> {
+    internal::fallback_full(component_dependency)
+}
 
 pub(crate) fn check_exhaustive_pattern_match_with_arms(
-    pattern_match_expr: &Expr,
-    arm_patterns: &[ArmPattern],
-    component_dependency: &ComponentDependencies,
+    match_source_span: SourceSpan,
+    scrutinee_type: &InferredType,
+    arm_pattern_ids: &[ArmPatternId],
+    arena: &ExprArena,
+    types: &TypeTable,
+    fallback_cached: &[ConstructorDetail],
 ) -> Result<(), ExhaustivePatternMatchError> {
-    internal::check_exhaustive_pattern_match(pattern_match_expr, arm_patterns, component_dependency)
+    internal::check_exhaustive_pattern_match_from_ids(
+        match_source_span,
+        Some(scrutinee_type),
+        arm_pattern_ids,
+        arena,
+        types,
+        fallback_cached,
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -37,70 +59,258 @@ pub enum ExhaustivePatternMatchError {
 }
 
 mod internal {
-    use crate::analysis::TypeVariant;
+    use crate::expr_arena::{
+        rebuild_arm_pattern, rebuild_expr, ArmPatternId, ArmPatternNode, ExprArena, ExprId,
+        ExprKind, TypeTable,
+    };
+    use crate::rib_source_span::SourceSpan;
     use crate::type_checker::exhaustive_pattern_match::ExhaustivePatternMatchError;
-    use crate::{ArmPattern, ComponentDependencies, Expr};
+    use crate::wit_type::TypeVariant;
+    use crate::{ArmPattern, ComponentDependency, InferredType, TypeInternal};
+    use std::borrow::Cow;
     use std::collections::HashMap;
-
     use std::ops::Deref;
 
-    pub(crate) fn check_exhaustive_pattern_match(
-        predicate: &Expr,
-        arms: &[ArmPattern],
-        component_dependency: &ComponentDependencies,
+    /// Arena-based pattern reference: avoids [`rebuild_arm_pattern`] on the hot path.
+    #[derive(Clone, Debug)]
+    pub(super) enum PatternView {
+        Node(ArmPatternId),
+        /// Argument sub-expression in a pattern like `some(x)` (not a standalone pattern node).
+        ArgLiteral(ExprId),
+    }
+
+    pub(crate) fn check_exhaustive_pattern_match_from_ids(
+        match_source_span: SourceSpan,
+        scrutinee_type: Option<&InferredType>,
+        arm_pattern_ids: &[ArmPatternId],
+        arena: &ExprArena,
+        types: &TypeTable,
+        fallback_cached: &[ConstructorDetail],
     ) -> Result<(), ExhaustivePatternMatchError> {
-        let mut exhaustive_check_result =
-            check_exhaustive(predicate, arms, ConstructorDetail::option());
+        let arms: Vec<PatternView> = arm_pattern_ids
+            .iter()
+            .map(|&id| PatternView::Node(id))
+            .collect();
+        check_exhaustive_pattern_match(
+            match_source_span,
+            scrutinee_type,
+            &arms,
+            arena,
+            types,
+            fallback_cached,
+        )
+    }
 
-        let variants = component_dependency.get_variants();
-
-        let mut constructor_details = vec![];
-
-        for variant in variants {
-            let detail = ConstructorDetail::from_variant(variant);
-            constructor_details.push(detail);
+    fn pattern_view_to_arm_pattern(
+        pv: &PatternView,
+        arena: &ExprArena,
+        types: &TypeTable,
+    ) -> ArmPattern {
+        match pv {
+            PatternView::Node(id) => rebuild_arm_pattern(*id, arena, types),
+            PatternView::ArgLiteral(eid) => {
+                ArmPattern::Literal(Box::new(rebuild_expr(*eid, arena, types)))
+            }
         }
+    }
 
-        constructor_details.push(ConstructorDetail::option());
-        constructor_details.push(ConstructorDetail::result());
+    fn expr_is_identifier(eid: ExprId, arena: &ExprArena) -> bool {
+        matches!(arena.expr(eid).kind, ExprKind::Identifier { .. })
+    }
 
-        for detail in constructor_details {
-            exhaustive_check_result =
-                exhaustive_check_result.unwrap_or_run_with(predicate, arms, detail);
+    fn pattern_view_is_wildcard(pv: &PatternView, arena: &ExprArena) -> bool {
+        matches!(
+            pv,
+            PatternView::Node(id) if matches!(arena.pattern(*id), ArmPatternNode::WildCard)
+        )
+    }
+
+    fn pattern_view_is_literal_identifier(pv: &PatternView, arena: &ExprArena) -> bool {
+        match pv {
+            PatternView::Node(id) => match arena.pattern(*id) {
+                ArmPatternNode::Literal(eid) => expr_is_identifier(*eid, arena),
+                _ => false,
+            },
+            PatternView::ArgLiteral(eid) => expr_is_identifier(*eid, arena),
+        }
+    }
+
+    struct PatternCollectState<'a> {
+        arena: &'a ExprArena,
+        with_arg_constructors: &'a [String],
+        no_arg_constructors: &'a [String],
+        constructor_map_result: &'a mut HashMap<String, Vec<PatternView>>,
+        constructors_with_arg: &'a mut ConstructorsWithArgTracker,
+        constructors_with_no_arg: &'a mut NoArgConstructorsTracker,
+        detected_wild_card_or_identifier: &'a mut Vec<PatternView>,
+    }
+
+    fn handle_literal_expr(
+        eid: ExprId,
+        literal_pattern_id: Option<ArmPatternId>,
+        state: &mut PatternCollectState<'_>,
+    ) {
+        if let ExprKind::Call { call_type, args } = &state.arena.expr(eid).kind {
+            let ctor_name = call_type.to_string();
+            let arm_patterns: Vec<PatternView> =
+                args.iter().map(|&a| PatternView::ArgLiteral(a)).collect();
+            if state.with_arg_constructors.contains(&ctor_name) {
+                state
+                    .constructor_map_result
+                    .entry(ctor_name.clone())
+                    .or_default()
+                    .extend(arm_patterns);
+                state.constructors_with_arg.register(ctor_name.as_str());
+            } else if state.no_arg_constructors.contains(&ctor_name) {
+                state.constructors_with_no_arg.register(ctor_name.as_str());
+            }
+        } else if expr_is_identifier(eid, state.arena) {
+            let pv = if let Some(pid) = literal_pattern_id {
+                PatternView::Node(pid)
+            } else {
+                PatternView::ArgLiteral(eid)
+            };
+            state.detected_wild_card_or_identifier.push(pv);
+        }
+    }
+
+    fn process_pattern_view(pv: &PatternView, state: &mut PatternCollectState<'_>) {
+        match pv {
+            PatternView::ArgLiteral(eid) => {
+                handle_literal_expr(*eid, None, state);
+            }
+            PatternView::Node(id) => match state.arena.pattern(*id) {
+                ArmPatternNode::WildCard => {
+                    state
+                        .detected_wild_card_or_identifier
+                        .push(PatternView::Node(*id));
+                }
+                ArmPatternNode::As(_, inner) => {
+                    process_pattern_view(&PatternView::Node(*inner), state);
+                }
+                ArmPatternNode::Constructor(ctor_name, arm_patterns) => {
+                    let mapped: Vec<PatternView> =
+                        arm_patterns.iter().map(|&c| PatternView::Node(c)).collect();
+                    if state.with_arg_constructors.contains(ctor_name) {
+                        state
+                            .constructor_map_result
+                            .entry(ctor_name.clone())
+                            .or_default()
+                            .extend(mapped);
+                        state.constructors_with_arg.register(ctor_name);
+                    } else if state.no_arg_constructors.contains(ctor_name) {
+                        state.constructors_with_no_arg.register(ctor_name);
+                    }
+                }
+                ArmPatternNode::Literal(eid) => {
+                    handle_literal_expr(*eid, Some(*id), state);
+                }
+                ArmPatternNode::TupleConstructor(_)
+                | ArmPatternNode::RecordConstructor(_)
+                | ArmPatternNode::ListConstructor(_) => {}
+            },
+        }
+    }
+
+    pub(crate) fn check_exhaustive_pattern_match(
+        match_source_span: SourceSpan,
+        scrutinee_type: Option<&InferredType>,
+        arms: &[PatternView],
+        arena: &ExprArena,
+        types: &TypeTable,
+        fallback_cached: &[ConstructorDetail],
+    ) -> Result<(), ExhaustivePatternMatchError> {
+        let constructor_details =
+            constructor_details_for_scrutinee(scrutinee_type, fallback_cached);
+
+        let mut exhaustive_check_result =
+            ExhaustiveCheckResult(Ok(ConstructorPatterns(HashMap::new())));
+
+        for detail in constructor_details.iter() {
+            exhaustive_check_result = exhaustive_check_result.unwrap_or_run_with(
+                match_source_span.clone(),
+                arms,
+                detail.clone(),
+                arena,
+                types,
+            );
         }
 
         let inner_constructors = exhaustive_check_result.value()?;
 
         for (field, patterns) in inner_constructors.inner() {
-            check_exhaustive_pattern_match(predicate, patterns, component_dependency).map_err(
-                |e| match e {
+            check_exhaustive_pattern_match(
+                match_source_span.clone(),
+                None,
+                patterns,
+                arena,
+                types,
+                fallback_cached,
+            )
+            .map_err(|e| match e {
+                ExhaustivePatternMatchError::MissingConstructors {
+                    missing_constructors,
+                    ..
+                } => {
+                    let mut new_missing_constructors = vec![];
+                    missing_constructors.iter().for_each(|missing_constructor| {
+                        new_missing_constructors.push(format!("{field}({missing_constructor})"));
+                    });
                     ExhaustivePatternMatchError::MissingConstructors {
-                        missing_constructors,
-                        ..
-                    } => {
-                        let mut new_missing_constructors = vec![];
-                        missing_constructors.iter().for_each(|missing_constructor| {
-                            new_missing_constructors
-                                .push(format!("{field}({missing_constructor})"));
-                        });
-                        ExhaustivePatternMatchError::MissingConstructors {
-                            predicate_source_span: predicate.source_span(),
-                            missing_constructors: new_missing_constructors,
-                        }
+                        predicate_source_span: match_source_span.clone(),
+                        missing_constructors: new_missing_constructors,
                     }
-                    other_errors => other_errors,
-                },
-            )?;
+                }
+                other_errors => other_errors,
+            })?;
         }
 
         Ok(())
     }
 
+    fn constructor_details_for_scrutinee<'a>(
+        scrutinee: Option<&InferredType>,
+        fallback_cached: &'a [ConstructorDetail],
+    ) -> Cow<'a, [ConstructorDetail]> {
+        let Some(ty) = scrutinee else {
+            return Cow::Borrowed(fallback_cached);
+        };
+        if ty.is_unknown() {
+            return Cow::Borrowed(fallback_cached);
+        }
+        match ty.inner.deref() {
+            TypeInternal::Option(_) => Cow::Owned(vec![ConstructorDetail::option()]),
+            TypeInternal::Result { .. } => Cow::Owned(vec![ConstructorDetail::result()]),
+            TypeInternal::Variant(cases) => {
+                Cow::Owned(vec![ConstructorDetail::from_inferred_variant_cases(cases)])
+            }
+            TypeInternal::Enum(cases) => {
+                Cow::Owned(vec![ConstructorDetail::from_enum_cases(cases)])
+            }
+            TypeInternal::AllOf(_) | TypeInternal::Instance { .. } => {
+                Cow::Borrowed(fallback_cached)
+            }
+            _ => Cow::Borrowed(fallback_cached),
+        }
+    }
+
+    pub(super) fn fallback_full(
+        component_dependency: &ComponentDependency,
+    ) -> Vec<ConstructorDetail> {
+        let mut constructor_details = vec![ConstructorDetail::option()];
+        for variant in component_dependency.get_variants() {
+            constructor_details.push(ConstructorDetail::from_variant(variant));
+        }
+        constructor_details.push(ConstructorDetail::option());
+        constructor_details.push(ConstructorDetail::result());
+        constructor_details
+    }
+
     #[derive(Clone, Debug)]
-    pub struct ConstructorPatterns(HashMap<String, Vec<ArmPattern>>);
+    pub struct ConstructorPatterns(HashMap<String, Vec<PatternView>>);
 
     impl ConstructorPatterns {
-        pub fn inner(&self) -> &HashMap<String, Vec<ArmPattern>> {
+        pub fn inner(&self) -> &HashMap<String, Vec<PatternView>> {
             &self.0
         }
 
@@ -117,14 +327,20 @@ mod internal {
     impl ExhaustiveCheckResult {
         fn unwrap_or_run_with(
             &self,
-            predicate: &Expr,
-            patterns: &[ArmPattern],
+            match_source_span: SourceSpan,
+            patterns: &[PatternView],
             constructor_details: ConstructorDetail,
+            arena: &ExprArena,
+            types: &TypeTable,
         ) -> ExhaustiveCheckResult {
             match self {
-                ExhaustiveCheckResult(Ok(result)) if result.is_empty() => {
-                    check_exhaustive(predicate, patterns, constructor_details)
-                }
+                ExhaustiveCheckResult(Ok(result)) if result.is_empty() => check_exhaustive(
+                    match_source_span,
+                    patterns,
+                    constructor_details,
+                    arena,
+                    types,
+                ),
                 ExhaustiveCheckResult(Ok(_)) => self.clone(),
                 ExhaustiveCheckResult(Err(e)) => ExhaustiveCheckResult(Err(e.clone())),
             }
@@ -134,18 +350,25 @@ mod internal {
             self.0.clone()
         }
 
-        fn missing_constructors(predicate: Expr, missing_constructors: Vec<String>) -> Self {
+        fn missing_constructors(
+            match_source_span: SourceSpan,
+            missing_constructors: Vec<String>,
+        ) -> Self {
             ExhaustiveCheckResult(Err(ExhaustivePatternMatchError::MissingConstructors {
-                predicate_source_span: predicate.source_span(),
+                predicate_source_span: match_source_span,
                 missing_constructors,
             }))
         }
 
-        fn dead_code(predicate: &Expr, cause: &ArmPattern, dead_pattern: &ArmPattern) -> Self {
+        fn dead_code(
+            match_source_span: SourceSpan,
+            cause: ArmPattern,
+            dead_pattern: ArmPattern,
+        ) -> Self {
             ExhaustiveCheckResult(Err(ExhaustivePatternMatchError::DeadCode {
-                predicate_source_span: predicate.source_span(),
-                cause: cause.clone(),
-                dead_pattern: dead_pattern.clone(),
+                predicate_source_span: match_source_span,
+                cause,
+                dead_pattern,
             }))
         }
 
@@ -155,9 +378,11 @@ mod internal {
     }
 
     fn check_exhaustive(
-        predicate: &Expr,
-        patterns: &[ArmPattern],
+        match_source_span: SourceSpan,
+        patterns: &[PatternView],
         pattern_mach_args: ConstructorDetail,
+        arena: &ExprArena,
+        types: &TypeTable,
     ) -> ExhaustiveCheckResult {
         let with_arg_constructors = pattern_mach_args.with_arg_constructors;
         let no_arg_constructors = pattern_mach_args.no_arg_constructors;
@@ -166,76 +391,33 @@ mod internal {
             ConstructorsWithArgTracker::new();
         let mut constructors_with_no_arg: NoArgConstructorsTracker =
             NoArgConstructorsTracker::new();
-        let mut detected_wild_card_or_identifier: Vec<ArmPattern> = vec![];
-        let mut constructor_map_result: HashMap<String, Vec<ArmPattern>> = HashMap::new();
+        let mut detected_wild_card_or_identifier: Vec<PatternView> = vec![];
+        let mut constructor_map_result: HashMap<String, Vec<PatternView>> = HashMap::new();
 
         constructors_with_arg.initialise(with_arg_constructors.clone());
         constructors_with_no_arg.initialise(no_arg_constructors.clone());
 
-        for pattern in patterns {
-            if !detected_wild_card_or_identifier.is_empty() {
-                return ExhaustiveCheckResult::dead_code(
-                    predicate,
-                    detected_wild_card_or_identifier
-                        .last()
-                        .unwrap_or(&ArmPattern::WildCard),
-                    pattern,
-                );
-            }
-            match pattern {
-                ArmPattern::Constructor(ctor_name, arm_patterns) => {
-                    if with_arg_constructors.contains(ctor_name) {
-                        constructor_map_result
-                            .entry(ctor_name.clone())
-                            .or_default()
-                            .extend(arm_patterns.clone());
-                        constructors_with_arg.register(ctor_name);
-                    } else if no_arg_constructors.contains(ctor_name) {
-                        constructors_with_no_arg.register(ctor_name);
-                    }
-                }
-                ArmPattern::As(_, inner_pattern) => {
-                    if let ArmPattern::Constructor(ctor_name, arm_patterns) = &**inner_pattern {
-                        if with_arg_constructors.contains(ctor_name) {
-                            constructor_map_result
-                                .entry(ctor_name.clone())
-                                .or_default()
-                                .extend(arm_patterns.clone());
-                            constructors_with_arg.register(ctor_name);
-                        } else if no_arg_constructors.contains(ctor_name) {
-                            constructors_with_no_arg.register(ctor_name);
-                        }
-                    }
-                }
-                arm_pattern @ ArmPattern::Literal(expr) => {
-                    if let Expr::Call {
-                        call_type, args, ..
-                    } = expr.deref()
-                    {
-                        let ctor_name = call_type.to_string();
-                        let arm_patterns = args
-                            .iter()
-                            .map(|arg| ArmPattern::Literal(Box::new(arg.clone())))
-                            .collect::<Vec<_>>();
-                        if with_arg_constructors.contains(&ctor_name) {
-                            constructor_map_result
-                                .entry(ctor_name.clone())
-                                .or_default()
-                                .extend(arm_patterns);
-                            constructors_with_arg.register(ctor_name.as_str());
-                        } else if no_arg_constructors.contains(&ctor_name) {
-                            constructors_with_no_arg.register(ctor_name.as_str());
-                        }
-                    } else if arm_pattern.is_literal_identifier() {
-                        detected_wild_card_or_identifier.push(arm_pattern.clone());
-                    }
-                }
-                ArmPattern::WildCard => {
-                    detected_wild_card_or_identifier.push(ArmPattern::WildCard);
-                }
+        let mut collect_state = PatternCollectState {
+            arena,
+            with_arg_constructors: &with_arg_constructors,
+            no_arg_constructors: &no_arg_constructors,
+            constructor_map_result: &mut constructor_map_result,
+            constructors_with_arg: &mut constructors_with_arg,
+            constructors_with_no_arg: &mut constructors_with_no_arg,
+            detected_wild_card_or_identifier: &mut detected_wild_card_or_identifier,
+        };
 
-                _ => {}
+        for pattern in patterns {
+            if !collect_state.detected_wild_card_or_identifier.is_empty() {
+                let cause = collect_state
+                    .detected_wild_card_or_identifier
+                    .last()
+                    .map(|pv| pattern_view_to_arm_pattern(pv, arena, types))
+                    .unwrap_or(ArmPattern::WildCard);
+                let dead = pattern_view_to_arm_pattern(pattern, arena, types);
+                return ExhaustiveCheckResult::dead_code(match_source_span.clone(), cause, dead);
             }
+            process_pattern_view(pattern, &mut collect_state);
         }
 
         if constructors_with_arg.registered_any() || constructors_with_no_arg.registered_any() {
@@ -253,22 +435,18 @@ mod internal {
                 missing_constructors.extend(missing_no_arg_constructors.clone());
 
                 return ExhaustiveCheckResult::missing_constructors(
-                    predicate.clone(),
+                    match_source_span.clone(),
                     missing_constructors,
                 );
             }
         }
 
-        // Mainly to handle the scenario of `match x { some(some(x)) => 1, _ => 0 }`. Here the constructor map
-        // is "some" -> vec[some(x)]. If we run another exhaustive check (recursively) on the inner pattern which is
-        // "some(x)", which becomes non-exhaustive unless we add the `wild-card` or `identifier` pattern into the pattern list before this recursion.
-        // In short, outer wild-pattern and identifier patterns have to be appended to every inner pattern before recursively running
-        // the exhaustive check. This needs to be done only constructor_map has some elements tracked by this time!
         if !constructor_map_result.is_empty() {
             if !detected_wild_card_or_identifier.is_empty() {
                 constructor_map_result.values_mut().for_each(|patterns| {
-                    if !patterns.iter().any(|arm_pattern| {
-                        arm_pattern.is_literal_identifier() || arm_pattern.is_wildcard()
+                    if !patterns.iter().any(|pv| {
+                        pattern_view_is_literal_identifier(pv, arena)
+                            || pattern_view_is_wildcard(pv, arena)
                     }) {
                         patterns.extend(detected_wild_card_or_identifier.clone());
                     }
@@ -357,7 +535,7 @@ mod internal {
     }
 
     #[derive(Clone, Debug)]
-    struct ConstructorDetail {
+    pub(crate) struct ConstructorDetail {
         no_arg_constructors: Vec<String>,
         with_arg_constructors: Vec<String>,
     }
@@ -391,9 +569,33 @@ mod internal {
                 with_arg_constructors: vec!["ok".to_string(), "err".to_string()],
             }
         }
+
+        fn from_inferred_variant_cases(
+            cases: &[(String, Option<InferredType>)],
+        ) -> ConstructorDetail {
+            let (no_arg_constructors, with_arg_constructors): (Vec<_>, Vec<_>) =
+                cases.iter().partition(|(_, typ)| typ.is_none());
+
+            ConstructorDetail {
+                no_arg_constructors: no_arg_constructors
+                    .iter()
+                    .map(|(name, _)| name.clone())
+                    .collect(),
+                with_arg_constructors: with_arg_constructors
+                    .iter()
+                    .map(|(name, _)| name.clone())
+                    .collect(),
+            }
+        }
+
+        fn from_enum_cases(cases: &[String]) -> ConstructorDetail {
+            ConstructorDetail {
+                no_arg_constructors: cases.to_vec(),
+                with_arg_constructors: vec![],
+            }
+        }
     }
 }
-
 #[cfg(test)]
 mod pattern_match_exhaustive_tests {
     use crate::type_checker::exhaustive_pattern_match::pattern_match_exhaustive_tests::internal::strip_spaces;

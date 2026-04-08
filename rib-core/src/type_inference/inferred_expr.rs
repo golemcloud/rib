@@ -15,7 +15,7 @@
 use crate::call_type::CallType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{
-    visit_post_order_rev_mut, ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName,
+    visit_post_order_rev_mut, ComponentDependency, CustomInstanceSpec, DynamicParsedFunctionName,
     Expr, FunctionName, GlobalVariableTypeSpec,
 };
 use std::collections::HashSet;
@@ -30,7 +30,7 @@ impl InferredExpr {
 
     pub fn from_expr(
         expr: Expr,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<InferredExpr, RibTypeErrorInternal> {

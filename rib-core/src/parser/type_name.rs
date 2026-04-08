@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{AnalysedType, TypeResult};
 use crate::parser::errors::RibParseError;
 use crate::rib_source_span::GetSourcePosition;
+use crate::wit_type::{TypeResult, WitType};
 use crate::{InferredNumber, InferredType, TypeInternal};
 use combine::parser::char;
 use combine::parser::char::{char, spaces, string};
@@ -25,11 +25,11 @@ use std::ops::Deref;
 
 // Rib grammar uses it's own `TypeName` instead of relying from any other crates to annotate types (Example: 1: u32, let x: u32 = 1;),
 // and sticks on to the  Display instance that aligns with what we see in WIT.
-// Usage of TypeName, InferredType and AnalysedType:
+// Usage of TypeName, InferredType and WitType:
 // The Rib compiler uses `InferredType` - the output of type inference. The `TypeName` used in type annotations may help with this type inference.
-// The Rib-IR which is close to running Rib code uses `AnalysedType`, that there won't be either `TypeName` or `InferredType` in the Rib-IR.
+// The Rib-IR which is close to running Rib code uses `WitType`, that there won't be either `TypeName` or `InferredType` in the Rib-IR.
 // Any compilation or interpreter error messages will also be using `TypeName` to show the type of the expression
-// for which we convert AnalysedType or InferredType back to TypeName. If `InferredType` cannot be converted to `TypeName`, we explain the error displaying
+// for which we convert WitType or InferredType back to TypeName. If `InferredType` cannot be converted to `TypeName`, we explain the error displaying
 // the original expression, and there is no point displaying `InferredType` to the user.
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum TypeName {
@@ -168,37 +168,37 @@ impl From<&InferredNumber> for TypeName {
     }
 }
 
-impl TryFrom<AnalysedType> for TypeName {
+impl TryFrom<WitType> for TypeName {
     type Error = String;
-    fn try_from(analysed_type: AnalysedType) -> Result<Self, Self::Error> {
+    fn try_from(analysed_type: WitType) -> Result<Self, Self::Error> {
         match analysed_type {
-            AnalysedType::Bool(_) => Ok(TypeName::Bool),
-            AnalysedType::S8(_) => Ok(TypeName::S8),
-            AnalysedType::U8(_) => Ok(TypeName::U8),
-            AnalysedType::S16(_) => Ok(TypeName::S16),
-            AnalysedType::U16(_) => Ok(TypeName::U16),
-            AnalysedType::S32(_) => Ok(TypeName::S32),
-            AnalysedType::U32(_) => Ok(TypeName::U32),
-            AnalysedType::S64(_) => Ok(TypeName::S64),
-            AnalysedType::U64(_) => Ok(TypeName::U64),
-            AnalysedType::F32(_) => Ok(TypeName::F32),
-            AnalysedType::F64(_) => Ok(TypeName::F64),
-            AnalysedType::Chr(_) => Ok(TypeName::Chr),
-            AnalysedType::Str(_) => Ok(TypeName::Str),
-            AnalysedType::List(inner_type) => Ok(TypeName::List(Box::new(
+            WitType::Bool(_) => Ok(TypeName::Bool),
+            WitType::S8(_) => Ok(TypeName::S8),
+            WitType::U8(_) => Ok(TypeName::U8),
+            WitType::S16(_) => Ok(TypeName::S16),
+            WitType::U16(_) => Ok(TypeName::U16),
+            WitType::S32(_) => Ok(TypeName::S32),
+            WitType::U32(_) => Ok(TypeName::U32),
+            WitType::S64(_) => Ok(TypeName::S64),
+            WitType::U64(_) => Ok(TypeName::U64),
+            WitType::F32(_) => Ok(TypeName::F32),
+            WitType::F64(_) => Ok(TypeName::F64),
+            WitType::Chr(_) => Ok(TypeName::Chr),
+            WitType::Str(_) => Ok(TypeName::Str),
+            WitType::List(inner_type) => Ok(TypeName::List(Box::new(
                 inner_type.inner.deref().clone().try_into()?,
             ))),
-            AnalysedType::Tuple(inner_type) => Ok(TypeName::Tuple(
+            WitType::Tuple(inner_type) => Ok(TypeName::Tuple(
                 inner_type
                     .items
                     .into_iter()
                     .map(|x| x.try_into())
                     .collect::<Result<_, _>>()?,
             )),
-            AnalysedType::Option(type_option) => Ok(TypeName::Option(Box::new(
+            WitType::Option(type_option) => Ok(TypeName::Option(Box::new(
                 type_option.inner.deref().clone().try_into()?,
             ))),
-            AnalysedType::Result(TypeResult { ok, err, .. }) => match (ok, err) {
+            WitType::Result(TypeResult { ok, err, .. }) => match (ok, err) {
                 (Some(ok), Some(err)) => Ok(TypeName::Result {
                     ok: Some(Box::new(ok.deref().clone().try_into()?)),
                     error: Some(Box::new(err.deref().clone().try_into()?)),
@@ -216,7 +216,7 @@ impl TryFrom<AnalysedType> for TypeName {
                     error: None,
                 }),
             },
-            AnalysedType::Record(type_record) => {
+            WitType::Record(type_record) => {
                 let mut fields = vec![];
                 for field in type_record.fields {
                     let name = field.name.clone();
@@ -227,9 +227,9 @@ impl TryFrom<AnalysedType> for TypeName {
 
                 Ok(TypeName::Record(fields))
             }
-            AnalysedType::Flags(flags) => Ok(TypeName::Flags(flags.names)),
-            AnalysedType::Enum(cases) => Ok(TypeName::Enum(cases.cases)),
-            AnalysedType::Variant(cases) => {
+            WitType::Flags(flags) => Ok(TypeName::Flags(flags.names)),
+            WitType::Enum(cases) => Ok(TypeName::Enum(cases.cases)),
+            WitType::Variant(cases) => {
                 let mut variant_cases = vec![];
                 for case in cases.cases {
                     let name = case.name.clone();
@@ -248,7 +248,7 @@ impl TryFrom<AnalysedType> for TypeName {
                     cases: variant_cases,
                 })
             }
-            AnalysedType::Handle(type_handle) => {
+            WitType::Handle(type_handle) => {
                 Err(format!("Handle type not supported: {type_handle:?}"))
             }
         }

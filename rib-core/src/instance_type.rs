@@ -16,10 +16,11 @@ use crate::parser::PackageName;
 use crate::type_parameter::InterfaceName;
 use crate::FunctionName;
 use crate::{
-    ComponentDependencies, ComponentDependencyKey, Expr, FullyQualifiedResourceConstructor,
+    ComponentDependency, ComponentDependencyKey, Expr, FullyQualifiedResourceConstructor,
     FunctionDictionary, FunctionType, ResourceMethodDictionary,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -33,10 +34,11 @@ use std::ops::Deref;
 // for a tangible view on the fact that an instance can be either worker or a resource.
 #[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InstanceType {
-    // Holds functions across every package and interface in every component
+    // Worker instance: one component's exports (all packages/interfaces merged in the dictionary)
     Global {
         worker_name: Option<Box<Expr>>,
-        component_dependency: ComponentDependencies,
+        /// Shared across all worker-instance types for one compile — avoids cloning [`FunctionDictionary`] per node.
+        component: Arc<ComponentDependency>,
     },
 
     // Holds the resource creation and the functions in the resource
@@ -60,11 +62,8 @@ impl InstanceType {
         component_dependency_key: &ComponentDependencyKey,
     ) {
         match self {
-            InstanceType::Global {
-                component_dependency,
-                ..
-            } => {
-                component_dependency.narrow_to_component(component_dependency_key);
+            InstanceType::Global { component, .. } => {
+                Arc::make_mut(component).narrow_to_component(component_dependency_key);
             }
             // A resource is already narrowed down to a component
             InstanceType::Resource { .. } => {}
@@ -112,28 +111,25 @@ impl InstanceType {
         let package_name = fully_qualified_resource_constructor.package_name.clone();
         let resource_constructor_name = fully_qualified_resource_constructor.resource_name.clone();
 
-        let mut tree = vec![];
-        for (component_info, function_type) in self.component_dependencies().dependencies.iter() {
-            let mut resource_method_dict = BTreeMap::new();
+        let dependencies = self.component_dependency();
+        let mut resource_method_dict = BTreeMap::new();
 
-            for (name, typ) in function_type.name_and_types.iter() {
-                if let FunctionName::ResourceMethod(resource_method) = name {
-                    if resource_method.resource_name == resource_constructor_name
-                        && resource_method.interface_name == interface_name
-                        && resource_method.package_name == package_name
-                    {
-                        resource_method_dict.insert(resource_method.clone(), typ.clone());
-                    }
+        for (name, typ) in dependencies.function_dictionary.name_and_types.iter() {
+            if let FunctionName::ResourceMethod(resource_method) = name {
+                if resource_method.resource_name == resource_constructor_name
+                    && resource_method.interface_name == interface_name
+                    && resource_method.package_name == package_name
+                {
+                    resource_method_dict.insert(resource_method.clone(), typ.clone());
                 }
             }
-
-            tree.push((component_info.clone(), resource_method_dict));
         }
 
-        if tree.len() == 1 {
-            let (component_dependency_key, resource_methods) = tree.pop().unwrap();
+        let component_dependency_key = dependencies.key.clone();
+        let resource_methods = resource_method_dict;
 
-            let resource_method_dict = ResourceMethodDictionary {
+        if !resource_methods.is_empty() {
+            let resource_method_dictionary = ResourceMethodDictionary {
                 map: resource_methods,
             };
 
@@ -144,17 +140,13 @@ impl InstanceType {
                 resource_constructor: resource_constructor_name,
                 resource_args,
                 component_dependency_key,
-                resource_method_dictionary: resource_method_dict,
+                resource_method_dictionary,
                 analysed_resource_id,
                 analysed_resource_mode,
             })
-        } else if tree.is_empty() {
-            Err(format!(
-                "No components found have the resource constructor '{resource_constructor_name}'"
-            ))
         } else {
             Err(format!(
-                "Multiple components found with the resource constructor '{resource_constructor_name}'"
+                "No components found have the resource constructor '{resource_constructor_name}'"
             ))
         }
     }
@@ -184,23 +176,18 @@ impl InstanceType {
         &self,
         method_name: &str,
     ) -> Result<(ComponentDependencyKey, Function), String> {
-        search_function_in_instance(self, method_name, None)
+        search_function_in_instance(self, method_name)
     }
 
     // A flattened list of all resource methods
     pub fn resource_method_dictionary(&self) -> FunctionDictionary {
         let name_and_types = self
-            .component_dependencies()
-            .dependencies
-            .values()
-            .flat_map(|function_dictionary| {
-                function_dictionary
-                    .name_and_types
-                    .iter()
-                    .filter(|(f, _)| matches!(f, FunctionName::ResourceMethod(_)))
-                    .map(|(f, t)| (f.clone(), t.clone()))
-                    .collect::<Vec<_>>()
-            })
+            .component_dependency()
+            .function_dictionary
+            .name_and_types
+            .iter()
+            .filter(|(f, _)| matches!(f, FunctionName::ResourceMethod(_)))
+            .map(|(f, t)| (f.clone(), t.clone()))
             .collect();
 
         FunctionDictionary { name_and_types }
@@ -208,53 +195,46 @@ impl InstanceType {
 
     pub fn function_dict_without_resource_methods(&self) -> FunctionDictionary {
         let name_and_types = self
-            .component_dependencies()
-            .dependencies
-            .values()
-            .flat_map(|function_dictionary| {
-                function_dictionary
-                    .name_and_types
-                    .iter()
-                    .filter(|(f, _)| {
-                        !matches!(f, FunctionName::ResourceMethod(_))
-                            && !matches!(f, FunctionName::Variant(_))
-                            && !matches!(f, FunctionName::Enum(_))
-                    })
-                    .map(|(f, t)| (f.clone(), t.clone()))
-                    .collect::<Vec<_>>()
+            .component_dependency()
+            .function_dictionary
+            .name_and_types
+            .iter()
+            .filter(|(f, _)| {
+                !matches!(f, FunctionName::ResourceMethod(_))
+                    && !matches!(f, FunctionName::Variant(_))
+                    && !matches!(f, FunctionName::Enum(_))
             })
+            .map(|(f, t)| (f.clone(), t.clone()))
             .collect();
 
         FunctionDictionary { name_and_types }
     }
 
-    pub fn component_dependencies(&self) -> ComponentDependencies {
+    pub fn component_dependency(&self) -> ComponentDependency {
         match self {
-            InstanceType::Global {
-                component_dependency,
-                ..
-            } => component_dependency.clone(),
+            InstanceType::Global { component, .. } => (**component).clone(),
             InstanceType::Resource {
                 resource_method_dictionary,
                 component_dependency_key,
                 ..
             } => {
                 let function_dictionary = FunctionDictionary::from(resource_method_dictionary);
-                let mut dependencies = BTreeMap::new();
-                dependencies.insert(component_dependency_key.clone(), function_dictionary);
 
-                ComponentDependencies { dependencies }
+                ComponentDependency {
+                    key: component_dependency_key.clone(),
+                    function_dictionary,
+                }
             }
         }
     }
 
     pub fn from(
-        dependency: &ComponentDependencies,
+        dependency: Arc<ComponentDependency>,
         worker_name: Option<&Expr>,
     ) -> Result<InstanceType, String> {
         Ok(InstanceType::Global {
             worker_name: worker_name.cloned().map(Box::new),
-            component_dependency: dependency.clone(),
+            component: dependency,
         })
     }
 }
@@ -268,112 +248,40 @@ pub struct Function {
 fn search_function_in_instance(
     instance: &InstanceType,
     function_name: &str,
-    component_info: Option<&ComponentDependencyKey>,
 ) -> Result<(ComponentDependencyKey, Function), String> {
-    match component_info {
-        Some(component_info) => {
-            let dependencies = instance.component_dependencies();
+    let dependencies = instance.component_dependency();
+    let function_dictionary = &dependencies.function_dictionary;
+    let key = dependencies.key.clone();
 
-            let function_dictionary =
-                dependencies
-                    .dependencies
-                    .get(component_info)
-                    .ok_or(format!(
-                        "component '{component_info}' not found in dependencies"
-                    ))?;
+    let functions: Vec<&(FunctionName, FunctionType)> = function_dictionary
+        .name_and_types
+        .iter()
+        .filter(|(f, _)| f.name() == function_name)
+        .collect();
 
-            let functions = function_dictionary
-                .name_and_types
-                .iter()
-                .filter(|(f, _)| f.name() == function_name)
-                .collect::<Vec<_>>();
+    if functions.is_empty() {
+        return Err(format!("function '{function_name}' not found"));
+    }
 
-            if functions.is_empty() {
-                return Err(format!(
-                    "function '{function_name}' not found in component '{component_info}'"
-                ));
-            }
+    let mut package_map: HashMap<Option<PackageName>, HashSet<Option<InterfaceName>>> =
+        HashMap::new();
 
-            let mut package_map: HashMap<Option<PackageName>, HashSet<Option<InterfaceName>>> =
-                HashMap::new();
+    for (fqfn, _) in &functions {
+        package_map
+            .entry(fqfn.package_name())
+            .or_default()
+            .insert(fqfn.interface_name());
+    }
 
-            for (fqfn, _) in &functions {
-                package_map
-                    .entry(fqfn.package_name())
-                    .or_default()
-                    .insert(fqfn.interface_name());
-            }
-
-            match package_map.len() {
-                1 => {
-                    let interfaces = package_map.values().flatten().cloned().collect();
-                    let function =
-                        search_function_in_single_package(interfaces, functions, function_name)?;
-
-                    Ok((component_info.clone(), function))
-                }
-                _ => {
-                    let function =
-                        search_function_in_multiple_packages(function_name, package_map)?;
-                    Ok((component_info.clone(), function))
-                }
-            }
+    match package_map.len() {
+        1 => {
+            let interfaces = package_map.values().flatten().cloned().collect();
+            let function = search_function_in_single_package(interfaces, functions, function_name)?;
+            Ok((key, function))
         }
-        None => {
-            let mut component_info_functions = vec![];
-
-            for (info, function_dictionary) in instance.component_dependencies().dependencies.iter()
-            {
-                let functions = function_dictionary
-                    .name_and_types
-                    .iter()
-                    .filter(|(f, _)| f.name() == function_name)
-                    .collect::<Vec<_>>();
-
-                if functions.is_empty() {
-                    continue;
-                }
-
-                let mut package_map: HashMap<Option<PackageName>, HashSet<Option<InterfaceName>>> =
-                    HashMap::new();
-
-                for (fqfn, _) in &functions {
-                    package_map
-                        .entry(fqfn.package_name())
-                        .or_default()
-                        .insert(fqfn.interface_name());
-                }
-
-                match package_map.len() {
-                    1 => {
-                        let interfaces = package_map.values().flatten().cloned().collect();
-                        let function = search_function_in_single_package(
-                            interfaces,
-                            functions,
-                            function_name,
-                        )?;
-
-                        component_info_functions.push((info.clone(), function));
-                    }
-                    _ => {
-                        let function =
-                            search_function_in_multiple_packages(function_name, package_map)?;
-
-                        component_info_functions.push((info.clone(), function));
-                    }
-                }
-            }
-
-            if component_info_functions.len() == 1 {
-                let (info, function) = &component_info_functions[0];
-                Ok((info.clone(), function.clone()))
-            } else if component_info_functions.is_empty() {
-                Err(format!("function '{function_name}' not found"))
-            } else {
-                Err(format!(
-                    "function '{function_name}' found in multiple components"
-                ))
-            }
+        _ => {
+            let function = search_function_in_multiple_packages(function_name, package_map)?;
+            Ok((key, function))
         }
     }
 }

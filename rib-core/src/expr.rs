@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::inferred_type::DefaultType;
 use crate::parser::block::block;
 use crate::parser::type_name::TypeName;
 use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
+use crate::type_inference as ti;
+use crate::wit_type::WitType;
 use crate::{
-    from_string, text, type_checker, type_inference, ComponentDependencies, ComponentDependencyKey,
+    from_string, text, type_checker, type_inference, ComponentDependency, ComponentDependencyKey,
     CustomInstanceSpec, DynamicParsedFunctionName, GlobalVariableTypeSpec, InferredType,
     InstanceIdentifier, VariableId,
 };
@@ -35,6 +36,7 @@ use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Deref;
+use std::sync::Arc;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
@@ -1110,11 +1112,11 @@ impl Expr {
 
     pub fn infer_types(
         &mut self,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
-        use crate::type_inference as ti;
+        let component = Arc::new(component_dependency.clone());
 
         let (mut arena, mut types, root) = {
             let _p = crate::profile::Scope::new("infer_types: lower");
@@ -1125,41 +1127,32 @@ impl Expr {
             let _p = crate::profile::Scope::new(
                 "infer_types: initial_arena + variants/enums/bind_instance",
             );
-            ti::initial_arena_phase::run_initial_binding_and_instance_phases(
+            ti::run_initial_binding_and_instance_phases(
                 root,
                 &mut arena,
                 &mut types,
-                component_dependency,
+                component.clone(),
                 global_variable_type_spec.as_slice(),
                 custom_instance_spec,
             )?;
 
-            ti::variant_inference::infer_variants_lowered(
-                root,
-                &mut arena,
-                &mut types,
-                component_dependency,
-            );
-            ti::enum_inference::infer_enums_lowered(
-                root,
-                &mut arena,
-                &mut types,
-                component_dependency,
-            );
-            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+            ti::infer_variants_lowered(root, &mut arena, &mut types, component.as_ref());
+            ti::infer_enums(root, &mut arena, &mut types, component.as_ref());
+            ti::bind_instance_types_lowered(root, &arena, &mut types);
         }
 
         {
             let _p =
                 crate::profile::Scope::new("infer_types: fixpoint 1 (instance + worker invokes)");
-            ti::arena_type_inference_fix_point(
+
+            ti::type_inference_fix_point(
                 |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                    ti::instance_type_binding::bind_instance_types_lowered(root, arena, types);
-                    ti::worker_function_invocation::infer_worker_function_invokes_lowered(
+                    ti::bind_instance_types_lowered(root, arena, types);
+                    ti::infer_worker_function_invokes_lowered(
                         root,
                         arena,
                         types,
-                        component_dependency,
+                        component.as_ref(),
                     )
                 },
                 root,
@@ -1170,11 +1163,12 @@ impl Expr {
 
         {
             let _p = crate::profile::Scope::new("infer_types: infer_function_call_types_lowered");
-            ti::call_arguments_inference::infer_function_call_types_lowered(
+
+            ti::infer_function_call_types(
                 root,
                 &arena,
                 &mut types,
-                component_dependency,
+                component.as_ref(),
                 custom_instance_spec,
             )
             .map_err(RibTypeErrorInternal::from)?;
@@ -1182,23 +1176,19 @@ impl Expr {
 
         {
             let _p = crate::profile::Scope::new("infer_types: fixpoint 2 (main scan)");
-            ti::arena_type_inference_fix_point(
+
+            ti::type_inference_fix_point(
                 |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
-                    ti::type_push_down::push_types_down_lowered(root, arena, types)?;
-                    ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
-                    ti::type_pull_up::type_pull_up_lowered(
+                    ti::infer_all_identifiers(root, arena, types);
+                    ti::push_types_down(root, arena, types)?;
+                    ti::infer_all_identifiers(root, arena, types);
+                    ti::pull_types_up(root, arena, types, component.as_ref())?;
+                    ti::infer_global_inputs(root, arena, types);
+                    ti::infer_function_call_types(
                         root,
                         arena,
                         types,
-                        component_dependency,
-                    )?;
-                    ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
-                    ti::call_arguments_inference::infer_function_call_types_lowered(
-                        root,
-                        arena,
-                        types,
-                        component_dependency,
+                        component.as_ref(),
                         custom_instance_spec,
                     )
                     .map_err(RibTypeErrorInternal::from)?;
@@ -1212,29 +1202,19 @@ impl Expr {
 
         {
             let _p = crate::profile::Scope::new("infer_types: final arena refinement + sync/bind");
-            ti::type_push_down::push_types_down_lowered(root, &arena, &mut types)?;
-            ti::type_pull_up::type_pull_up_lowered(
-                root,
-                &mut arena,
-                &mut types,
-                component_dependency,
-            )?;
-            ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
-            ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
-            ti::instance_type_binding::sync_embedded_worker_exprs_from_calls(
-                root, &arena, &mut types,
-            );
-            ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
+
+            ti::sync_embedded_worker_exprs_from_calls(root, &arena, &mut types);
+            ti::bind_instance_types_lowered(root, &arena, &mut types);
         }
 
         {
             let _p = crate::profile::Scope::new("infer_types: type_check");
-            type_checker::checker::type_check(root, &arena, &mut types, component_dependency)?;
+            type_checker::checker::type_check(root, &arena, &mut types, component.as_ref())?;
         }
 
         {
             let _p = crate::profile::Scope::new("infer_types: unify_types");
-            type_inference::unify_types_lowered(root, &arena, &mut types)?;
+            type_inference::unify_types(root, &arena, &mut types)?;
         }
 
         {
@@ -1243,38 +1223,6 @@ impl Expr {
         }
 
         Ok(())
-    }
-
-    pub fn infer_types_initial_phase(
-        &mut self,
-        component_dependency: &ComponentDependencies,
-        global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
-        custom_instance_spec: &[CustomInstanceSpec],
-    ) -> Result<(), RibTypeErrorInternal> {
-        use crate::type_inference as ti;
-
-        let (mut arena, mut types, root) = crate::expr_arena::lower(self);
-        ti::initial_arena_phase::run_initial_binding_and_instance_phases(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-            global_variable_type_spec.as_slice(),
-            custom_instance_spec,
-        )?;
-        ti::variant_inference::infer_variants_lowered(
-            root,
-            &mut arena,
-            &mut types,
-            component_dependency,
-        );
-        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
-        *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
-        Ok(())
-    }
-
-    pub fn bind_type_annotations(&mut self) {
-        type_inference::bind_type_annotations(self);
     }
 
     pub fn merge_inferred_type(&self, new_inferred_type: InferredType) -> Expr {
@@ -1825,18 +1773,18 @@ pub struct Number {
 impl Eq for Number {}
 
 impl Number {
-    pub fn to_val(&self, analysed_type: &AnalysedType) -> Option<ValueAndType> {
+    pub fn to_val(&self, analysed_type: &WitType) -> Option<ValueAndType> {
         match analysed_type {
-            AnalysedType::F64(_) => self.value.to_f64().map(|v| v.into_value_and_type()),
-            AnalysedType::U64(_) => self.value.to_u64().map(|v| v.into_value_and_type()),
-            AnalysedType::F32(_) => self.value.to_f32().map(|v| v.into_value_and_type()),
-            AnalysedType::U32(_) => self.value.to_u32().map(|v| v.into_value_and_type()),
-            AnalysedType::S32(_) => self.value.to_i32().map(|v| v.into_value_and_type()),
-            AnalysedType::S64(_) => self.value.to_i64().map(|v| v.into_value_and_type()),
-            AnalysedType::U8(_) => self.value.to_u8().map(|v| v.into_value_and_type()),
-            AnalysedType::S8(_) => self.value.to_i8().map(|v| v.into_value_and_type()),
-            AnalysedType::U16(_) => self.value.to_u16().map(|v| v.into_value_and_type()),
-            AnalysedType::S16(_) => self.value.to_i16().map(|v| v.into_value_and_type()),
+            WitType::F64(_) => self.value.to_f64().map(|v| v.into_value_and_type()),
+            WitType::U64(_) => self.value.to_u64().map(|v| v.into_value_and_type()),
+            WitType::F32(_) => self.value.to_f32().map(|v| v.into_value_and_type()),
+            WitType::U32(_) => self.value.to_u32().map(|v| v.into_value_and_type()),
+            WitType::S32(_) => self.value.to_i32().map(|v| v.into_value_and_type()),
+            WitType::S64(_) => self.value.to_i64().map(|v| v.into_value_and_type()),
+            WitType::U8(_) => self.value.to_u8().map(|v| v.into_value_and_type()),
+            WitType::S8(_) => self.value.to_i8().map(|v| v.into_value_and_type()),
+            WitType::U16(_) => self.value.to_u16().map(|v| v.into_value_and_type()),
+            WitType::S16(_) => self.value.to_i16().map(|v| v.into_value_and_type()),
             _ => None,
         }
     }

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit_type::WitType;
 use crate::{InferredExpr, RibCompilationError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RibOutputTypeInfo {
-    pub analysed_type: AnalysedType,
+    pub analysed_type: WitType,
 }
 
 impl RibOutputTypeInfo {
@@ -27,7 +27,7 @@ impl RibOutputTypeInfo {
         inferred_expr: &InferredExpr,
     ) -> Result<RibOutputTypeInfo, RibCompilationError> {
         let inferred_type = inferred_expr.get_expr().inferred_type();
-        let analysed_type = AnalysedType::try_from(&inferred_type).map_err(|e| {
+        let analysed_type = WitType::try_from(&inferred_type).map_err(|e| {
             RibCompilationError::RibStaticAnalysisError(format!(
                 "failed to convert inferred type to analysed type: {e}"
             ))

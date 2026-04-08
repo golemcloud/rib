@@ -18,11 +18,11 @@ pub use ir::*;
 pub use type_with_unit::*;
 pub use worker_functions_in_rib::*;
 
-use crate::analysis::{AnalysedExport, TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
+use crate::wit_type::{TypeEnum, TypeVariant};
 use crate::{
-    ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr,
-    GlobalVariableTypeSpec, InferredExpr, RibInputTypeInfo, RibOutputTypeInfo,
+    ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredExpr,
+    RibInputTypeInfo, RibOutputTypeInfo,
 };
 use std::error::Error;
 use std::fmt::Display;
@@ -36,26 +36,17 @@ mod worker_functions_in_rib;
 
 #[derive(Default)]
 pub struct RibCompiler {
-    component_dependency: ComponentDependencies,
+    component: ComponentDependency,
     global_variable_type_spec: Vec<GlobalVariableTypeSpec>,
     custom_instance_spec: Vec<CustomInstanceSpec>,
 }
 
 impl RibCompiler {
     pub fn new(config: RibCompilerConfig) -> RibCompiler {
-        let component_dependencies = ComponentDependencies::from_raw(
-            config
-                .component_dependencies
-                .iter()
-                .map(|dep| (dep.component_dependency_key.clone(), &dep.component_exports))
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
-
         let global_variable_type_spec = config.input_spec;
 
         RibCompiler {
-            component_dependency: component_dependencies,
+            component: config.component,
             global_variable_type_spec,
             custom_instance_spec: config.custom_instance_spec,
         }
@@ -73,7 +64,7 @@ impl RibCompiler {
             );
             InferredExpr::from_expr(
                 expr_for_infer,
-                &self.component_dependency,
+                &self.component,
                 &self.global_variable_type_spec,
                 &self.custom_instance_spec,
             )
@@ -91,9 +82,8 @@ impl RibCompiler {
             .collect::<Vec<_>>()
     }
 
-    // Currently supports only 1 component and hence really only one InstanceType
-    pub fn get_component_dependencies(&self) -> ComponentDependencies {
-        self.component_dependency.clone()
+    pub fn get_component_dependency(&self) -> ComponentDependency {
+        self.component.clone()
     }
 
     pub fn compile(&self, expr: Expr) -> Result<CompilerOutput, RibCompilationError> {
@@ -106,7 +96,7 @@ impl RibCompiler {
         let function_calls_identified = {
             let _p =
                 crate::profile::Scope::new("compile: WorkerFunctionsInRib::from_inferred_expr");
-            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component_dependency)?
+            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component)?
         };
 
         let global_input_type_info = {
@@ -156,11 +146,11 @@ impl RibCompiler {
     }
 
     pub fn get_variants(&self) -> Vec<TypeVariant> {
-        self.component_dependency.get_variants()
+        self.component.get_variants()
     }
 
     pub fn get_enums(&self) -> Vec<TypeEnum> {
-        self.component_dependency.get_enums()
+        self.component.get_enums()
     }
 }
 
@@ -180,39 +170,21 @@ impl RibCompiler {
 ///   be of type `string`. Note that not all global variables require a type specification.
 #[derive(Default)]
 pub struct RibCompilerConfig {
-    component_dependencies: Vec<ComponentDependency>,
+    pub component: ComponentDependency,
     input_spec: Vec<GlobalVariableTypeSpec>,
     custom_instance_spec: Vec<CustomInstanceSpec>,
 }
 
 impl RibCompilerConfig {
     pub fn new(
-        component_dependencies: Vec<ComponentDependency>,
+        component: ComponentDependency,
         input_spec: Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: Vec<CustomInstanceSpec>,
     ) -> RibCompilerConfig {
         RibCompilerConfig {
-            component_dependencies,
+            component,
             input_spec,
             custom_instance_spec,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ComponentDependency {
-    component_dependency_key: ComponentDependencyKey,
-    component_exports: Vec<AnalysedExport>,
-}
-
-impl ComponentDependency {
-    pub fn new(
-        component_dependency_key: ComponentDependencyKey,
-        component_exports: Vec<AnalysedExport>,
-    ) -> Self {
-        Self {
-            component_dependency_key,
-            component_exports,
         }
     }
 }
@@ -868,12 +840,12 @@ mod compiler_error_tests {
     }
 
     mod test_utils {
-        use crate::analysis::analysed_type::{
+        use crate::wit_type::{
             case, f32, field, handle, list, record, s32, str, tuple, u32, u64, variant,
         };
-        use crate::analysis::{
-            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
-            AnalysedInstance, AnalysedResourceId, AnalysedResourceMode, NameTypePair,
+        use crate::wit_type::{
+            AnalysedResourceId, AnalysedResourceMode, NameTypePair, WitExport, WitFunction,
+            WitFunctionParameter, WitFunctionResult, WitInterface,
         };
         use crate::{ComponentDependency, ComponentDependencyKey};
         use uuid::Uuid;
@@ -901,10 +873,10 @@ mod compiler_error_tests {
             result.strip_prefix("\n").unwrap_or(&result).to_string()
         }
 
-        pub(crate) fn get_metadata() -> Vec<ComponentDependency> {
-            let function_export = AnalysedExport::Function(AnalysedFunction {
+        pub(crate) fn get_metadata() -> ComponentDependency {
+            let function_export = WitExport::Function(WitFunction {
                 name: "foo".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "arg1".to_string(),
                     typ: record(vec![
                         NameTypePair {
@@ -952,30 +924,30 @@ mod compiler_error_tests {
                         },
                     ]),
                 }],
-                result: Some(AnalysedFunctionResult { typ: str() }),
+                result: Some(WitFunctionResult { typ: str() }),
             });
 
-            let resource_export = AnalysedExport::Instance(AnalysedInstance {
+            let resource_export = WitExport::Interface(WitInterface {
                 name: "golem:it/api".to_string(),
                 functions: vec![
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[constructor]cart".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "cons".to_string(),
                             typ: str(),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.add-item".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "item".to_string(),
                                 typ: record(vec![
                                     field("product-id", str()),
@@ -987,58 +959,58 @@ mod compiler_error_tests {
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.remove-item".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "product-id".to_string(),
                                 typ: str(),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.update-item-quantity".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "product-id".to_string(),
                                 typ: str(),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "quantity".to_string(),
                                 typ: u32(),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.checkout".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: variant(vec![
                                 case("error", str()),
                                 case("success", record(vec![field("order-id", str())])),
                             ]),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.get-cart-contents".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: list(record(vec![
                                 field("product-id", str()),
                                 field("name", str()),
@@ -1047,23 +1019,23 @@ mod compiler_error_tests {
                             ])),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.merge-with".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "other-cart".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[drop]cart".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         }],
@@ -1072,18 +1044,16 @@ mod compiler_error_tests {
                 ],
             });
 
-            let component_dependency = ComponentDependency {
-                component_dependency_key: ComponentDependencyKey {
-                    component_name: "some_name".to_string(),
-                    component_id: Uuid::new_v4(),
-                    component_revision: 0,
-                    root_package_name: None,
-                    root_package_version: None,
-                },
-                component_exports: vec![function_export, resource_export],
+            let key = ComponentDependencyKey {
+                component_name: "some_name".to_string(),
+                component_id: Uuid::new_v4(),
+                component_revision: 0,
+                root_package_name: None,
+                root_package_version: None,
             };
 
-            vec![component_dependency]
+            let exports = vec![function_export, resource_export];
+            ComponentDependency::from_wit_metadata(key, &exports).unwrap()
         }
     }
 }

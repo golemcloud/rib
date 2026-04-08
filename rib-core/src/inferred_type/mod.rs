@@ -23,10 +23,10 @@ mod type_internal;
 mod type_origin;
 mod unification;
 
-use crate::analysis::*;
 use crate::instance_type::InstanceType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::GetTypeHint;
+use crate::wit_type::*;
 use crate::TypeName;
 use bigdecimal::BigDecimal;
 use std::fmt::{Display, Formatter};
@@ -485,7 +485,7 @@ impl InferredType {
     }
 
     pub fn is_valid_wit_type(&self) -> bool {
-        AnalysedType::try_from(self).is_ok()
+        WitType::try_from(self).is_ok()
     }
 
     pub fn is_all_of(&self) -> bool {
@@ -661,41 +661,39 @@ impl Display for InferredNumber {
     }
 }
 
-impl From<&AnalysedType> for InferredType {
-    fn from(analysed_type: &AnalysedType) -> Self {
+impl From<&WitType> for InferredType {
+    fn from(analysed_type: &WitType) -> Self {
         match analysed_type {
-            AnalysedType::Bool(_) => InferredType::bool(),
-            AnalysedType::S8(_) => InferredType::s8(),
-            AnalysedType::U8(_) => InferredType::u8(),
-            AnalysedType::S16(_) => InferredType::s16(),
-            AnalysedType::U16(_) => InferredType::u16(),
-            AnalysedType::S32(_) => InferredType::s32(),
-            AnalysedType::U32(_) => InferredType::u32(),
-            AnalysedType::S64(_) => InferredType::s64(),
-            AnalysedType::U64(_) => InferredType::u64(),
-            AnalysedType::F32(_) => InferredType::f32(),
-            AnalysedType::F64(_) => InferredType::f64(),
-            AnalysedType::Chr(_) => InferredType::char(),
-            AnalysedType::Str(_) => InferredType::string(),
-            AnalysedType::List(t) => InferredType::list(t.inner.as_ref().into()),
-            AnalysedType::Tuple(ts) => {
-                InferredType::tuple(ts.items.iter().map(|t| t.into()).collect())
-            }
-            AnalysedType::Record(fs) => InferredType::record(
+            WitType::Bool(_) => InferredType::bool(),
+            WitType::S8(_) => InferredType::s8(),
+            WitType::U8(_) => InferredType::u8(),
+            WitType::S16(_) => InferredType::s16(),
+            WitType::U16(_) => InferredType::u16(),
+            WitType::S32(_) => InferredType::s32(),
+            WitType::U32(_) => InferredType::u32(),
+            WitType::S64(_) => InferredType::s64(),
+            WitType::U64(_) => InferredType::u64(),
+            WitType::F32(_) => InferredType::f32(),
+            WitType::F64(_) => InferredType::f64(),
+            WitType::Chr(_) => InferredType::char(),
+            WitType::Str(_) => InferredType::string(),
+            WitType::List(t) => InferredType::list(t.inner.as_ref().into()),
+            WitType::Tuple(ts) => InferredType::tuple(ts.items.iter().map(|t| t.into()).collect()),
+            WitType::Record(fs) => InferredType::record(
                 fs.fields
                     .iter()
                     .map(|name_type| (name_type.name.clone(), (&name_type.typ).into()))
                     .collect(),
             ),
-            AnalysedType::Flags(vs) => InferredType::flags(vs.names.clone()),
-            AnalysedType::Enum(vs) => InferredType::from_enum_cases(vs),
-            AnalysedType::Option(t) => InferredType::option(t.inner.as_ref().into()),
-            AnalysedType::Result(TypeResult { ok, err, .. }) => InferredType::result(
+            WitType::Flags(vs) => InferredType::flags(vs.names.clone()),
+            WitType::Enum(vs) => InferredType::from_enum_cases(vs),
+            WitType::Option(t) => InferredType::option(t.inner.as_ref().into()),
+            WitType::Result(TypeResult { ok, err, .. }) => InferredType::result(
                 ok.as_ref().map(|t| t.as_ref().into()),
                 err.as_ref().map(|t| t.as_ref().into()),
             ),
-            AnalysedType::Variant(vs) => InferredType::from_type_variant(vs),
-            AnalysedType::Handle(TypeHandle {
+            WitType::Variant(vs) => InferredType::from_type_variant(vs),
+            WitType::Handle(TypeHandle {
                 resource_id,
                 mode,
                 name,

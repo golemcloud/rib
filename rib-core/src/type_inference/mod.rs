@@ -23,6 +23,7 @@ pub use identifier_inference::*;
 pub use identify_instance_creation::*;
 pub use inference_fix_point::*;
 pub use inferred_expr::*;
+pub use initial_phase::*;
 pub use instance_type_binding::*;
 pub use rib_input_type::*;
 pub use rib_output_type::*;
@@ -37,35 +38,34 @@ pub use variable_binding::*;
 pub use variant_inference::*;
 pub use worker_function_invocation::*;
 
-pub(crate) mod call_arguments_inference;
+mod call_arguments_inference;
 mod custom_instance_spec;
-pub(crate) mod enum_inference;
+mod enum_inference;
 mod errors;
 mod expr_visitor;
-pub(crate) mod global_input_inference;
-pub(crate) mod global_variable_type_binding;
-pub(crate) mod identifier_inference;
-pub(crate) mod identify_instance_creation;
+mod global_input_inference;
+mod global_variable_type_binding;
+mod identifier_inference;
+mod identify_instance_creation;
 mod inference_fix_point;
 mod inferred_expr;
-pub(crate) mod initial_arena_phase;
-pub(crate) mod instance_type_binding;
+mod initial_phase;
+mod instance_type_binding;
 mod rib_input_type;
 mod rib_output_type;
-pub(crate) mod stateful_instance;
-pub(crate) mod type_annotation_binding;
+mod stateful_instance;
+mod type_annotation_binding;
 mod type_hint;
-pub(crate) mod type_pull_up;
-pub(crate) mod type_push_down;
+mod type_pull_up;
+mod type_push_down;
 mod type_reset;
 mod type_unification;
-pub(crate) mod variable_binding;
-pub(crate) mod variant_inference;
-pub(crate) mod worker_function_invocation;
+mod variable_binding;
+mod variant_inference;
+mod worker_function_invocation;
 
 #[cfg(test)]
 mod tests {
-    use crate::analysis::analysed_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::call_type::CallType;
     use crate::type_checker::Path;
     use crate::type_inference::global_variable_type_binding::GlobalVariableTypeSpec;
@@ -75,15 +75,16 @@ mod tests {
         number, option, pattern_match, plus, record, result, select_dynamic, select_field,
         sequence, tuple,
     };
+    use crate::wit_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::{
-        ArmPattern, ComponentDependencies, DynamicParsedFunctionName,
-        DynamicParsedFunctionReference, Expr, InferredType, InstanceCreationType,
-        InstanceIdentifier, InstanceType, MatchArm, Number, ParsedFunctionSite, RibCompiler,
-        RibCompilerConfig, TypeName, VariableId,
+        ArmPattern, ComponentDependency, DynamicParsedFunctionName, DynamicParsedFunctionReference,
+        Expr, InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
+        Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig, TypeName, VariableId,
     };
     use bigdecimal::BigDecimal;
+    use std::sync::Arc;
 
-    use crate::analysis::analysed_type;
+    use crate::wit_type::builders as wit_type;
     use test_r::test;
 
     #[test]
@@ -98,14 +99,13 @@ mod tests {
             GlobalVariableTypeSpec::new("foo", Path::from_elems(vec![]), InferredType::string());
 
         let with_type_spec =
-            expr.infer_types(&ComponentDependencies::default(), &vec![type_spec], &[]);
+            expr.infer_types(&ComponentDependency::default(), &vec![type_spec], &[]);
 
         assert!(with_type_spec.is_ok());
 
         let mut new_expr = Expr::from_text(rib_expr).unwrap();
 
-        let without_type_spec =
-            new_expr.infer_types(&ComponentDependencies::default(), &vec![], &[]);
+        let without_type_spec = new_expr.infer_types(&ComponentDependency::default(), &vec![], &[]);
 
         assert!(without_type_spec.is_err())
     }
@@ -126,7 +126,7 @@ mod tests {
         );
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &vec![type_spec], &[])
+            .infer_types(&ComponentDependency::default(), &vec![type_spec], &[])
             .is_ok());
     }
 
@@ -154,7 +154,7 @@ mod tests {
         ];
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &type_spec, &[])
+            .infer_types(&ComponentDependency::default(), &type_spec, &[])
             .is_ok());
     }
 
@@ -174,7 +174,7 @@ mod tests {
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &vec![], &[])
+            .infer_types(&ComponentDependency::default(), &vec![], &[])
             .is_ok());
     }
 
@@ -258,8 +258,11 @@ mod tests {
             InferredType::string(),
         );
 
-        let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(vec![], vec![type_spec], vec![]));
+        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
+            ComponentDependency::default(),
+            vec![type_spec],
+            vec![],
+        ));
 
         // by default foo.bar.* will be inferred to be a string (given the above type spec) and
         // foo.bar.baz + 1u32 should fail compilation since we are adding string with a u32.
@@ -285,8 +288,11 @@ mod tests {
         // foo + 1u32 should fail compilation since we are adding string with a u32.
         let invalid_rib_expr = Expr::from_text(r#"foo + 1u32"#).unwrap();
 
-        let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(vec![], vec![type_spec], vec![]));
+        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
+            ComponentDependency::default(),
+            vec![type_spec],
+            vec![],
+        ));
 
         let result = rib_compiler.compile(invalid_rib_expr);
 
@@ -427,13 +433,7 @@ mod tests {
 
         let rib_compiler = test_utils::get_test_compiler();
 
-        let component_dependency_key = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let component_dependency_key = rib_compiler.get_component_dependency().key.clone();
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
@@ -463,7 +463,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -509,13 +509,8 @@ mod tests {
 
         let rib_compiler = test_utils::get_test_compiler();
 
-        let expected_component_in_function_call = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let expected_component_in_function_call =
+            rib_compiler.get_component_dependency().key.clone();
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
@@ -557,7 +552,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -800,7 +795,7 @@ mod tests {
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
         let expected =
-            test_utils::expected_expr_for_enum_test(&rib_compiler.get_component_dependencies());
+            test_utils::expected_expr_for_enum_test(&rib_compiler.get_component_dependency());
 
         assert_eq!(inferred_expr.get_expr(), &expected);
     }
@@ -1287,7 +1282,7 @@ mod tests {
 
         let mut expr = Expr::from_text(expr_str).unwrap();
 
-        expr.infer_types(&ComponentDependencies::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
             .unwrap();
 
         let expected = expr_block(
@@ -1370,13 +1365,7 @@ mod tests {
         let expr = Expr::from_text(rib_expr).unwrap();
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
-        let expected_component_key = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let expected_component_key = rib_compiler.get_component_dependency().key.clone();
 
         let let_binding1 = let_binding(
             VariableId::local("x", 0),
@@ -1414,7 +1403,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -2178,20 +2167,20 @@ mod tests {
 
     #[test]
     fn test_inference_record_select_with_function_call() {
-        let request_body_type = analysed_type::record(vec![
+        let request_body_type = wit_type::record(vec![
             field("id", str()),
             field("name", str()),
             field("titles", list(str())),
             field(
                 "address",
-                analysed_type::record(vec![field("street", str()), field("city", str())]),
+                wit_type::record(vec![field("street", str()), field("city", str())]),
             ),
         ]);
 
         let worker_response = test_utils::create_none(&str());
 
-        let request_type = analysed_type::record(vec![field("body", request_body_type.clone())]);
-        let return_type = analysed_type::option(worker_response.typ);
+        let request_type = wit_type::record(vec![field("body", request_body_type.clone())]);
+        let return_type = wit_type::option(worker_response.typ);
 
         let rib_compiler =
             get_test_rib_compiler_with("foo", vec![request_type.clone()], return_type);
@@ -2208,7 +2197,7 @@ mod tests {
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
         let expected =
-            test_utils::expected_expr_for_select_index(&rib_compiler.get_component_dependencies());
+            test_utils::expected_expr_for_select_index(&rib_compiler.get_component_dependency());
 
         assert_eq!(inferred_expr.get_expr(), &expected);
     }
@@ -2444,23 +2433,22 @@ mod tests {
     }
 
     mod test_utils {
-        use crate::analysis::analysed_type::u64;
-        use crate::analysis::{
-            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
-            AnalysedType, TypeU32,
-        };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
         use crate::parser::type_name::TypeName;
         use crate::rib_source_span::SourceSpan;
+        use crate::wit_type::u64;
+        use crate::wit_type::{
+            TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult, WitType,
+        };
         use crate::{
-            ArmPattern, ComponentDependencies, ComponentDependency, ComponentDependencyKey, Expr,
-            InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
-            MatchIdentifier, Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig,
-            VariableId,
+            ArmPattern, ComponentDependency, ComponentDependencyKey, Expr, InferredType,
+            InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm, MatchIdentifier,
+            Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig, VariableId,
         };
         use crate::{Value, ValueAndType};
         use bigdecimal::BigDecimal;
+        use std::sync::Arc;
         use uuid::Uuid;
 
         pub fn result(
@@ -2708,19 +2696,19 @@ mod tests {
 
         pub fn get_test_compiler() -> RibCompiler {
             let metadata = vec![
-                AnalysedExport::Function(AnalysedFunction {
+                WitExport::Function(WitFunction {
                     name: "foo".to_string(),
-                    parameters: vec![AnalysedFunctionParameter {
+                    parameters: vec![WitFunctionParameter {
                         name: "my_parameter".to_string(),
                         typ: u64(),
                     }],
                     result: None,
                 }),
-                AnalysedExport::Function(AnalysedFunction {
+                WitExport::Function(WitFunction {
                     name: "baz".to_string(),
-                    parameters: vec![AnalysedFunctionParameter {
+                    parameters: vec![WitFunctionParameter {
                         name: "my_parameter".to_string(),
-                        typ: AnalysedType::U32(TypeU32),
+                        typ: WitType::U32(TypeU32),
                     }],
                     result: None,
                 }),
@@ -2735,31 +2723,29 @@ mod tests {
             };
 
             RibCompiler::new(RibCompilerConfig::new(
-                vec![ComponentDependency::new(
+                ComponentDependency::from_wit_metadata(
                     component_dependency_key.clone(),
-                    metadata.clone(),
-                )],
+                    metadata.as_slice(),
+                )
+                .unwrap(),
                 vec![],
                 vec![],
             ))
         }
 
-        pub fn create_none(typ: &AnalysedType) -> ValueAndType {
-            ValueAndType::new(
-                Value::Option(None),
-                crate::analysis::analysed_type::option(typ.clone()),
-            )
+        pub fn create_none(typ: &WitType) -> ValueAndType {
+            ValueAndType::new(Value::Option(None), crate::wit_type::option(typ.clone()))
         }
 
         pub fn get_test_rib_compiler_with(
             function_name: &str,
-            input_types: Vec<AnalysedType>,
-            output: AnalysedType,
+            input_types: Vec<WitType>,
+            output: WitType,
         ) -> RibCompiler {
             let analysed_function_parameters = input_types
                 .into_iter()
                 .enumerate()
-                .map(|(index, typ)| AnalysedFunctionParameter {
+                .map(|(index, typ)| WitFunctionParameter {
                     name: format!("param{index}"),
                     typ,
                 })
@@ -2773,30 +2759,22 @@ mod tests {
                 root_package_version: None,
             };
 
-            let exports = vec![AnalysedExport::Function(AnalysedFunction {
+            let exports = vec![WitExport::Function(WitFunction {
                 name: function_name.to_string(),
                 parameters: analysed_function_parameters,
-                result: Some(AnalysedFunctionResult { typ: output }),
+                result: Some(WitFunctionResult { typ: output }),
             })];
 
             RibCompiler::new(RibCompilerConfig::new(
-                vec![ComponentDependency::new(
-                    component_dependency_key.clone(),
-                    exports,
-                )],
+                ComponentDependency::from_wit_metadata(component_dependency_key.clone(), &exports)
+                    .unwrap(),
                 vec![],
                 vec![],
             ))
         }
 
-        pub fn expected_expr_for_enum_test(component_dependencies: &ComponentDependencies) -> Expr {
-            let expected_component_in_function_calls = component_dependencies
-                .clone()
-                .dependencies
-                .first_key_value()
-                .unwrap()
-                .0
-                .clone();
+        pub fn expected_expr_for_enum_test(component_dependencies: &ComponentDependency) -> Expr {
+            let expected_component_in_function_calls = component_dependencies.key.clone();
 
             expr_block(
                 vec![
@@ -2880,7 +2858,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component_dependency: component_dependencies.clone(),
+                                component: Arc::new(component_dependencies.clone()),
                             },
                         )),
                     ),
@@ -3204,15 +3182,9 @@ mod tests {
         }
 
         pub fn expected_expr_for_select_index(
-            component_dependencies: &ComponentDependencies,
+            component_dependencies: &ComponentDependency,
         ) -> Expr {
-            let expected_component_in_function_calls = component_dependencies
-                .clone()
-                .dependencies
-                .first_key_value()
-                .unwrap()
-                .0
-                .clone();
+            let expected_component_in_function_calls = component_dependencies.key.clone();
 
             expr_block(
                 vec![
@@ -3402,7 +3374,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component_dependency: component_dependencies.clone(),
+                                component: Arc::new(component_dependencies.clone()),
                             },
                         )),
                     ),

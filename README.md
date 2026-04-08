@@ -11,3 +11,7 @@ This work is on it's way.
 ## Developing rib-core
 
 [rib-core/README.md](rib-core/README.md).
+
+## Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.

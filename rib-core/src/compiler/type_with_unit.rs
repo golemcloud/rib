@@ -12,56 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::analysed_type::{bool, field, record, str, tuple};
-use crate::analysis::{
-    AnalysedResourceId, AnalysedResourceMode, AnalysedType, NameOptionTypePair, NameTypePair,
-    TypeBool, TypeChr, TypeEnum, TypeF32, TypeF64, TypeFlags, TypeHandle, TypeList, TypeOption,
-    TypeRecord, TypeResult, TypeS16, TypeS32, TypeS64, TypeS8, TypeStr, TypeTuple, TypeU16,
-    TypeU32, TypeU64, TypeU8, TypeVariant,
+use crate::wit_type::{bool, field, record, str, tuple};
+use crate::wit_type::{
+    AnalysedResourceId, AnalysedResourceMode, NameOptionTypePair, NameTypePair, TypeBool, TypeChr,
+    TypeEnum, TypeF32, TypeF64, TypeFlags, TypeHandle, TypeList, TypeOption, TypeRecord,
+    TypeResult, TypeS16, TypeS32, TypeS64, TypeS8, TypeStr, TypeTuple, TypeU16, TypeU32, TypeU64,
+    TypeU8, TypeVariant, WitType,
 };
 use crate::{GetTypeHint, InferredType, InstanceType, TypeInternal};
 use serde::{Deserialize, Serialize};
 
 // An absence of analysed type is really `Unit`, however, we avoid
-// Option<AnalysedType> in favor of `AnalysedTypeWithUnit` for clarity.
+// Option<WitType> in favor of `WitTypeWithUnit` for clarity.
 // and conversions such as what to print if its `unit` becomes more precise
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum AnalysedTypeWithUnit {
+pub enum WitTypeWithUnit {
     Unit,
-    Type(AnalysedType),
+    Type(WitType),
 }
 
-impl AnalysedTypeWithUnit {
+impl WitTypeWithUnit {
     pub fn unit() -> Self {
-        AnalysedTypeWithUnit::Unit
+        WitTypeWithUnit::Unit
     }
 
-    pub fn analysed_type(typ: AnalysedType) -> Self {
-        AnalysedTypeWithUnit::Type(typ)
+    pub fn analysed_type(typ: WitType) -> Self {
+        WitTypeWithUnit::Type(typ)
     }
 }
 
-impl TryFrom<AnalysedTypeWithUnit> for AnalysedType {
+impl TryFrom<WitTypeWithUnit> for WitType {
     type Error = String;
 
-    fn try_from(value: AnalysedTypeWithUnit) -> Result<Self, Self::Error> {
+    fn try_from(value: WitTypeWithUnit) -> Result<Self, Self::Error> {
         match value {
-            AnalysedTypeWithUnit::Unit => Ok(tuple(vec![])),
-            AnalysedTypeWithUnit::Type(typ) => Ok(typ),
+            WitTypeWithUnit::Unit => Ok(tuple(vec![])),
+            WitTypeWithUnit::Type(typ) => Ok(typ),
         }
     }
 }
 
-impl TryFrom<&InferredType> for AnalysedType {
+impl TryFrom<&InferredType> for WitType {
     type Error = String;
 
     fn try_from(value: &InferredType) -> Result<Self, Self::Error> {
-        let with_unit = AnalysedTypeWithUnit::try_from(value)?;
-        AnalysedType::try_from(with_unit)
+        let with_unit = WitTypeWithUnit::try_from(value)?;
+        WitType::try_from(with_unit)
     }
 }
 
-impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
+impl TryFrom<&InferredType> for WitTypeWithUnit {
     type Error = String;
 
     fn try_from(inferred_type: &InferredType) -> Result<Self, Self::Error> {
@@ -80,7 +80,7 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
                         AnalysedResourceMode::Borrowed
                     };
 
-                    Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::Handle(
+                    Ok(WitTypeWithUnit::analysed_type(WitType::Handle(
                         TypeHandle {
                             resource_id: analysed_resource_id,
                             mode: analysed_resource_mode,
@@ -90,12 +90,11 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
                     )))
                 }
 
-                _ => Ok(AnalysedTypeWithUnit::analysed_type(str())),
+                _ => Ok(WitTypeWithUnit::analysed_type(str())),
             },
             TypeInternal::Range { from, to } => {
-                let from: AnalysedType = AnalysedType::try_from(from)?;
-                let to: Option<AnalysedType> =
-                    to.as_ref().map(AnalysedType::try_from).transpose()?;
+                let from: WitType = WitType::try_from(from)?;
+                let to: Option<WitType> = to.as_ref().map(WitType::try_from).transpose()?;
                 let analysed_type = match (from, to) {
                     (from_type, Some(to_type)) => record(vec![
                         field("from", from_type),
@@ -107,66 +106,40 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
                         record(vec![field("from", from_type), field("inclusive", bool())])
                     }
                 };
-                Ok(AnalysedTypeWithUnit::analysed_type(analysed_type))
+                Ok(WitTypeWithUnit::analysed_type(analysed_type))
             }
-            TypeInternal::Bool => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::Bool(
-                TypeBool,
-            ))),
-            TypeInternal::S8 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::S8(
-                TypeS8,
-            ))),
-            TypeInternal::U8 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::U8(
-                TypeU8,
-            ))),
-            TypeInternal::S16 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::S16(
-                TypeS16,
-            ))),
-            TypeInternal::U16 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::U16(
-                TypeU16,
-            ))),
-            TypeInternal::S32 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::S32(
-                TypeS32,
-            ))),
-            TypeInternal::U32 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::U32(
-                TypeU32,
-            ))),
-            TypeInternal::S64 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::S64(
-                TypeS64,
-            ))),
-            TypeInternal::U64 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::U64(
-                TypeU64,
-            ))),
-            TypeInternal::F32 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::F32(
-                TypeF32,
-            ))),
-            TypeInternal::F64 => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::F64(
-                TypeF64,
-            ))),
-            TypeInternal::Chr => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::Chr(
-                TypeChr,
-            ))),
-            TypeInternal::Str => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::Str(
-                TypeStr,
-            ))),
-            TypeInternal::List(inferred_type) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::List(TypeList {
+            TypeInternal::Bool => Ok(WitTypeWithUnit::analysed_type(WitType::Bool(TypeBool))),
+            TypeInternal::S8 => Ok(WitTypeWithUnit::analysed_type(WitType::S8(TypeS8))),
+            TypeInternal::U8 => Ok(WitTypeWithUnit::analysed_type(WitType::U8(TypeU8))),
+            TypeInternal::S16 => Ok(WitTypeWithUnit::analysed_type(WitType::S16(TypeS16))),
+            TypeInternal::U16 => Ok(WitTypeWithUnit::analysed_type(WitType::U16(TypeU16))),
+            TypeInternal::S32 => Ok(WitTypeWithUnit::analysed_type(WitType::S32(TypeS32))),
+            TypeInternal::U32 => Ok(WitTypeWithUnit::analysed_type(WitType::U32(TypeU32))),
+            TypeInternal::S64 => Ok(WitTypeWithUnit::analysed_type(WitType::S64(TypeS64))),
+            TypeInternal::U64 => Ok(WitTypeWithUnit::analysed_type(WitType::U64(TypeU64))),
+            TypeInternal::F32 => Ok(WitTypeWithUnit::analysed_type(WitType::F32(TypeF32))),
+            TypeInternal::F64 => Ok(WitTypeWithUnit::analysed_type(WitType::F64(TypeF64))),
+            TypeInternal::Chr => Ok(WitTypeWithUnit::analysed_type(WitType::Chr(TypeChr))),
+            TypeInternal::Str => Ok(WitTypeWithUnit::analysed_type(WitType::Str(TypeStr))),
+            TypeInternal::List(inferred_type) => {
+                Ok(WitTypeWithUnit::analysed_type(WitType::List(TypeList {
                     inner: Box::new(inferred_type.try_into()?),
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Tuple(tuple) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Tuple(TypeTuple {
+                })))
+            }
+            TypeInternal::Tuple(tuple) => {
+                Ok(WitTypeWithUnit::analysed_type(WitType::Tuple(TypeTuple {
                     items: tuple
                         .iter()
                         .map(|t| t.try_into())
-                        .collect::<Result<Vec<AnalysedType>, String>>()?,
+                        .collect::<Result<Vec<WitType>, String>>()?,
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Record(record) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Record(TypeRecord {
+                })))
+            }
+            TypeInternal::Record(record) => Ok(WitTypeWithUnit::analysed_type(WitType::Record(
+                TypeRecord {
                     fields: record
                         .iter()
                         .map(|(name, typ)| {
@@ -178,40 +151,40 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
                         .collect::<Result<Vec<NameTypePair>, String>>()?,
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Flags(flags) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Flags(TypeFlags {
+                },
+            ))),
+            TypeInternal::Flags(flags) => {
+                Ok(WitTypeWithUnit::analysed_type(WitType::Flags(TypeFlags {
                     names: flags.clone(),
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Enum(enums) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Enum(TypeEnum {
+                })))
+            }
+            TypeInternal::Enum(enums) => {
+                Ok(WitTypeWithUnit::analysed_type(WitType::Enum(TypeEnum {
                     cases: enums.clone(),
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Option(option) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Option(TypeOption {
+                })))
+            }
+            TypeInternal::Option(option) => Ok(WitTypeWithUnit::analysed_type(WitType::Option(
+                TypeOption {
                     inner: Box::new(option.try_into()?),
                     name: None,
                     owner: None,
-                }),
-            )),
-            TypeInternal::Result { ok, error } => Ok(AnalysedTypeWithUnit::analysed_type(
+                },
+            ))),
+            TypeInternal::Result { ok, error } => Ok(WitTypeWithUnit::analysed_type(
                 // In the case of result, there are instances users give just 1 value with zero function calls, we need to be flexible here
-                AnalysedType::Result(TypeResult {
+                WitType::Result(TypeResult {
                     ok: ok.as_ref().and_then(|t| t.try_into().ok().map(Box::new)),
                     err: error.as_ref().and_then(|t| t.try_into().ok().map(Box::new)),
                     name: None,
                     owner: None,
                 }),
             )),
-            TypeInternal::Variant(variant) => Ok(AnalysedTypeWithUnit::analysed_type(
-                AnalysedType::Variant(TypeVariant {
+            TypeInternal::Variant(variant) => Ok(WitTypeWithUnit::analysed_type(WitType::Variant(
+                TypeVariant {
                     cases: variant
                         .iter()
                         .map(|(name, typ)| {
@@ -223,14 +196,14 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
                         .collect::<Result<Vec<NameOptionTypePair>, String>>()?,
                     name: None,
                     owner: None,
-                }),
-            )),
+                },
+            ))),
             TypeInternal::Resource {
                 resource_id,
                 resource_mode,
                 name: _,
                 owner: _,
-            } => Ok(AnalysedTypeWithUnit::analysed_type(AnalysedType::Handle(
+            } => Ok(WitTypeWithUnit::analysed_type(WitType::Handle(
                 TypeHandle {
                     resource_id: AnalysedResourceId(*resource_id),
                     mode: if resource_mode == &0 {
@@ -256,7 +229,7 @@ impl TryFrom<&InferredType> for AnalysedTypeWithUnit {
             // This implies Rib will not support multiple types from worker-function results
             TypeInternal::Sequence(vec) => {
                 if vec.is_empty() {
-                    Ok(AnalysedTypeWithUnit::unit())
+                    Ok(WitTypeWithUnit::unit())
                 } else if vec.len() == 1 {
                     let first = &vec[0];
                     Ok(first.try_into()?)
