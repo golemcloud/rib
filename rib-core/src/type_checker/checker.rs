@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::expr_arena::{
     ArmPatternNode, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode,
     InstanceIdentifierNode, MatchArmNode, RangeKind, ResultExprKind, TypeTable,
@@ -68,11 +68,11 @@ pub fn type_check(
 fn find_missing_fields_in_record_lowered(
     expr_id: ExprId,
     arena: &ExprArena,
-    expected: &AnalysedType,
+    expected: &WitType,
 ) -> Vec<Path> {
     let mut missing_paths = Vec::new();
 
-    if let AnalysedType::Record(expected_record) = expected {
+    if let WitType::Record(expected_record) = expected {
         for (field_name, expected_type_of_field) in expected_record
             .fields
             .iter()
@@ -85,11 +85,11 @@ fn find_missing_fields_in_record_lowered(
                     .map(|(_, id)| *id);
 
                 if let Some(actual_id) = actual_value_opt {
-                    if let AnalysedType::Record(record) = expected_type_of_field {
+                    if let WitType::Record(record) = expected_type_of_field {
                         let nested_paths = find_missing_fields_in_record_lowered(
                             actual_id,
                             arena,
-                            &AnalysedType::Record(record.clone()),
+                            &WitType::Record(record.clone()),
                         );
                         for mut nested_path in nested_paths {
                             nested_path.push_front(PathElem::Field(field_name.clone()));
@@ -164,7 +164,7 @@ fn get_missing_record_keys_lowered(
 
     let mut filtered_expected_types = expected_arg_types
         .iter()
-        .map(|x| AnalysedType::try_from(x).unwrap())
+        .map(|x| WitType::try_from(x).unwrap())
         .collect::<Vec<_>>();
 
     if call_type.is_resource_method() {

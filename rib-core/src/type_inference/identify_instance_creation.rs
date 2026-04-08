@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::call_type::InstanceCreationType;
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
@@ -261,7 +261,7 @@ fn get_instance_creation_details_arena(
 
                                 let arg_expr = rebuild_expr(arg_id, arena, types);
                                 match analysed_type {
-                                    AnalysedType::Str(_) => {
+                                    WitType::Str(_) => {
                                         concat_parts.push(Expr::literal("\""));
                                         concat_parts.push(arg_expr);
                                         concat_parts.push(Expr::literal("\""));

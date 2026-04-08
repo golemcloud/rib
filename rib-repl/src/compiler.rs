@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::repl_state::ReplState;
-use rib::analysis::{TypeEnum, TypeVariant};
+use rib::wit::{TypeEnum, TypeVariant};
 use rib::*;
 use std::collections::HashMap;
 use std::fmt::Display;

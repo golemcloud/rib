@@ -65,7 +65,7 @@ pub(crate) mod worker_function_invocation;
 
 #[cfg(test)]
 mod tests {
-    use crate::analysis::analysed_type::{case, field, list, r#enum, str, u64, unit_case, variant};
+    use crate::wit::wit_type::{case, field, list, r#enum, str, u64, unit_case, variant};
     use crate::call_type::CallType;
     use crate::type_checker::Path;
     use crate::type_inference::global_variable_type_binding::GlobalVariableTypeSpec;
@@ -83,7 +83,7 @@ mod tests {
     use bigdecimal::BigDecimal;
     use std::sync::Arc;
 
-    use crate::analysis::analysed_type;
+    use crate::wit::wit_type;
     use test_r::test;
 
     #[test]
@@ -2166,20 +2166,20 @@ mod tests {
 
     #[test]
     fn test_inference_record_select_with_function_call() {
-        let request_body_type = analysed_type::record(vec![
+        let request_body_type = wit_type::record(vec![
             field("id", str()),
             field("name", str()),
             field("titles", list(str())),
             field(
                 "address",
-                analysed_type::record(vec![field("street", str()), field("city", str())]),
+                wit_type::record(vec![field("street", str()), field("city", str())]),
             ),
         ]);
 
         let worker_response = test_utils::create_none(&str());
 
-        let request_type = analysed_type::record(vec![field("body", request_body_type.clone())]);
-        let return_type = analysed_type::option(worker_response.typ);
+        let request_type = wit_type::record(vec![field("body", request_body_type.clone())]);
+        let return_type = wit_type::option(worker_response.typ);
 
         let rib_compiler =
             get_test_rib_compiler_with("foo", vec![request_type.clone()], return_type);
@@ -2432,9 +2432,9 @@ mod tests {
     }
 
     mod test_utils {
-        use crate::analysis::analysed_type::u64;
-        use crate::analysis::{
-            AnalysedType, TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
+        use crate::wit::wit_type::u64;
+        use crate::wit::{
+            WitType, TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
         };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
@@ -2707,7 +2707,7 @@ mod tests {
                     name: "baz".to_string(),
                     parameters: vec![WitFunctionParameter {
                         name: "my_parameter".to_string(),
-                        typ: AnalysedType::U32(TypeU32),
+                        typ: WitType::U32(TypeU32),
                     }],
                     result: None,
                 }),
@@ -2732,17 +2732,17 @@ mod tests {
             ))
         }
 
-        pub fn create_none(typ: &AnalysedType) -> ValueAndType {
+        pub fn create_none(typ: &WitType) -> ValueAndType {
             ValueAndType::new(
                 Value::Option(None),
-                crate::analysis::analysed_type::option(typ.clone()),
+                crate::wit::wit_type::option(typ.clone()),
             )
         }
 
         pub fn get_test_rib_compiler_with(
             function_name: &str,
-            input_types: Vec<AnalysedType>,
-            output: AnalysedType,
+            input_types: Vec<WitType>,
+            output: WitType,
         ) -> RibCompiler {
             let analysed_function_parameters = input_types
                 .into_iter()

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::rib_source_span::SourceSpan;
 use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::{InferredType, Path, PathElem};
@@ -112,7 +112,7 @@ pub struct TypeMismatchError {
 
 #[derive(Clone, Debug)]
 pub enum ExpectedType {
-    AnalysedType(AnalysedType),
+    WitType(WitType),
     // If the expected type is not fully known yet but only a hint is available.
     // Example: when compiler cannot proceed unless it is a `record`, or `list` etc
     Hint(TypeHint),
@@ -127,9 +127,9 @@ pub enum ActualType {
 }
 
 impl TypeMismatchError {
-    pub fn updated_expected_type(&self, expected_type: &AnalysedType) -> TypeMismatchError {
+    pub fn updated_expected_type(&self, expected_type: &WitType) -> TypeMismatchError {
         let mut mismatch_error: TypeMismatchError = self.clone();
-        mismatch_error.expected_type = ExpectedType::AnalysedType(expected_type.clone());
+        mismatch_error.expected_type = ExpectedType::WitType(expected_type.clone());
         mismatch_error
     }
 
@@ -261,7 +261,7 @@ pub enum FunctionCallError {
         function_name: String,
         source_span: SourceSpan,
         unresolved_error: UnResolvedTypesError,
-        expected_type: AnalysedType,
+        expected_type: WitType,
     },
 
     InvalidResourceMethodCall {

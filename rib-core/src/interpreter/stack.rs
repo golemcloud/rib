@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::analysed_type::{list, option, record, str, tuple, variant};
-use crate::analysis::{
-    AnalysedType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
+use crate::wit::wit_type::{list, option, record, str, tuple, variant};
+use crate::wit::{
+    WitType, NameOptionTypePair, NameTypePair, TypeEnum, TypeRecord, TypeResult,
 };
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::interpreter::rib_runtime_error::{
@@ -57,7 +57,7 @@ impl InterpreterStack {
         self.pop().ok_or(empty_stack())
     }
 
-    pub fn pop_sink(&mut self) -> Option<(Vec<ValueAndType>, AnalysedType)> {
+    pub fn pop_sink(&mut self) -> Option<(Vec<ValueAndType>, WitType)> {
         while let Some(value) = self.pop() {
             match value {
                 RibInterpreterStackValue::Sink(vec, analysed_type) => {
@@ -127,7 +127,7 @@ impl InterpreterStack {
         match value {
             ValueAndType {
                 value: Value::Record(field_values),
-                typ: AnalysedType::Record(typ),
+                typ: WitType::Record(typ),
             } => Ok((field_values, typ)),
             _ => Err(type_mismatch_with_value(
                 vec![TypeHint::Record(None)],
@@ -151,7 +151,7 @@ impl InterpreterStack {
         self.stack.push(interpreter_result);
     }
 
-    pub fn create_sink(&mut self, analysed_type: AnalysedType) {
+    pub fn create_sink(&mut self, analysed_type: WitType) {
         self.stack
             .push(RibInterpreterStackValue::Sink(vec![], analysed_type))
     }
@@ -202,7 +202,7 @@ impl InterpreterStack {
         })? as u32;
         self.push_val(ValueAndType::new(
             Value::Enum(idx),
-            AnalysedType::Enum(TypeEnum {
+            WitType::Enum(TypeEnum {
                 cases: cases.into_iter().collect(),
                 name: None,
                 owner: None,
@@ -212,7 +212,7 @@ impl InterpreterStack {
         Ok(())
     }
 
-    pub fn push_some(&mut self, inner_element: Value, inner_type: &AnalysedType) {
+    pub fn push_some(&mut self, inner_element: Value, inner_type: &WitType) {
         self.push_val(ValueAndType {
             value: Value::Option(Some(Box::new(inner_element))),
             typ: option(inner_type.clone()),
@@ -222,7 +222,7 @@ impl InterpreterStack {
     // We allow untyped none to be in stack,
     // Need to verify how strict we should be
     // Example: ${match ok(1) { ok(value) => none }} should be allowed
-    pub fn push_none(&mut self, analysed_type: Option<AnalysedType>) {
+    pub fn push_none(&mut self, analysed_type: Option<WitType>) {
         self.push_val(ValueAndType {
             value: Value::Option(None),
             typ: option(analysed_type.unwrap_or(str())), // TODO: this used to be a "missing value in protobuf"
@@ -232,12 +232,12 @@ impl InterpreterStack {
     pub fn push_ok(
         &mut self,
         inner_element: Value,
-        ok_type: Option<&AnalysedType>,
-        err_type: Option<&AnalysedType>,
+        ok_type: Option<&WitType>,
+        err_type: Option<&WitType>,
     ) {
         self.push_val(ValueAndType {
             value: Value::Result(Ok(Some(Box::new(inner_element)))),
-            typ: AnalysedType::Result(TypeResult {
+            typ: WitType::Result(TypeResult {
                 ok: ok_type.map(|x| Box::new(x.clone())),
                 err: err_type.map(|x| Box::new(x.clone())),
                 name: None,
@@ -249,12 +249,12 @@ impl InterpreterStack {
     pub fn push_err(
         &mut self,
         inner_element: Value,
-        ok_type: Option<&AnalysedType>,
-        err_type: Option<&AnalysedType>,
+        ok_type: Option<&WitType>,
+        err_type: Option<&WitType>,
     ) {
         self.push_val(ValueAndType {
             value: Value::Result(Err(Some(Box::new(inner_element)))),
-            typ: AnalysedType::Result(TypeResult {
+            typ: WitType::Result(TypeResult {
                 ok: ok_type.map(|x| Box::new(x.clone())),
                 err: err_type.map(|x| Box::new(x.clone())),
                 name: None,
@@ -263,7 +263,7 @@ impl InterpreterStack {
         });
     }
 
-    pub fn push_list(&mut self, values: Vec<Value>, list_elem_type: &AnalysedType) {
+    pub fn push_list(&mut self, values: Vec<Value>, list_elem_type: &WitType) {
         self.push_val(ValueAndType {
             value: Value::List(values),
             typ: list(list_elem_type.clone()),

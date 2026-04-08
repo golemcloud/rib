@@ -346,14 +346,14 @@ impl Interpreter {
 }
 
 mod internal {
-    use crate::analysis::AnalysedType;
-    use crate::analysis::TypeResult;
+    use crate::wit::WitType;
+    use crate::wit::TypeResult;
     use crate::interpreter::env::{EnvironmentKey, InterpreterEnv};
     use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
     use crate::interpreter::literal::LiteralValue;
     use crate::interpreter::stack::InterpreterStack;
     use crate::{
-        bail_corrupted_state, internal_corrupted_state, AnalysedTypeWithUnit, CoercedNumericValue,
+        bail_corrupted_state, internal_corrupted_state, WitTypeWithUnit, CoercedNumericValue,
         ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName,
         FunctionReferenceType, GetLiteralValue, InstanceVariable, InstructionId, Interpreter,
         ParsedFunctionName, ParsedFunctionReference, ParsedFunctionSite,
@@ -362,7 +362,7 @@ mod internal {
     };
     use crate::{IntoValueAndType, Value, ValueAndType};
 
-    use crate::analysis::analysed_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
+    use crate::wit::wit_type::{s16, s32, s64, s8, str, u16, u32, u64, u8};
     use crate::interpreter::instruction_cursor::RibByteCodeCursor;
     use crate::interpreter::rib_runtime_error::{
         cast_error_custom, empty_stack, exhausted_iterator, field_not_found, function_invoke_fail,
@@ -385,7 +385,7 @@ mod internal {
             _worker_name: EvaluatedWorkerName,
             _function_name: EvaluatedFqFn,
             _args: EvaluatedFnArgs,
-            _return_type: Option<AnalysedType>,
+            _return_type: Option<WitType>,
         ) -> RibFunctionInvokeResult {
             Ok(None)
         }
@@ -493,7 +493,7 @@ mod internal {
         let value_and_type = popped_up.get_val().ok_or_else(empty_stack)?;
 
         match (value_and_type.value, value_and_type.typ) {
-            (Value::List(items), AnalysedType::List(item_type)) => {
+            (Value::List(items), WitType::List(item_type)) => {
                 let items = items
                     .into_iter()
                     .map(|item| ValueAndType::new(item, (*item_type.inner).clone()))
@@ -505,7 +505,7 @@ mod internal {
 
                 Ok(())
             }
-            (Value::Record(fields), AnalysedType::Record(_)) => {
+            (Value::Record(fields), WitType::Record(_)) => {
                 let from_value = fields.first().ok_or_else(|| {
                     internal_corrupted_state!(
                         "expected a field named 'from' to be present in the record"
@@ -582,10 +582,10 @@ mod internal {
 
     pub(crate) fn run_create_sink_instruction(
         interpreter_stack: &mut InterpreterStack,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
     ) -> RibInterpreterResult<()> {
         let analysed_type = match analysed_type {
-            AnalysedType::List(type_list) => *type_list.inner,
+            WitType::List(type_list) => *type_list.inner,
             _ => bail_corrupted_state!("expecting a list type to create sink"),
         };
         interpreter_stack.create_sink(analysed_type);
@@ -768,11 +768,11 @@ mod internal {
     }
 
     pub(crate) fn run_create_record_instruction(
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
         interpreter_stack: &mut InterpreterStack,
     ) -> RibInterpreterResult<()> {
         let name_type_pair = match analysed_type {
-            AnalysedType::Record(type_record) => type_record.fields,
+            WitType::Record(type_record) => type_record.fields,
             _ => {
                 bail_corrupted_state!(
                     "expected a record type to create a record, but obtained {}",
@@ -813,18 +813,18 @@ mod internal {
 
         interpreter_stack.push_val(ValueAndType {
             value: Value::Record(fields),
-            typ: AnalysedType::Record(record_type),
+            typ: WitType::Record(record_type),
         });
         Ok(())
     }
 
     pub(crate) fn run_push_list_instruction(
         list_size: usize,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
         interpreter_stack: &mut InterpreterStack,
     ) -> RibInterpreterResult<()> {
         match analysed_type {
-            AnalysedType::List(inner_type) => {
+            WitType::List(inner_type) => {
                 let items = interpreter_stack.try_pop_n_val(list_size)?;
 
                 interpreter_stack.push_list(
@@ -844,11 +844,11 @@ mod internal {
 
     pub(crate) fn run_push_tuple_instruction(
         list_size: usize,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
         interpreter_stack: &mut InterpreterStack,
     ) -> RibInterpreterResult<()> {
         match analysed_type {
-            AnalysedType::Tuple(_inner_type) => {
+            WitType::Tuple(_inner_type) => {
                 let items = interpreter_stack.try_pop_n_val(list_size)?;
                 interpreter_stack.push_tuple(items);
                 Ok(())
@@ -909,7 +909,7 @@ mod internal {
             CoercedNumericValue,
             CoercedNumericValue,
         ) -> Result<CoercedNumericValue, RibRuntimeError>,
-        target_numerical_type: &AnalysedType,
+        target_numerical_type: &WitType,
     ) -> RibInterpreterResult<()> {
         let left = interpreter_stack.try_pop()?;
         let right = interpreter_stack.try_pop()?;
@@ -948,7 +948,7 @@ mod internal {
         match record {
             RibInterpreterStackValue::Val(ValueAndType {
                 value: Value::Record(field_values),
-                typ: AnalysedType::Record(typ),
+                typ: WitType::Record(typ),
             }) => {
                 let field = field_values
                     .into_iter()
@@ -974,7 +974,7 @@ mod internal {
         match stack_list_value {
             RibInterpreterStackValue::Val(ValueAndType {
                 value: Value::List(items),
-                typ: AnalysedType::List(typ),
+                typ: WitType::List(typ),
             }) => match index_value.get_literal().and_then(|v| v.get_number()) {
                 Some(CoercedNumericValue::PosInt(index)) => {
                     let value = items
@@ -1003,7 +1003,7 @@ mod internal {
             },
             RibInterpreterStackValue::Val(ValueAndType {
                 value: Value::Tuple(items),
-                typ: AnalysedType::Tuple(typ),
+                typ: WitType::Tuple(typ),
             }) => match index_value.get_literal().and_then(|v| v.get_number()) {
                 Some(CoercedNumericValue::PosInt(index)) => {
                     let value = items
@@ -1046,7 +1046,7 @@ mod internal {
         match stack_value {
             RibInterpreterStackValue::Val(ValueAndType {
                 value: Value::List(items),
-                typ: AnalysedType::List(typ),
+                typ: WitType::List(typ),
             }) => {
                 let value = items
                     .get(index)
@@ -1058,7 +1058,7 @@ mod internal {
             }
             RibInterpreterStackValue::Val(ValueAndType {
                 value: Value::Tuple(items),
-                typ: AnalysedType::Tuple(typ),
+                typ: WitType::Tuple(typ),
             }) => {
                 let value = items
                     .get(index)
@@ -1084,10 +1084,10 @@ mod internal {
     pub(crate) fn run_push_enum_instruction(
         interpreter_stack: &mut InterpreterStack,
         enum_name: String,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
     ) -> RibInterpreterResult<()> {
         match analysed_type {
-            AnalysedType::Enum(typed_enum) => {
+            WitType::Enum(typed_enum) => {
                 interpreter_stack.push_enum(enum_name, typed_enum.cases)?;
                 Ok(())
             }
@@ -1100,11 +1100,11 @@ mod internal {
 
     pub(crate) async fn run_variant_construction_instruction(
         variant_name: String,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
         interpreter_stack: &mut InterpreterStack,
     ) -> RibInterpreterResult<()> {
         match analysed_type {
-            AnalysedType::Variant(variants) => {
+            WitType::Variant(variants) => {
                 let variant = variants
                     .cases
                     .iter()
@@ -1193,7 +1193,7 @@ mod internal {
         instance_variable_type: InstanceVariable,
         interpreter_stack: &mut InterpreterStack,
         interpreter_env: &mut InterpreterEnv,
-        expected_result_type: AnalysedTypeWithUnit,
+        expected_result_type: WitTypeWithUnit,
     ) -> RibInterpreterResult<()> {
         let function_name = interpreter_stack
             .pop_str()
@@ -1206,8 +1206,8 @@ mod internal {
             .ok_or_else(|| insufficient_stack_items(arg_size))?;
 
         let expected_result_type = match expected_result_type {
-            AnalysedTypeWithUnit::Type(analysed_type) => Some(analysed_type),
-            AnalysedTypeWithUnit::Unit => None,
+            WitTypeWithUnit::Type(analysed_type) => Some(analysed_type),
+            WitTypeWithUnit::Unit => None,
         };
 
         let parameter_values = last_n_elements
@@ -1383,7 +1383,7 @@ mod internal {
         let tag = match value {
             ValueAndType {
                 value: Value::Variant { case_idx, .. },
-                typ: AnalysedType::Variant(typ),
+                typ: WitType::Variant(typ),
             } => typ.cases[case_idx as usize].name.clone(),
             ValueAndType {
                 value: Value::Option(option),
@@ -1401,7 +1401,7 @@ mod internal {
             },
             ValueAndType {
                 value: Value::Enum(idx),
-                typ: AnalysedType::Enum(typ),
+                typ: WitType::Enum(typ),
             } => typ.cases[idx as usize].clone(),
             _ => "untagged".to_string(),
         };
@@ -1412,12 +1412,12 @@ mod internal {
 
     pub(crate) fn run_create_some_instruction(
         interpreter_stack: &mut InterpreterStack,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
     ) -> RibInterpreterResult<()> {
         let value = interpreter_stack.try_pop_val()?;
 
         match analysed_type {
-            AnalysedType::Option(analysed_type) => {
+            WitType::Option(analysed_type) => {
                 interpreter_stack.push_some(value.value, analysed_type.inner.deref());
                 Ok(())
             }
@@ -1430,10 +1430,10 @@ mod internal {
 
     pub(crate) fn run_create_none_instruction(
         interpreter_stack: &mut InterpreterStack,
-        analysed_type: Option<AnalysedType>,
+        analysed_type: Option<WitType>,
     ) -> RibInterpreterResult<()> {
         match analysed_type {
-            Some(AnalysedType::Option(_)) | None => {
+            Some(WitType::Option(_)) | None => {
                 interpreter_stack.push_none(analysed_type);
                 Ok(())
             }
@@ -1449,12 +1449,12 @@ mod internal {
 
     pub(crate) fn run_create_ok_instruction(
         interpreter_stack: &mut InterpreterStack,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
     ) -> RibInterpreterResult<()> {
         let value = interpreter_stack.try_pop_val()?;
 
         match analysed_type {
-            AnalysedType::Result(TypeResult { ok, err, .. }) => {
+            WitType::Result(TypeResult { ok, err, .. }) => {
                 interpreter_stack.push_ok(value.value, ok.as_deref(), err.as_deref());
                 Ok(())
             }
@@ -1470,12 +1470,12 @@ mod internal {
 
     pub(crate) fn run_create_err_instruction(
         interpreter_stack: &mut InterpreterStack,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
     ) -> RibInterpreterResult<()> {
         let value = interpreter_stack.try_pop_val()?;
 
         match analysed_type {
-            AnalysedType::Result(TypeResult { ok, err, .. }) => {
+            WitType::Result(TypeResult { ok, err, .. }) => {
                 interpreter_stack.push_err(value.value, ok.as_deref(), err.as_deref());
                 Ok(())
             }
@@ -1525,11 +1525,11 @@ mod tests {
     use test_r::test;
 
     use super::*;
-    use crate::analysis::analysed_type::{
+    use crate::wit::wit_type::{
         bool, case, f32, field, list, option, r#enum, record, result, result_err, result_ok, s32,
         str, tuple, u32, u64, u8, unit_case, variant,
     };
-    use crate::analysis::AnalysedType;
+    use crate::wit::WitType;
     use crate::interpreter::rib_interpreter::tests::test_utils::{
         get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
     };
@@ -4148,7 +4148,7 @@ mod tests {
                 {weather: first-result, assistant: second-result}
             "#;
 
-        let weather_agent_constructor_param_types: Vec<AnalysedType> = vec![
+        let weather_agent_constructor_param_types: Vec<WitType> = vec![
             str(),
             s32(),
             bool(),
@@ -4258,12 +4258,12 @@ mod tests {
     }
 
     mod test_utils {
-        use crate::analysis::analysed_type::{
+        use crate::wit::wit_type::{
             case, f32, field, handle, list, option, r#enum, record, result, s32, str, tuple, u32,
             u64, unit_case, variant,
         };
-        use crate::analysis::{
-            AnalysedResourceId, AnalysedResourceMode, AnalysedType, TypeHandle, WitExport,
+        use crate::wit::{
+            AnalysedResourceId, AnalysedResourceMode, WitType, TypeHandle, WitExport,
             WitFunction, WitFunctionParameter, WitFunctionResult, WitInterface,
         };
         use crate::interpreter::rib_interpreter::internal::NoopRibFunctionInvoke;
@@ -4302,7 +4302,7 @@ mod tests {
             result.strip_prefix("\n").unwrap_or(&result).to_string()
         }
 
-        pub(crate) fn get_analysed_type_variant() -> AnalysedType {
+        pub(crate) fn get_analysed_type_variant() -> WitType {
             variant(vec![
                 case("register-user", u64()),
                 case("process-user", str()),
@@ -4310,7 +4310,7 @@ mod tests {
             ])
         }
 
-        pub(crate) fn get_analysed_type_record() -> AnalysedType {
+        pub(crate) fn get_analysed_type_record() -> WitType {
             record(vec![
                 field(
                     "request",
@@ -4320,23 +4320,23 @@ mod tests {
             ])
         }
 
-        pub(crate) fn get_analysed_type_result() -> AnalysedType {
+        pub(crate) fn get_analysed_type_result() -> WitType {
             result(u64(), str())
         }
 
-        pub(crate) fn get_analysed_type_enum() -> AnalysedType {
+        pub(crate) fn get_analysed_type_enum() -> WitType {
             r#enum(&["prod", "dev", "test"])
         }
 
-        pub(crate) fn get_analysed_typ_str() -> AnalysedType {
+        pub(crate) fn get_analysed_typ_str() -> WitType {
             str()
         }
 
-        pub(crate) fn get_analysed_typ_u64() -> AnalysedType {
+        pub(crate) fn get_analysed_typ_u64() -> WitType {
             u64()
         }
 
-        pub(crate) fn get_analysed_type_tuple() -> AnalysedType {
+        pub(crate) fn get_analysed_type_tuple() -> WitType {
             tuple(vec![
                 get_analysed_typ_u64(),
                 get_analysed_type_result(),
@@ -4353,8 +4353,8 @@ mod tests {
 
         pub(crate) fn configurable_metadata(
             function_name: &str,
-            input_types: Vec<AnalysedType>,
-            output: Option<AnalysedType>,
+            input_types: Vec<WitType>,
+            output: Option<WitType>,
         ) -> ComponentDependency {
             let analysed_function_parameters = input_types
                 .into_iter()
@@ -4595,7 +4595,7 @@ mod tests {
                             typ: str(),
                         }],
                         result: Some(WitFunctionResult {
-                            typ: AnalysedType::Handle(TypeHandle {
+                            typ: WitType::Handle(TypeHandle {
                                 name: Some("cart".to_string()),
                                 owner: Some("golem:it/api".to_string()),
                                 resource_id: AnalysedResourceId(0),
@@ -4611,7 +4611,7 @@ mod tests {
                         }],
                         result: Some(WitFunctionResult {
                             typ: result(
-                                AnalysedType::Handle(TypeHandle {
+                                WitType::Handle(TypeHandle {
                                     name: Some("cart".to_string()),
                                     owner: Some("golem:it/api".to_string()),
                                     resource_id: AnalysedResourceId(0),
@@ -4737,7 +4737,7 @@ mod tests {
         }
 
         pub(crate) fn get_value_and_type(
-            analysed_type: &AnalysedType,
+            analysed_type: &WitType,
             wasm_wave_str: &str,
         ) -> ValueAndType {
             crate::parse_value_and_type(analysed_type, wasm_wave_str).unwrap()
@@ -4811,7 +4811,7 @@ mod tests {
                 _worker_name: EvaluatedWorkerName,
                 _fqn: EvaluatedFqFn,
                 _args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 let value = self.value.clone();
                 Ok(Some(value))
@@ -4829,7 +4829,7 @@ mod tests {
                 worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 let analysed_type = record(vec![
                     field("worker-name", str()),
@@ -4860,7 +4860,7 @@ mod tests {
                 worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 match function_name.0.as_str() {
                     "golem:it/api.{cart.new}" => {
@@ -5010,7 +5010,7 @@ mod tests {
                 _worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 let arg = args.0.first().unwrap();
 
@@ -5031,7 +5031,7 @@ mod tests {
                 worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 let mut arguments_concatenated = String::new();
 
@@ -5074,7 +5074,7 @@ mod tests {
                 _worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 _args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 match function_name.0.as_str() {
                     "amazon:shopping-cart/api1.{foo}" => {
@@ -5362,7 +5362,7 @@ mod tests {
                 _worker_name: EvaluatedWorkerName,
                 function_name: EvaluatedFqFn,
                 args: EvaluatedFnArgs,
-                _return_type: Option<AnalysedType>,
+                _return_type: Option<WitType>,
             ) -> RibFunctionInvokeResult {
                 match function_name.0.as_str() {
                     "add-u32" => {

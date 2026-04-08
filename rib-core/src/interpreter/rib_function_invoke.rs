@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::ValueAndType;
 use crate::{ComponentDependencyKey, InstructionId};
 use async_trait::async_trait;
@@ -26,7 +26,7 @@ pub trait RibComponentFunctionInvoke {
         worker_name: EvaluatedWorkerName,
         function_name: EvaluatedFqFn,
         args: EvaluatedFnArgs,
-        return_type: Option<AnalysedType>,
+        return_type: Option<WitType>,
     ) -> RibFunctionInvokeResult;
 }
 

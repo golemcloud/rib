@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::{ComponentDependency, FunctionName, InferredExpr, RibCompilationError};
 
 // An easier data type that focus just on the side effecting function calls in Rib script.
@@ -46,12 +46,12 @@ impl WorkerFunctionsInRib {
                 parameter_types: function_type
                     .parameter_types
                     .iter()
-                    .map(|param| AnalysedType::try_from(param).unwrap())
+                    .map(|param| WitType::try_from(param).unwrap())
                     .collect(),
                 return_type: function_type
                     .return_type
                     .as_ref()
-                    .map(|return_type| AnalysedType::try_from(return_type).unwrap()),
+                    .map(|return_type| WitType::try_from(return_type).unwrap()),
             };
 
             function_calls.push(function_call_in_rib)
@@ -69,6 +69,6 @@ impl WorkerFunctionsInRib {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerFunctionType {
     pub function_name: FunctionName,
-    pub parameter_types: Vec<AnalysedType>,
-    pub return_type: Option<AnalysedType>,
+    pub parameter_types: Vec<WitType>,
+    pub return_type: Option<WitType>,
 }

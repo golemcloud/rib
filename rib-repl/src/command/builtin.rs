@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{Clear as TermClear, ClearType},
 };
-use rib::analysis::AnalysedType;
+use rib::wit::WitType;
 use rib::{CompilerOutput, ComponentDependency, Expr, RibCompilationError};
 use std::io::stdout;
 
@@ -28,7 +28,7 @@ pub struct TypeInfo;
 
 impl Command for TypeInfo {
     type Input = TypeInfoInput;
-    type Output = AnalysedType;
+    type Output = WitType;
     type InputParseError = clap::Error;
     type ExecutionError = RibCompilationError;
 

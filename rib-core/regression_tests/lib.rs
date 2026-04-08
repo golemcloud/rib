@@ -2,8 +2,8 @@ test_r::enable!();
 
 use test_r::test;
 
-use rib::analysis::analysed_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
-use rib::analysis::AnalysedType;
+use rib::wit::wit_type::{bool, f32, f64, field, record, s16, s32, str, u64, u8};
+use rib::wit::WitType;
 use rib::ValueAndType;
 use rib::{
     EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, Expr, Interpreter, RibCompiler,
@@ -568,7 +568,7 @@ fn expected_value_and_type() -> ValueAndType {
     test_utils::get_value_and_type(&expected_analysed_type(), wasm_wave_str)
 }
 
-fn expected_analysed_type() -> AnalysedType {
+fn expected_analysed_type() -> WitType {
     record(vec![
         field("a", str()),
         field("aa", u64()),
@@ -699,7 +699,7 @@ mod component_metadata {
 
 mod function_metadata {
     use crate::{data_types, test_utils};
-    use rib::analysis::WitExport;
+    use rib::wit::WitExport;
 
     pub(crate) fn function_unit_response() -> Vec<WitExport> {
         test_utils::get_function_component_metadata(
@@ -1156,117 +1156,117 @@ mod function_metadata {
 }
 
 mod data_types {
-    use rib::analysis::analysed_type::{
+    use rib::wit::wit_type::{
         bool, case, chr, f32, f64, field, flags, list, option, r#enum, record, result, s16, s32,
         s64, s8, str, tuple, u16, u32, u64, u8, unit_case, variant,
     };
-    use rib::analysis::*;
+    use rib::wit::*;
 
     // Result
-    pub(crate) fn result_of_str_type() -> AnalysedType {
+    pub(crate) fn result_of_str_type() -> WitType {
         result(str(), str())
     }
 
-    pub(crate) fn result_of_number_type() -> AnalysedType {
+    pub(crate) fn result_of_number_type() -> WitType {
         result(u64(), u64())
     }
 
-    pub(crate) fn result_of_option_type() -> AnalysedType {
+    pub(crate) fn result_of_option_type() -> WitType {
         result(option_of_str_type(), option_of_str_type())
     }
 
-    pub(crate) fn result_of_variant_type() -> AnalysedType {
+    pub(crate) fn result_of_variant_type() -> WitType {
         result(variant_type(), variant_type())
     }
 
-    pub(crate) fn result_of_enum_type() -> AnalysedType {
+    pub(crate) fn result_of_enum_type() -> WitType {
         result(enum_type(), enum_type())
     }
 
-    pub(crate) fn result_of_tuple_type() -> AnalysedType {
+    pub(crate) fn result_of_tuple_type() -> WitType {
         result(tuple_type(), tuple_type())
     }
 
-    pub(crate) fn result_of_flag_type() -> AnalysedType {
+    pub(crate) fn result_of_flag_type() -> WitType {
         result(flag_type(), flag_type())
     }
 
-    pub(crate) fn result_of_record_type() -> AnalysedType {
+    pub(crate) fn result_of_record_type() -> WitType {
         result(record_type(), record_type())
     }
 
-    pub(crate) fn result_of_list_type() -> AnalysedType {
+    pub(crate) fn result_of_list_type() -> WitType {
         result(list_of_str_type(), list_of_str_type())
     }
 
     // List
-    pub(crate) fn list_of_number_type_type() -> AnalysedType {
+    pub(crate) fn list_of_number_type_type() -> WitType {
         list(u64())
     }
 
-    pub(crate) fn list_of_str_type() -> AnalysedType {
+    pub(crate) fn list_of_str_type() -> WitType {
         list(str())
     }
 
-    pub(crate) fn list_of_option_type() -> AnalysedType {
+    pub(crate) fn list_of_option_type() -> WitType {
         list(option(str()))
     }
 
-    pub(crate) fn list_of_list_type() -> AnalysedType {
+    pub(crate) fn list_of_list_type() -> WitType {
         list(list(str()))
     }
 
-    pub(crate) fn list_of_variant_type() -> AnalysedType {
+    pub(crate) fn list_of_variant_type() -> WitType {
         list(variant_type())
     }
 
-    pub(crate) fn list_of_enum_type() -> AnalysedType {
+    pub(crate) fn list_of_enum_type() -> WitType {
         list(enum_type())
     }
 
-    pub(crate) fn list_of_tuple() -> AnalysedType {
+    pub(crate) fn list_of_tuple() -> WitType {
         list(tuple_type())
     }
 
-    pub(crate) fn list_of_record_type() -> AnalysedType {
+    pub(crate) fn list_of_record_type() -> WitType {
         list(record_type())
     }
 
-    pub(crate) fn option_of_number_type() -> AnalysedType {
+    pub(crate) fn option_of_number_type() -> WitType {
         option(u64())
     }
 
     // Option
-    pub(crate) fn option_of_str_type() -> AnalysedType {
+    pub(crate) fn option_of_str_type() -> WitType {
         option(str())
     }
 
-    pub(crate) fn option_of_option_type() -> AnalysedType {
+    pub(crate) fn option_of_option_type() -> WitType {
         option(option(str()))
     }
 
-    pub(crate) fn option_of_variant_type() -> AnalysedType {
+    pub(crate) fn option_of_variant_type() -> WitType {
         option(variant_type())
     }
 
-    pub(crate) fn option_of_enum_type() -> AnalysedType {
+    pub(crate) fn option_of_enum_type() -> WitType {
         option(enum_type())
     }
 
-    pub(crate) fn option_of_tuple() -> AnalysedType {
+    pub(crate) fn option_of_tuple() -> WitType {
         option(tuple_type())
     }
 
-    pub(crate) fn option_of_record_type() -> AnalysedType {
+    pub(crate) fn option_of_record_type() -> WitType {
         option(record_type())
     }
 
-    pub(crate) fn option_of_list() -> AnalysedType {
+    pub(crate) fn option_of_list() -> WitType {
         option(list(str()))
     }
 
     // Record
-    pub(crate) fn record_type() -> AnalysedType {
+    pub(crate) fn record_type() -> WitType {
         record(vec![
             field(
                 "string-headers",
@@ -1354,7 +1354,7 @@ mod data_types {
     }
 
     // Tuple
-    pub(crate) fn tuple_type() -> AnalysedType {
+    pub(crate) fn tuple_type() -> WitType {
         tuple(vec![
             str(),
             u64(),
@@ -1372,27 +1372,27 @@ mod data_types {
     }
 
     // Enum
-    pub(crate) fn enum_type() -> AnalysedType {
+    pub(crate) fn enum_type() -> WitType {
         r#enum(&["enum-a", "enum-b", "enum-c"])
     }
 
     // Str
-    pub(crate) fn str_type() -> AnalysedType {
+    pub(crate) fn str_type() -> WitType {
         str()
     }
 
     // Number
-    pub(crate) fn number_type() -> AnalysedType {
+    pub(crate) fn number_type() -> WitType {
         u64()
     }
 
     // Flag
-    pub(crate) fn flag_type() -> AnalysedType {
+    pub(crate) fn flag_type() -> WitType {
         flags(&["featurex", "featurey", "featurez"])
     }
 
     // Variant
-    pub(crate) fn variant_type() -> AnalysedType {
+    pub(crate) fn variant_type() -> WitType {
         variant(vec![
             unit_case("case-none"),
             case("case-str", str()),
@@ -1716,8 +1716,8 @@ mod mock_interpreter {
     };
     use async_trait::async_trait;
 
-    use rib::analysis::analysed_type::{field, record, str};
-    use rib::analysis::AnalysedType;
+    use rib::wit::wit_type::{field, record, str};
+    use rib::wit::WitType;
     use rib::ValueAndType;
     use rib::{ComponentDependencyKey, DefaultWorkerNameGenerator, InstructionId};
     use std::collections::HashMap;
@@ -1924,7 +1924,7 @@ mod mock_interpreter {
             _worker_name: EvaluatedWorkerName,
             function_name: EvaluatedFqFn,
             _args: EvaluatedFnArgs,
-            _return_type: Option<AnalysedType>,
+            _return_type: Option<WitType>,
         ) -> RibFunctionInvokeResult {
             let function_name = FunctionName(function_name.0);
 
@@ -1940,11 +1940,11 @@ mod mock_interpreter {
 }
 
 mod test_utils {
-    use rib::analysis::*;
+    use rib::wit::*;
     use rib::ValueAndType;
 
     pub(crate) fn get_value_and_type(
-        analysed_type: &AnalysedType,
+        analysed_type: &WitType,
         wasm_wave_str: &str,
     ) -> ValueAndType {
         let result = rib::parse_value_and_type(analysed_type, wasm_wave_str);
@@ -1961,8 +1961,8 @@ mod test_utils {
 
     pub(crate) fn get_function_component_metadata(
         function_name: &str,
-        input_types: Vec<AnalysedType>,
-        output: Option<AnalysedType>,
+        input_types: Vec<WitType>,
+        output: Option<WitType>,
     ) -> Vec<WitExport> {
         let analysed_function_parameters = input_types
             .into_iter()

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{AnalysedType, TypeResult};
-use crate::analysis::{TypeVariant, WitExport};
+use crate::wit::{WitType, TypeResult};
+use crate::wit::{TypeVariant, WitExport};
 use crate::DynamicParsedFunctionName;
 use std::fmt::{Display, Formatter};
 
@@ -204,19 +204,19 @@ impl RegistryKey {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum RegistryValue {
-    Value(AnalysedType),
+    Value(WitType),
     Variant {
-        parameter_types: Vec<AnalysedType>,
+        parameter_types: Vec<WitType>,
         variant_type: TypeVariant,
     },
     Function {
-        parameter_types: Vec<AnalysedType>,
-        return_type: Option<AnalysedType>,
+        parameter_types: Vec<WitType>,
+        return_type: Option<WitType>,
     },
 }
 
 impl RegistryValue {
-    pub fn argument_types(&self) -> Vec<AnalysedType> {
+    pub fn argument_types(&self) -> Vec<WitType> {
         match self {
             RegistryValue::Function {
                 parameter_types,
@@ -231,9 +231,9 @@ impl RegistryValue {
     }
 }
 
-fn update_registry(ty: &AnalysedType, registry: &mut Vec<(RegistryKey, RegistryValue)>) {
+fn update_registry(ty: &WitType, registry: &mut Vec<(RegistryKey, RegistryValue)>) {
     match ty.clone() {
-        AnalysedType::Variant(variant) => {
+        WitType::Variant(variant) => {
             let type_variant = variant.clone();
             for name_type_pair in &type_variant.cases {
                 registry.push((RegistryKey::FunctionName(name_type_pair.name.clone()), {
@@ -248,7 +248,7 @@ fn update_registry(ty: &AnalysedType, registry: &mut Vec<(RegistryKey, RegistryV
             }
         }
 
-        AnalysedType::Enum(type_enum) => {
+        WitType::Enum(type_enum) => {
             for name_type_pair in type_enum.cases {
                 registry.push((
                     RegistryKey::FunctionName(name_type_pair.clone()),
@@ -257,23 +257,23 @@ fn update_registry(ty: &AnalysedType, registry: &mut Vec<(RegistryKey, RegistryV
             }
         }
 
-        AnalysedType::Tuple(tuple) => {
+        WitType::Tuple(tuple) => {
             for element in tuple.items {
                 update_registry(&element, registry);
             }
         }
 
-        AnalysedType::List(list) => {
+        WitType::List(list) => {
             update_registry(list.inner.as_ref(), registry);
         }
 
-        AnalysedType::Record(record) => {
+        WitType::Record(record) => {
             for name_type in record.fields.iter() {
                 update_registry(&name_type.typ, registry);
             }
         }
 
-        AnalysedType::Result(TypeResult {
+        WitType::Result(TypeResult {
             ok: Some(ok_type),
             err: Some(err_type),
             ..
@@ -281,42 +281,42 @@ fn update_registry(ty: &AnalysedType, registry: &mut Vec<(RegistryKey, RegistryV
             update_registry(ok_type.as_ref(), registry);
             update_registry(err_type.as_ref(), registry);
         }
-        AnalysedType::Result(TypeResult {
+        WitType::Result(TypeResult {
             ok: None,
             err: Some(err_type),
             ..
         }) => {
             update_registry(err_type.as_ref(), registry);
         }
-        AnalysedType::Result(TypeResult {
+        WitType::Result(TypeResult {
             ok: Some(ok_type),
             err: None,
             ..
         }) => {
             update_registry(ok_type.as_ref(), registry);
         }
-        AnalysedType::Option(type_option) => {
+        WitType::Option(type_option) => {
             update_registry(type_option.inner.as_ref(), registry);
         }
-        AnalysedType::Result(TypeResult {
+        WitType::Result(TypeResult {
             ok: None,
             err: None,
             ..
         }) => {}
-        AnalysedType::Flags(_) => {}
-        AnalysedType::Str(_) => {}
-        AnalysedType::Chr(_) => {}
-        AnalysedType::F64(_) => {}
-        AnalysedType::F32(_) => {}
-        AnalysedType::U64(_) => {}
-        AnalysedType::S64(_) => {}
-        AnalysedType::U32(_) => {}
-        AnalysedType::S32(_) => {}
-        AnalysedType::U16(_) => {}
-        AnalysedType::S16(_) => {}
-        AnalysedType::U8(_) => {}
-        AnalysedType::S8(_) => {}
-        AnalysedType::Bool(_) => {}
-        AnalysedType::Handle(_) => {}
+        WitType::Flags(_) => {}
+        WitType::Str(_) => {}
+        WitType::Chr(_) => {}
+        WitType::F64(_) => {}
+        WitType::F32(_) => {}
+        WitType::U64(_) => {}
+        WitType::S64(_) => {}
+        WitType::U32(_) => {}
+        WitType::S32(_) => {}
+        WitType::U16(_) => {}
+        WitType::S16(_) => {}
+        WitType::U8(_) => {}
+        WitType::S8(_) => {}
+        WitType::Bool(_) => {}
+        WitType::Handle(_) => {}
     }
 }

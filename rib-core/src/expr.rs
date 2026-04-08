@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::call_type::CallType;
 use crate::inferred_type::DefaultType;
 use crate::parser::block::block;
@@ -1826,18 +1826,18 @@ pub struct Number {
 impl Eq for Number {}
 
 impl Number {
-    pub fn to_val(&self, analysed_type: &AnalysedType) -> Option<ValueAndType> {
+    pub fn to_val(&self, analysed_type: &WitType) -> Option<ValueAndType> {
         match analysed_type {
-            AnalysedType::F64(_) => self.value.to_f64().map(|v| v.into_value_and_type()),
-            AnalysedType::U64(_) => self.value.to_u64().map(|v| v.into_value_and_type()),
-            AnalysedType::F32(_) => self.value.to_f32().map(|v| v.into_value_and_type()),
-            AnalysedType::U32(_) => self.value.to_u32().map(|v| v.into_value_and_type()),
-            AnalysedType::S32(_) => self.value.to_i32().map(|v| v.into_value_and_type()),
-            AnalysedType::S64(_) => self.value.to_i64().map(|v| v.into_value_and_type()),
-            AnalysedType::U8(_) => self.value.to_u8().map(|v| v.into_value_and_type()),
-            AnalysedType::S8(_) => self.value.to_i8().map(|v| v.into_value_and_type()),
-            AnalysedType::U16(_) => self.value.to_u16().map(|v| v.into_value_and_type()),
-            AnalysedType::S16(_) => self.value.to_i16().map(|v| v.into_value_and_type()),
+            WitType::F64(_) => self.value.to_f64().map(|v| v.into_value_and_type()),
+            WitType::U64(_) => self.value.to_u64().map(|v| v.into_value_and_type()),
+            WitType::F32(_) => self.value.to_f32().map(|v| v.into_value_and_type()),
+            WitType::U32(_) => self.value.to_u32().map(|v| v.into_value_and_type()),
+            WitType::S32(_) => self.value.to_i32().map(|v| v.into_value_and_type()),
+            WitType::S64(_) => self.value.to_i64().map(|v| v.into_value_and_type()),
+            WitType::U8(_) => self.value.to_u8().map(|v| v.into_value_and_type()),
+            WitType::S8(_) => self.value.to_i8().map(|v| v.into_value_and_type()),
+            WitType::U16(_) => self.value.to_u16().map(|v| v.into_value_and_type()),
+            WitType::S16(_) => self.value.to_i16().map(|v| v.into_value_and_type()),
             _ => None,
         }
     }

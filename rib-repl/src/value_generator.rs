@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rib::analysis::AnalysedType;
+use rib::wit::WitType;
 use rib::Value;
 
-pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
+pub fn generate_value(analysed_tpe: &WitType) -> Value {
     match analysed_tpe {
-        AnalysedType::Variant(typed_variant) => {
+        WitType::Variant(typed_variant) => {
             let first_case = typed_variant.cases.first();
 
             if let Some(first_case) = first_case {
@@ -42,7 +42,7 @@ pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
                 }
             }
         }
-        AnalysedType::Result(typ) => {
+        WitType::Result(typ) => {
             let ok_type = &typ.ok;
             let err_type = &typ.err;
 
@@ -60,22 +60,22 @@ pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
                 },
             }
         }
-        AnalysedType::Option(typ) => {
+        WitType::Option(typ) => {
             let inner_type = &typ.inner;
             let inner_value = generate_value(inner_type);
 
             Value::Option(Some(Box::new(inner_value)))
         }
-        AnalysedType::Enum(_) => Value::Enum(0),
+        WitType::Enum(_) => Value::Enum(0),
 
-        AnalysedType::Flags(flags) => {
+        WitType::Flags(flags) => {
             let flag_names = &flags.names;
             let length = flag_names.len();
             let flags = vec![true; length];
 
             Value::Flags(flags)
         }
-        AnalysedType::Record(typed_record) => {
+        WitType::Record(typed_record) => {
             let fields = &typed_record.fields;
             let mut values = vec![];
 
@@ -88,7 +88,7 @@ pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
 
             Value::Record(values)
         }
-        AnalysedType::Tuple(tuple) => {
+        WitType::Tuple(tuple) => {
             let inner_types = &tuple.items;
             let mut values = vec![];
 
@@ -100,7 +100,7 @@ pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
 
             Value::Tuple(values)
         }
-        AnalysedType::List(typ) => {
+        WitType::List(typ) => {
             let inner_type = &typ.inner;
             let inner_value = generate_value(inner_type);
 
@@ -108,20 +108,20 @@ pub fn generate_value(analysed_tpe: &AnalysedType) -> Value {
 
             Value::List(values)
         }
-        AnalysedType::Str(_) => Value::String("foo".to_string()),
-        AnalysedType::Chr(_) => Value::Char('c'),
-        AnalysedType::F64(_) => Value::F64(42.0),
-        AnalysedType::F32(_) => Value::F32(42.0),
-        AnalysedType::U64(_) => Value::U64(42),
-        AnalysedType::S64(_) => Value::S64(42),
-        AnalysedType::U32(_) => Value::U32(42),
-        AnalysedType::S32(_) => Value::S32(42),
-        AnalysedType::U16(_) => Value::U16(42),
-        AnalysedType::S16(_) => Value::S16(42),
-        AnalysedType::U8(_) => Value::U8(42),
-        AnalysedType::S8(_) => Value::S8(42),
-        AnalysedType::Bool(_) => Value::Bool(true),
-        AnalysedType::Handle(_) => Value::Handle {
+        WitType::Str(_) => Value::String("foo".to_string()),
+        WitType::Chr(_) => Value::Char('c'),
+        WitType::F64(_) => Value::F64(42.0),
+        WitType::F32(_) => Value::F32(42.0),
+        WitType::U64(_) => Value::U64(42),
+        WitType::S64(_) => Value::S64(42),
+        WitType::U32(_) => Value::U32(42),
+        WitType::S32(_) => Value::S32(42),
+        WitType::U16(_) => Value::U16(42),
+        WitType::S16(_) => Value::S16(42),
+        WitType::U8(_) => Value::U8(42),
+        WitType::S8(_) => Value::S8(42),
+        WitType::Bool(_) => Value::Bool(true),
+        WitType::Handle(_) => Value::Handle {
             uri: "".to_string(),
             resource_id: 0,
         },

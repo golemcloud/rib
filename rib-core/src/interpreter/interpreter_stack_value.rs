@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
 use crate::interpreter::rib_runtime_error::{
     arithmetic_error, invalid_comparison, RibRuntimeError,
@@ -31,7 +31,7 @@ pub enum RibInterpreterStackValue {
     Unit,
     Val(ValueAndType),
     Iterator(Box<dyn Iterator<Item = ValueAndType> + Send + Sync>),
-    Sink(Vec<ValueAndType>, AnalysedType),
+    Sink(Vec<ValueAndType>, WitType),
 }
 
 impl TryFrom<RibInterpreterStackValue> for String {
@@ -149,7 +149,7 @@ impl RibInterpreterStackValue {
     pub fn unwrap(&self) -> Option<ValueAndType> {
         match self {
             RibInterpreterStackValue::Val(val) => match (val.value.clone(), val.typ.clone()) {
-                (Value::Option(Some(option)), AnalysedType::Option(option_type)) => {
+                (Value::Option(Some(option)), WitType::Option(option_type)) => {
                     let inner_value = option.deref().clone();
                     let inner_type = option_type.inner.deref().clone();
                     Some(ValueAndType {
@@ -158,7 +158,7 @@ impl RibInterpreterStackValue {
                     })
                 }
 
-                (Value::Result(Ok(Some(ok))), AnalysedType::Result(result_type)) => {
+                (Value::Result(Ok(Some(ok))), WitType::Result(result_type)) => {
                     let ok_value = ok.deref().clone();
                     let ok_type = result_type.ok.as_ref()?.deref().clone();
                     Some(ValueAndType {
@@ -167,7 +167,7 @@ impl RibInterpreterStackValue {
                     })
                 }
 
-                (Value::Result(Err(Some(err))), AnalysedType::Result(result_type)) => {
+                (Value::Result(Err(Some(err))), WitType::Result(result_type)) => {
                     let err_value = err.deref().clone();
                     let err_type = result_type.err.as_ref()?.deref().clone();
                     Some(ValueAndType {
@@ -181,7 +181,7 @@ impl RibInterpreterStackValue {
                         case_value: Some(case_value),
                         case_idx,
                     },
-                    AnalysedType::Variant(variant_type),
+                    WitType::Variant(variant_type),
                 ) => {
                     let case_type = variant_type
                         .cases
@@ -240,7 +240,7 @@ impl fmt::Debug for RibInterpreterStackValue {
 }
 
 mod internal {
-    use crate::analysis::{AnalysedType, TypeVariant};
+    use crate::wit::{WitType, TypeVariant};
     use crate::interpreter::literal::{GetLiteralValue, LiteralValue};
     use crate::interpreter::rib_runtime_error::invalid_comparison;
     use crate::{internal_corrupted_state, RibInterpreterResult};
@@ -263,7 +263,7 @@ mod internal {
                         case_idx: left_case_idx,
                         case_value: left_case_value,
                     },
-                typ: AnalysedType::Variant(left_typ),
+                typ: WitType::Variant(left_typ),
             },
             ValueAndType {
                 value:
@@ -271,7 +271,7 @@ mod internal {
                         case_idx: right_cast_idx,
                         case_value: right_case_value,
                     },
-                typ: AnalysedType::Variant(right_typ),
+                typ: WitType::Variant(right_typ),
             },
         ) = (left, right)
         {

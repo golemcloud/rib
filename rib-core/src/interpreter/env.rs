@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::ValueAndType;
 use crate::{
@@ -53,7 +53,7 @@ impl InterpreterEnv {
         worker_name: String,
         function_name: String,
         args: Vec<ValueAndType>,
-        return_type: Option<AnalysedType>,
+        return_type: Option<WitType>,
     ) -> Result<Option<ValueAndType>, Box<dyn std::error::Error + Send + Sync>> {
         self.call_worker_function_async
             .invoke(
@@ -122,7 +122,7 @@ impl EnvironmentKey {
 }
 
 mod internal {
-    use crate::analysis::AnalysedType;
+    use crate::wit::WitType;
     use crate::interpreter::env::RibComponentFunctionInvoke;
     use crate::{
         ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
@@ -141,7 +141,7 @@ mod internal {
             _worker_name: EvaluatedWorkerName,
             _function_name: EvaluatedFqFn,
             _args: EvaluatedFnArgs,
-            _return_type: Option<AnalysedType>,
+            _return_type: Option<WitType>,
         ) -> RibFunctionInvokeResult {
             Ok(None)
         }

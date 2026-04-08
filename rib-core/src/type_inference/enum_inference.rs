@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_inference::expr_visitor::arena::children_of;
 use crate::ComponentDependency;
@@ -65,7 +65,7 @@ fn collect_enum_identifiers(
 
                 if let Some(typed_enum) = result {
                     let new_type: crate::InferredType =
-                        (&AnalysedType::Enum(typed_enum.clone())).into();
+                        (&WitType::Enum(typed_enum.clone())).into();
                     let current = types.get(id).clone();
                     types.set(id, current.merge(new_type));
                     enum_ids.push(id);

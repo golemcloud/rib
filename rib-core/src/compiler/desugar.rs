@@ -632,8 +632,8 @@ mod desugar_tests {
     use test_r::test;
 
     use super::*;
-    use crate::analysis::{
-        AnalysedType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
+    use crate::wit::{
+        WitType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
     };
     use crate::compiler::desugar::desugar_tests::expectations::expected_condition_with_identifiers;
     use crate::{
@@ -648,7 +648,7 @@ mod desugar_tests {
                 name: "foo".to_string(),
                 parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U64(TypeU64),
+                    typ: WitType::U64(TypeU64),
                 }],
                 result: None,
             }),
@@ -656,7 +656,7 @@ mod desugar_tests {
                 name: "baz".to_string(),
                 parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U32(TypeU32),
+                    typ: WitType::U32(TypeU32),
                 }],
                 result: None,
             }),

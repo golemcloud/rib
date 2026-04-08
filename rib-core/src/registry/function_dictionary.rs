@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{AnalysedType, TypeEnum, TypeVariant, WitExport};
+use crate::wit::{WitType, TypeEnum, TypeVariant, WitExport};
 use crate::expr_arena::CallTypeNode;
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
@@ -193,7 +193,7 @@ impl FunctionDictionary {
                 },
 
                 RegistryValue::Value(value) => match value {
-                    AnalysedType::Enum(type_enum) => match key {
+                    WitType::Enum(type_enum) => match key {
                         RegistryKey::FunctionName(name) => {
                             let function_name = FunctionName::Enum(name.to_string());
 
@@ -207,7 +207,7 @@ impl FunctionDictionary {
                         }
                         RegistryKey::FunctionNameWithInterface { .. } => {}
                     },
-                    AnalysedType::Variant(variant_type) => match key {
+                    WitType::Variant(variant_type) => match key {
                         RegistryKey::FunctionName(name) => {
                             let function_name = FunctionName::Variant(name.to_string());
 
@@ -608,32 +608,32 @@ pub struct FunctionType {
 
 impl FunctionType {
     pub fn as_type_variant(&self) -> Option<TypeVariant> {
-        let analysed_type = AnalysedType::try_from(&self.return_type.clone()?).ok()?;
+        let analysed_type = WitType::try_from(&self.return_type.clone()?).ok()?;
 
         match analysed_type {
-            AnalysedType::Variant(type_variant) => Some(type_variant),
+            WitType::Variant(type_variant) => Some(type_variant),
             _ => None,
         }
     }
 
     pub fn as_type_enum(&self) -> Option<TypeEnum> {
-        let analysed_type = AnalysedType::try_from(&self.return_type.clone()?).ok()?;
+        let analysed_type = WitType::try_from(&self.return_type.clone()?).ok()?;
         match analysed_type {
-            AnalysedType::Enum(type_enum) => Some(type_enum),
+            WitType::Enum(type_enum) => Some(type_enum),
             _ => None,
         }
     }
 
-    pub fn parameter_types(&self) -> Vec<AnalysedType> {
+    pub fn parameter_types(&self) -> Vec<WitType> {
         self.parameter_types
             .iter()
-            .map(|x| AnalysedType::try_from(x).unwrap())
+            .map(|x| WitType::try_from(x).unwrap())
             .collect()
     }
 
-    pub fn return_type(&self) -> Option<AnalysedType> {
+    pub fn return_type(&self) -> Option<WitType> {
         self.return_type
             .clone()
-            .map(|x| AnalysedType::try_from(&x).unwrap())
+            .map(|x| WitType::try_from(&x).unwrap())
     }
 }

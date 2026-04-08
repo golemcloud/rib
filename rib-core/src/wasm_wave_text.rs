@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::{IntoValueAndType, Value, ValueAndType};
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -20,7 +20,7 @@ use wasm_wave::wasm::{WasmType, WasmTypeKind, WasmValue, WasmValueError};
 use wasm_wave::{from_str, to_string};
 
 pub fn parse_value_and_type(
-    analysed_type: &AnalysedType,
+    analysed_type: &WitType,
     input: &str,
 ) -> Result<ValueAndType, String> {
     let parsed: ValueAndType = from_str(analysed_type, input).map_err(|err| err.to_string())?;
@@ -36,7 +36,7 @@ pub fn print_value_and_type(value: &ValueAndType) -> Result<String, String> {
 }
 
 impl WasmValue for ValueAndType {
-    type Type = AnalysedType;
+    type Type = WitType;
 
     fn kind(&self) -> WasmTypeKind {
         self.typ.kind()
@@ -129,7 +129,7 @@ impl WasmValue for ValueAndType {
         case: &str,
         val: Option<Self>,
     ) -> Result<Self, WasmValueError> {
-        if let AnalysedType::Variant(typ) = ty {
+        if let WitType::Variant(typ) = ty {
             let case_idx = typ
                 .cases
                 .iter()
@@ -152,7 +152,7 @@ impl WasmValue for ValueAndType {
     }
 
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
-        if let AnalysedType::Enum(typ) = ty {
+        if let WitType::Enum(typ) = ty {
             let case_idx = typ
                 .cases
                 .iter()
@@ -195,7 +195,7 @@ impl WasmValue for ValueAndType {
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
     ) -> Result<Self, WasmValueError> {
-        if let AnalysedType::Flags(typ) = ty {
+        if let WitType::Flags(typ) = ty {
             let mut bitmap = Vec::new();
             let names: HashSet<&'a str> = HashSet::from_iter(names);
             for name in &typ.names {
@@ -306,7 +306,7 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_list(&self) -> Box<dyn Iterator<Item = Cow<'_, Self>> + '_> {
         match (&self.value, &self.typ) {
-            (Value::List(vals), AnalysedType::List(typ)) => Box::new(vals.iter().map(|val| {
+            (Value::List(vals), WitType::List(typ)) => Box::new(vals.iter().map(|val| {
                 Cow::Owned(ValueAndType {
                     value: val.clone(),
                     typ: (*typ.inner).clone(),
@@ -318,7 +318,7 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_record(&self) -> Box<dyn Iterator<Item = (Cow<'_, str>, Cow<'_, Self>)> + '_> {
         match (&self.value, &self.typ) {
-            (Value::Record(vals), AnalysedType::Record(typ)) => {
+            (Value::Record(vals), WitType::Record(typ)) => {
                 Box::new(vals.iter().zip(typ.fields.iter()).map(|(val, field)| {
                     (
                         Cow::Borrowed(field.name.as_str()),
@@ -335,7 +335,7 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<'_, Self>> + '_> {
         match (&self.value, &self.typ) {
-            (Value::Tuple(vals), AnalysedType::Tuple(typ)) => {
+            (Value::Tuple(vals), WitType::Tuple(typ)) => {
                 Box::new(vals.iter().zip(typ.items.iter()).map(|(val, ty)| {
                     Cow::Owned(ValueAndType {
                         value: val.clone(),
@@ -354,7 +354,7 @@ impl WasmValue for ValueAndType {
                     case_idx,
                     case_value,
                 },
-                AnalysedType::Variant(typ),
+                WitType::Variant(typ),
             ) => {
                 let case = &typ.cases[*case_idx as usize];
                 (
@@ -373,7 +373,7 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_enum(&self) -> Cow<'_, str> {
         match (&self.value, &self.typ) {
-            (Value::Enum(case_idx), AnalysedType::Enum(typ)) => {
+            (Value::Enum(case_idx), WitType::Enum(typ)) => {
                 Cow::Borrowed(&typ.cases[*case_idx as usize])
             }
             _ => panic!("Expected enum, found {self:?}"),
@@ -382,20 +382,20 @@ impl WasmValue for ValueAndType {
 
     fn unwrap_option(&self) -> Option<Cow<'_, Self>> {
         match (&self.value, &self.typ) {
-            (Value::Option(Some(val)), AnalysedType::Option(typ)) => {
+            (Value::Option(Some(val)), WitType::Option(typ)) => {
                 Some(Cow::Owned(ValueAndType {
                     value: *val.clone(),
                     typ: (*typ.inner).clone(),
                 }))
             }
-            (Value::Option(None), AnalysedType::Option(_)) => None,
+            (Value::Option(None), WitType::Option(_)) => None,
             _ => panic!("Expected option, found {self:?}"),
         }
     }
 
     fn unwrap_result(&self) -> Result<Option<Cow<'_, Self>>, Option<Cow<'_, Self>>> {
         match (&self.value, &self.typ) {
-            (Value::Result(Ok(Some(val))), AnalysedType::Result(typ)) => {
+            (Value::Result(Ok(Some(val))), WitType::Result(typ)) => {
                 Ok(Some(Cow::Owned(ValueAndType {
                     value: *val.clone(),
                     typ: *typ
@@ -405,8 +405,8 @@ impl WasmValue for ValueAndType {
                         .clone(),
                 })))
             }
-            (Value::Result(Ok(None)), AnalysedType::Result(_)) => Ok(None),
-            (Value::Result(Err(Some(val))), AnalysedType::Result(typ)) => {
+            (Value::Result(Ok(None)), WitType::Result(_)) => Ok(None),
+            (Value::Result(Err(Some(val))), WitType::Result(typ)) => {
                 Err(Some(Cow::Owned(ValueAndType {
                     value: *val.clone(),
                     typ: *typ
@@ -416,14 +416,14 @@ impl WasmValue for ValueAndType {
                         .clone(),
                 })))
             }
-            (Value::Result(Err(None)), AnalysedType::Result(_)) => Err(None),
+            (Value::Result(Err(None)), WitType::Result(_)) => Err(None),
             _ => panic!("Expected result, found {self:?}"),
         }
     }
 
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<'_, str>> + '_> {
         match (&self.value, &self.typ) {
-            (Value::Flags(bitmap), AnalysedType::Flags(typ)) => Box::new(
+            (Value::Flags(bitmap), WitType::Flags(typ)) => Box::new(
                 bitmap
                     .iter()
                     .zip(typ.names.iter())

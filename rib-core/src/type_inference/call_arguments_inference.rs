@@ -14,7 +14,7 @@
 
 use std::fmt::Display;
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
     CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
@@ -285,10 +285,10 @@ fn infer_args_and_result_type_arena(
         }
     })?;
 
-    let mut parameter_types: Vec<AnalysedType> = function_type
+    let mut parameter_types: Vec<WitType> = function_type
         .parameter_types
         .iter()
-        .map(|t| AnalysedType::try_from(t).unwrap())
+        .map(|t| WitType::try_from(t).unwrap())
         .collect();
 
     match key {
@@ -340,7 +340,7 @@ fn infer_args_and_result_type_arena(
         }
 
         FunctionName::ResourceMethod(_) => {
-            if let Some(AnalysedType::Handle(_)) = parameter_types.first() {
+            if let Some(WitType::Handle(_)) = parameter_types.first() {
                 parameter_types.remove(0);
             }
             let return_type = function_type.return_type.clone();
@@ -366,13 +366,13 @@ fn infer_args_and_result_type_arena(
 fn tag_argument_types_arena(
     function_details: &FunctionDetails,
     args: &[ExprId],
-    parameter_types: &[AnalysedType],
+    parameter_types: &[WitType],
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
     for (&arg_id, param_type) in args.iter().zip(parameter_types) {
         // Variant conflict workaround: update Variant TypeInternal in place
-        if let AnalysedType::Variant(type_variant) = param_type {
+        if let WitType::Variant(type_variant) = param_type {
             let current = types.get(arg_id).clone();
             let mut current_inner = current.inner.as_ref().clone();
             if let TypeInternal::Variant(ref mut collections) = current_inner {
@@ -403,7 +403,7 @@ fn tag_argument_types_arena(
                 argument_source_span: arg_span.clone(),
                 error: TypeMismatchError {
                     source_span: arg_span,
-                    expected_type: ExpectedType::AnalysedType(param_type.clone()),
+                    expected_type: ExpectedType::WitType(param_type.clone()),
                     actual_type: ActualType::Inferred(arg_type),
                     field_path: Default::default(),
                     additional_error_detail: vec![],
@@ -429,8 +429,8 @@ fn merge_into(id: ExprId, ty: InferredType, types: &mut TypeTable) {
 mod function_parameters_inference_tests {
     use test_r::test;
 
-    use crate::analysis::{
-        AnalysedType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
+    use crate::wit::{
+        WitType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
     };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
@@ -464,7 +464,7 @@ mod function_parameters_inference_tests {
                 name: "foo".to_string(),
                 parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U64(TypeU64),
+                    typ: WitType::U64(TypeU64),
                 }],
                 result: None,
             }),
@@ -472,7 +472,7 @@ mod function_parameters_inference_tests {
                 name: "baz".to_string(),
                 parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
-                    typ: AnalysedType::U32(TypeU32),
+                    typ: WitType::U32(TypeU32),
                 }],
                 result: None,
             }),

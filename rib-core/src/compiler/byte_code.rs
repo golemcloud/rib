@@ -119,16 +119,16 @@ impl RibByteCode {
     }
 }
 mod internal {
-    use crate::analysis::{AnalysedType, TypeFlags};
+    use crate::wit::{WitType, TypeFlags};
     use crate::compiler::desugar::{desugar_pattern_match, desugar_range_selection};
     use crate::{
-        AnalysedTypeWithUnit, DynamicParsedFunctionReference, Expr, FunctionReferenceType,
+        WitTypeWithUnit, DynamicParsedFunctionReference, Expr, FunctionReferenceType,
         InferredType, InstanceIdentifier, InstanceVariable, InstructionId, Range,
         RibByteCodeGenerationError, RibIR, TypeInternal, VariableId,
     };
     use std::collections::HashSet;
 
-    use crate::analysis::analysed_type::bool;
+    use crate::wit::wit_type::bool;
     use crate::call_type::{CallType, InstanceCreationType};
     use crate::type_inference::{GetTypeHint, TypeHint};
     use crate::{IntoValueAndType, Value, ValueAndType};
@@ -419,9 +419,9 @@ mod internal {
                         }
 
                         let function_result_type = if inferred_type.is_unit() {
-                            AnalysedTypeWithUnit::Unit
+                            WitTypeWithUnit::Unit
                         } else {
-                            AnalysedTypeWithUnit::Type(convert_to_analysed_type(
+                            WitTypeWithUnit::Type(convert_to_analysed_type(
                                 expr,
                                 inferred_type,
                             )?)
@@ -567,9 +567,9 @@ mod internal {
                                 )?;
 
                                 let function_result_type = if inferred_type.is_unit() {
-                                    AnalysedTypeWithUnit::Unit
+                                    WitTypeWithUnit::Unit
                                 } else {
-                                    AnalysedTypeWithUnit::Type(convert_to_analysed_type(
+                                    WitTypeWithUnit::Type(convert_to_analysed_type(
                                         expr,
                                         inferred_type,
                                     )?)
@@ -628,7 +628,7 @@ mod internal {
                     }
                     instructions.push(RibIR::PushFlag(ValueAndType {
                         value: Value::Flags(bitmap),
-                        typ: AnalysedType::Flags(TypeFlags {
+                        typ: WitType::Flags(TypeFlags {
                             names: all_flags.iter().map(|n| n.to_string()).collect(),
                             owner: None,
                             name: None,
@@ -739,10 +739,10 @@ mod internal {
     pub(crate) fn convert_to_analysed_type(
         expr: &Expr,
         inferred_type: &InferredType,
-    ) -> Result<AnalysedType, RibByteCodeGenerationError> {
-        AnalysedType::try_from(inferred_type).map_err(|error| {
+    ) -> Result<WitType, RibByteCodeGenerationError> {
+        WitType::try_from(inferred_type).map_err(|error| {
             RibByteCodeGenerationError::AnalysedTypeConversionError(format!(
-                "Invalid Rib {}. Error converting {} to AnalysedType: {}",
+                "Invalid Rib {}. Error converting {} to WitType: {}",
                 expr,
                 inferred_type.get_type_hint(),
                 error
@@ -772,7 +772,7 @@ mod internal {
     fn handle_range(
         range: &Range,
         stack: &mut Vec<ExprState>,
-        analysed_type: AnalysedType,
+        analysed_type: WitType,
         instructions: &mut Vec<RibIR>,
     ) {
         let from = range.from();
@@ -805,7 +805,7 @@ mod internal {
         iterable_expr: &Expr,
         yield_expr: &Expr,
         variable_id: &VariableId,
-        sink_type: &AnalysedType,
+        sink_type: &WitType,
     ) {
         stack.push(ExprState::from_expr(iterable_expr));
 
@@ -922,8 +922,8 @@ mod compiler_tests {
     use test_r::test;
 
     use super::*;
-    use crate::analysis::analysed_type;
-    use crate::analysis::analysed_type::{field, list, record, s32, str};
+    use crate::wit::wit_type;
+    use crate::wit::wit_type::{field, list, record, s32, str};
     use crate::{ArmPattern, InferredType, MatchArm, RibCompiler, VariableId};
     use crate::{IntoValueAndType, Value, ValueAndType};
 
@@ -1317,7 +1317,7 @@ mod compiler_tests {
         let instruction_set = vec![
             RibIR::PushLit(bar_value),
             RibIR::PushLit(foo_value),
-            RibIR::CreateAndPushRecord(analysed_type::record(vec![
+            RibIR::CreateAndPushRecord(wit_type::record(vec![
                 field("bar_key", str()),
                 field("foo_key", str()),
             ])),
@@ -1427,7 +1427,7 @@ mod compiler_tests {
     mod invalid_function_invoke_tests {
         use test_r::test;
 
-        use crate::analysis::analysed_type::str;
+        use crate::wit::wit_type::str;
         use crate::compiler::byte_code::compiler_tests::internal;
         use crate::{Expr, RibCompiler, RibCompilerConfig};
 
@@ -1519,7 +1519,7 @@ mod compiler_tests {
     mod global_input_tests {
         use test_r::test;
 
-        use crate::analysis::analysed_type::{
+        use crate::wit::wit_type::{
             case, field, list, option, r#enum, record, result, str, tuple, u32, u64, unit_case,
             variant,
         };
@@ -1858,8 +1858,8 @@ mod compiler_tests {
     }
 
     mod internal {
-        use crate::analysis::analysed_type::{case, str, u64, unit_case, variant};
-        use crate::analysis::*;
+        use crate::wit::wit_type::{case, str, u64, unit_case, variant};
+        use crate::wit::*;
         use crate::{ComponentDependency, ComponentDependencyKey, RibInputTypeInfo};
         use std::collections::HashMap;
         use uuid::Uuid;
@@ -1878,7 +1878,7 @@ mod compiler_tests {
                         ]),
                     }],
                     result: Some(WitFunctionResult {
-                        typ: AnalysedType::Handle(TypeHandle {
+                        typ: WitType::Handle(TypeHandle {
                             resource_id: AnalysedResourceId(0),
                             mode: AnalysedResourceMode::Owned,
                             name: None,
@@ -1901,8 +1901,8 @@ mod compiler_tests {
 
         pub(crate) fn get_component_metadata(
             function_name: &str,
-            input_types: Vec<AnalysedType>,
-            output: AnalysedType,
+            input_types: Vec<WitType>,
+            output: WitType,
         ) -> ComponentDependency {
             let analysed_function_parameters = input_types
                 .into_iter()
@@ -1929,7 +1929,7 @@ mod compiler_tests {
             ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
-        pub(crate) fn rib_input_type_info(types: Vec<(&str, AnalysedType)>) -> RibInputTypeInfo {
+        pub(crate) fn rib_input_type_info(types: Vec<(&str, WitType)>) -> RibInputTypeInfo {
             let mut type_info = HashMap::new();
             for (name, typ) in types {
                 type_info.insert(name.to_string(), typ);

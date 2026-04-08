@@ -14,7 +14,7 @@
 
 use crate::repl_state::ReplState;
 use async_trait::async_trait;
-use rib::analysis::AnalysedType;
+use rib::wit::WitType;
 use rib::ValueAndType;
 use rib::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
@@ -32,7 +32,7 @@ pub trait WorkerFunctionInvoke {
         worker_name: &str,
         function_name: &str,
         args: Vec<ValueAndType>,
-        return_type: Option<AnalysedType>,
+        return_type: Option<WitType>,
     ) -> anyhow::Result<Option<ValueAndType>>;
 }
 
@@ -71,7 +71,7 @@ impl RibComponentFunctionInvoke for ReplRibFunctionInvoke {
         worker_name: EvaluatedWorkerName,
         function_name: EvaluatedFqFn,
         args: EvaluatedFnArgs,
-        return_type: Option<AnalysedType>,
+        return_type: Option<WitType>,
     ) -> RibFunctionInvokeResult {
         match self.get_cached_result(instruction_id) {
             Some(result) => Ok(result),

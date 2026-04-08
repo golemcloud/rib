@@ -14,7 +14,7 @@
 
 use crate::rib_type_error::RibTypeErrorInternal;
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::expr_arena::{
     ArmPatternId, ArmPatternNode, ExprArena, ExprId, ExprKind, MatchArmNode, ResultExprKind,
     TypeTable,
@@ -41,11 +41,11 @@ fn get_compilation_error_for_ambiguity(
     // First check if the inferred type is a fully valid WIT type
     // If so, we trust this as this may handle majority of the cases
     // in compiler's best effort to create precise error message
-    match AnalysedType::try_from(actual_inferred_type) {
+    match WitType::try_from(actual_inferred_type) {
         Ok(analysed_type) => {
             let type_mismatch_error = TypeMismatchError {
                 source_span: source_span.clone(),
-                expected_type: ExpectedType::AnalysedType(analysed_type),
+                expected_type: ExpectedType::WitType(analysed_type),
                 actual_type: ActualType::Hint(push_down_kind.clone()),
                 field_path: Path::default(),
                 additional_error_detail: Vec::new(),

@@ -37,7 +37,11 @@ mod call_type;
 
 mod profile;
 
-pub mod analysis;
+pub mod wit;
+/// Backwards-compatible alias. Prefer `crate::wit::*` going forward.
+pub mod analysis {
+    pub use crate::wit::*;
+}
 mod compiler;
 mod expr;
 pub mod expr_arena;

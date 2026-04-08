@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::analysed_type::tuple;
-use crate::analysis::AnalysedType;
+use crate::wit::wit_type::tuple;
+use crate::wit::WitType;
 use crate::interpreter::interpreter_stack_value::RibInterpreterStackValue;
 use crate::{GetLiteralValue, LiteralValue};
 use crate::{Value, ValueAndType};
@@ -75,7 +75,7 @@ impl RibResult {
         self.get_val().and_then(|x| match x {
             ValueAndType {
                 value: Value::Record(field_values),
-                typ: AnalysedType::Record(typ),
+                typ: WitType::Record(typ),
             } => Some(
                 field_values
                     .into_iter()

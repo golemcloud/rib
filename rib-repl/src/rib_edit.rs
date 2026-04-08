@@ -16,7 +16,7 @@ use crate::compiler::{InstanceVariables, ReplCompilerOutput};
 use crate::value_generator::generate_value;
 use crate::CommandRegistry;
 use colored::Colorize;
-use rib::analysis::{TypeEnum, TypeVariant};
+use rib::wit::{TypeEnum, TypeVariant};
 use rib::ValueAndType;
 use rib::{CustomInstanceSpec, Expr, VariableId};
 use rustyline::completion::Completer;

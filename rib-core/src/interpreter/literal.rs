@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::AnalysedType;
+use crate::wit::WitType;
 use crate::{IntoValueAndType, Value, ValueAndType};
 use std::cmp::Ordering;
 use std::fmt::Display;
@@ -40,7 +40,7 @@ impl GetLiteralValue for ValueAndType {
             } => Some(LiteralValue::Bool(*value)),
             ValueAndType {
                 value: Value::Enum(idx),
-                typ: AnalysedType::Enum(typ),
+                typ: WitType::Enum(typ),
             } => {
                 // An enum can be turned into a simple literal and can be part of string concatenations
                 Some(LiteralValue::String(typ.cases[*idx as usize].clone()))
@@ -51,7 +51,7 @@ impl GetLiteralValue for ValueAndType {
                         case_idx,
                         case_value,
                     },
-                typ: AnalysedType::Variant(typ),
+                typ: WitType::Variant(typ),
             } => {
                 // A no arg variant can be turned into a simple literal and can be part of string concatenations
                 if case_value.is_none() {
@@ -131,40 +131,40 @@ impl CoercedNumericValue {
         }
     }
 
-    pub fn cast_to(&self, analysed_type: &AnalysedType) -> Option<ValueAndType> {
+    pub fn cast_to(&self, analysed_type: &WitType) -> Option<ValueAndType> {
         match self {
             CoercedNumericValue::PosInt(number) => {
                 let num = *number;
 
                 match analysed_type {
-                    AnalysedType::U8(_) if num <= u8::MAX as u64 => {
+                    WitType::U8(_) if num <= u8::MAX as u64 => {
                         Some((num as u8).into_value_and_type())
                     }
-                    AnalysedType::U16(_) if num <= u16::MAX as u64 => {
+                    WitType::U16(_) if num <= u16::MAX as u64 => {
                         Some((num as u16).into_value_and_type())
                     }
-                    AnalysedType::U32(_) if num <= u32::MAX as u64 => {
+                    WitType::U32(_) if num <= u32::MAX as u64 => {
                         Some((num as u32).into_value_and_type())
                     }
-                    AnalysedType::U64(_) => Some(num.into_value_and_type()),
+                    WitType::U64(_) => Some(num.into_value_and_type()),
 
-                    AnalysedType::S8(_) if num <= i8::MAX as u64 => {
+                    WitType::S8(_) if num <= i8::MAX as u64 => {
                         Some((num as i8).into_value_and_type())
                     }
-                    AnalysedType::S16(_) if num <= i16::MAX as u64 => {
+                    WitType::S16(_) if num <= i16::MAX as u64 => {
                         Some((num as i16).into_value_and_type())
                     }
-                    AnalysedType::S32(_) if num <= i32::MAX as u64 => {
+                    WitType::S32(_) if num <= i32::MAX as u64 => {
                         Some((num as i32).into_value_and_type())
                     }
-                    AnalysedType::S64(_) if num <= i64::MAX as u64 => {
+                    WitType::S64(_) if num <= i64::MAX as u64 => {
                         Some((num as i64).into_value_and_type())
                     }
 
-                    AnalysedType::F32(_) if num <= f32::MAX as u64 => {
+                    WitType::F32(_) if num <= f32::MAX as u64 => {
                         Some((num as f32).into_value_and_type())
                     }
-                    AnalysedType::F64(_) if num <= f64::MAX as u64 => {
+                    WitType::F64(_) if num <= f64::MAX as u64 => {
                         Some((num as f64).into_value_and_type())
                     }
 
@@ -176,33 +176,33 @@ impl CoercedNumericValue {
                 let num = *number;
 
                 match analysed_type {
-                    AnalysedType::S8(_) if num >= i8::MIN as i64 && num <= i8::MAX as i64 => {
+                    WitType::S8(_) if num >= i8::MIN as i64 && num <= i8::MAX as i64 => {
                         Some((num as i8).into_value_and_type())
                     }
-                    AnalysedType::S16(_) if num >= i16::MIN as i64 && num <= i16::MAX as i64 => {
+                    WitType::S16(_) if num >= i16::MIN as i64 && num <= i16::MAX as i64 => {
                         Some((num as i16).into_value_and_type())
                     }
-                    AnalysedType::S32(_) if num >= i32::MIN as i64 && num <= i32::MAX as i64 => {
+                    WitType::S32(_) if num >= i32::MIN as i64 && num <= i32::MAX as i64 => {
                         Some((num as i32).into_value_and_type())
                     }
-                    AnalysedType::S64(_) => Some(num.into_value_and_type()),
+                    WitType::S64(_) => Some(num.into_value_and_type()),
 
                     // Allow unsigned conversion only if non-negative
-                    AnalysedType::U8(_) if num >= 0 && num <= u8::MAX as i64 => {
+                    WitType::U8(_) if num >= 0 && num <= u8::MAX as i64 => {
                         Some((num as u8).into_value_and_type())
                     }
-                    AnalysedType::U16(_) if num >= 0 && num <= u16::MAX as i64 => {
+                    WitType::U16(_) if num >= 0 && num <= u16::MAX as i64 => {
                         Some((num as u16).into_value_and_type())
                     }
-                    AnalysedType::U32(_) if num >= 0 && num <= u32::MAX as i64 => {
+                    WitType::U32(_) if num >= 0 && num <= u32::MAX as i64 => {
                         Some((num as u32).into_value_and_type())
                     }
-                    AnalysedType::U64(_) if num >= 0 => Some((num as u64).into_value_and_type()),
+                    WitType::U64(_) if num >= 0 => Some((num as u64).into_value_and_type()),
 
-                    AnalysedType::F32(_) if num >= f32::MIN as i64 && num <= f32::MAX as i64 => {
+                    WitType::F32(_) if num >= f32::MIN as i64 && num <= f32::MAX as i64 => {
                         Some((num as f32).into_value_and_type())
                     }
-                    AnalysedType::F64(_) if num >= f64::MIN as i64 && num <= f64::MAX as i64 => {
+                    WitType::F64(_) if num >= f64::MIN as i64 && num <= f64::MAX as i64 => {
                         Some((num as f64).into_value_and_type())
                     }
 
@@ -214,15 +214,15 @@ impl CoercedNumericValue {
                 let num = *number;
 
                 match analysed_type {
-                    AnalysedType::F64(_) => Some(num.into_value_and_type()),
+                    WitType::F64(_) => Some(num.into_value_and_type()),
 
-                    AnalysedType::F32(_)
+                    WitType::F32(_)
                         if num.is_finite() && num >= f32::MIN as f64 && num <= f32::MAX as f64 =>
                     {
                         Some((num as f32).into_value_and_type())
                     }
 
-                    AnalysedType::U64(_)
+                    WitType::U64(_)
                         if num.is_finite()
                             && num >= 0.0
                             && num <= u64::MAX as f64
@@ -231,7 +231,7 @@ impl CoercedNumericValue {
                         Some((num as u64).into_value_and_type())
                     }
 
-                    AnalysedType::S64(_)
+                    WitType::S64(_)
                         if num.is_finite()
                             && num >= i64::MIN as f64
                             && num <= i64::MAX as f64

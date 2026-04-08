@@ -2,7 +2,6 @@
 //
 // Licensed under the Golem Source License v1.0 (the "License");
 // you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
 //
 //     http://license.golem.cloud/LICENSE
 //
@@ -12,20 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wit::WitType;
+// `wit` is the new public home for types derived from WIT / component metadata.
+// To avoid a huge file move churn, we keep the implementation in the existing
+// `analysis/model.rs` for now and re-export it from here.
+#[path = "../analysis/model.rs"]
+mod model;
 
-#[derive(Clone, Debug)]
-pub struct CustomInstanceSpec {
-    pub instance_name: String,
-    pub parameter_types: Vec<WitType>,
-}
+pub use model::*;
 
-impl CustomInstanceSpec {
-    /// Allows instance creation under a custom name (not only `instance`) with typed parameters.
-    pub fn new(instance_name: String, parameter_types: Vec<WitType>) -> Self {
-        CustomInstanceSpec {
-            instance_name,
-            parameter_types,
-        }
-    }
-}
