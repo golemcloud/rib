@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{WitExport, TypeVariant};
 use crate::analysis::{AnalysedType, TypeResult};
+use crate::analysis::{TypeVariant, WitExport};
 use crate::DynamicParsedFunctionName;
 use std::fmt::{Display, Formatter};
 

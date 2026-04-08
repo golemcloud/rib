@@ -21,8 +21,8 @@ pub use worker_functions_in_rib::*;
 use crate::analysis::{TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
 use crate::{
-    ComponentDependency, CustomInstanceSpec, Expr,
-    GlobalVariableTypeSpec, InferredExpr, RibInputTypeInfo, RibOutputTypeInfo,
+    ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredExpr,
+    RibInputTypeInfo, RibOutputTypeInfo,
 };
 use std::error::Error;
 use std::fmt::Display;
@@ -844,8 +844,8 @@ mod compiler_error_tests {
             case, f32, field, handle, list, record, s32, str, tuple, u32, u64, variant,
         };
         use crate::analysis::{
-            WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
-            AnalysedResourceId, AnalysedResourceMode, NameTypePair, WitInterface,
+            AnalysedResourceId, AnalysedResourceMode, NameTypePair, WitExport, WitFunction,
+            WitFunctionParameter, WitFunctionResult, WitInterface,
         };
         use crate::{ComponentDependency, ComponentDependencyKey};
         use uuid::Uuid;

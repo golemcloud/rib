@@ -123,15 +123,13 @@ fn identify_instance_creation_with_worker_arena(
             if let Some(instance_creation_type) = result {
                 let worker_name = instance_creation_type.worker_name();
 
-                let new_instance_type =
-                    InstanceType::from(component.clone(), worker_name.as_ref()).map_err(
-                        |err| {
-                            RibTypeErrorInternal::from(CustomError::new(
-                                span.clone(),
-                                format!("failed to create instance: {err}"),
-                            ))
-                        },
-                    )?;
+                let new_instance_type = InstanceType::from(component.clone(), worker_name.as_ref())
+                    .map_err(|err| {
+                        RibTypeErrorInternal::from(CustomError::new(
+                            span.clone(),
+                            format!("failed to create instance: {err}"),
+                        ))
+                    })?;
 
                 let new_type = InferredType::new(
                     TypeInternal::Instance {

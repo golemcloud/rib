@@ -318,9 +318,7 @@ fn handle_residual_method_invokes_arena(
             };
 
             let fn_name = FunctionName::ResourceMethod(fqrm.clone());
-            let (key, fn_type) = component_dependencies
-                .get_function_type(&fn_name)
-                .unwrap();
+            let (key, fn_type) = component_dependencies.get_function_type(&fn_name).unwrap();
 
             let inferred = fn_type.return_type.unwrap_or_else(InferredType::unit);
 

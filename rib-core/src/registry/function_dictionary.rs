@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{WitExport, AnalysedType, TypeEnum, TypeVariant};
+use crate::analysis::{AnalysedType, TypeEnum, TypeVariant, WitExport};
+use crate::expr_arena::CallTypeNode;
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
-use crate::expr_arena::CallTypeNode;
 use crate::{
     CallType, DynamicParsedFunctionName, DynamicParsedFunctionReference, FunctionTypeRegistry,
     InferredType, ParsedFunctionSite, RegistryKey, RegistryValue, SemVer,

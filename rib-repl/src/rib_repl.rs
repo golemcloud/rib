@@ -110,7 +110,12 @@ impl RibRepl {
 
                 match dependencies {
                     Ok(dependencies) => {
-                        if dependencies.component.function_dictionary.name_and_types.is_empty() {
+                        if dependencies
+                            .component
+                            .function_dictionary
+                            .name_and_types
+                            .is_empty()
+                        {
                             return Err(ReplBootstrapError::NoComponentsFound);
                         }
 

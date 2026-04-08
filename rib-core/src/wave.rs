@@ -1,6 +1,6 @@
 use crate::analysis::{
-    WitFunction, AnalysedType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord,
-    TypeResult, TypeTuple, TypeVariant,
+    AnalysedType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord, TypeResult, TypeTuple,
+    TypeVariant, WitFunction,
 };
 use std::borrow::Cow;
 use wasm_wave::wasm::{WasmFunc, WasmType, WasmTypeKind};

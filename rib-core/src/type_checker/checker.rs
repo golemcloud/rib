@@ -144,12 +144,13 @@ fn get_missing_record_keys_lowered(
     arena: &ExprArena,
     call_source_span: SourceSpan,
 ) -> Result<(), FunctionCallError> {
-    let function_name =
-        FunctionName::from_call_type_node(call_type).ok_or(FunctionCallError::InvalidFunctionCall {
+    let function_name = FunctionName::from_call_type_node(call_type).ok_or(
+        FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
             source_span: call_source_span.clone(),
             message: "invalid function call type".to_string(),
-        })?;
+        },
+    )?;
 
     let (_, function_type) = component_dependency
         .get_function_type(&function_name)
@@ -199,9 +200,7 @@ fn try_invalid_worker_name_for_node(
     };
 
     match call_type {
-        CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker {
-            worker_name, ..
-        }) => {
+        CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker { worker_name, .. }) => {
             check_worker_name_opt(*worker_name, arena, types)?;
         }
         CallTypeNode::Function {

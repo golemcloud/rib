@@ -76,10 +76,9 @@ mod tests {
         sequence, tuple,
     };
     use crate::{
-        ArmPattern, ComponentDependency, DynamicParsedFunctionName,
-        DynamicParsedFunctionReference, Expr, InferredType, InstanceCreationType,
-        InstanceIdentifier, InstanceType, MatchArm, Number, ParsedFunctionSite, RibCompiler,
-        RibCompilerConfig, TypeName, VariableId,
+        ArmPattern, ComponentDependency, DynamicParsedFunctionName, DynamicParsedFunctionReference,
+        Expr, InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
+        Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig, TypeName, VariableId,
     };
     use bigdecimal::BigDecimal;
     use std::sync::Arc;
@@ -105,8 +104,7 @@ mod tests {
 
         let mut new_expr = Expr::from_text(rib_expr).unwrap();
 
-        let without_type_spec =
-            new_expr.infer_types(&ComponentDependency::default(), &vec![], &[]);
+        let without_type_spec = new_expr.infer_types(&ComponentDependency::default(), &vec![], &[]);
 
         assert!(without_type_spec.is_err())
     }
@@ -259,8 +257,11 @@ mod tests {
             InferredType::string(),
         );
 
-        let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), vec![type_spec], vec![]));
+        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
+            ComponentDependency::default(),
+            vec![type_spec],
+            vec![],
+        ));
 
         // by default foo.bar.* will be inferred to be a string (given the above type spec) and
         // foo.bar.baz + 1u32 should fail compilation since we are adding string with a u32.
@@ -286,8 +287,11 @@ mod tests {
         // foo + 1u32 should fail compilation since we are adding string with a u32.
         let invalid_rib_expr = Expr::from_text(r#"foo + 1u32"#).unwrap();
 
-        let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), vec![type_spec], vec![]));
+        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
+            ComponentDependency::default(),
+            vec![type_spec],
+            vec![],
+        ));
 
         let result = rib_compiler.compile(invalid_rib_expr);
 
@@ -504,7 +508,8 @@ mod tests {
 
         let rib_compiler = test_utils::get_test_compiler();
 
-        let expected_component_in_function_call = rib_compiler.get_component_dependency().key.clone();
+        let expected_component_in_function_call =
+            rib_compiler.get_component_dependency().key.clone();
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
@@ -2429,18 +2434,16 @@ mod tests {
     mod test_utils {
         use crate::analysis::analysed_type::u64;
         use crate::analysis::{
-            WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
-            AnalysedType, TypeU32,
+            AnalysedType, TypeU32, WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
         };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
         use crate::parser::type_name::TypeName;
         use crate::rib_source_span::SourceSpan;
         use crate::{
-            ArmPattern, ComponentDependency, ComponentDependencyKey, Expr,
-            InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
-            MatchIdentifier, Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig,
-            VariableId,
+            ArmPattern, ComponentDependency, ComponentDependencyKey, Expr, InferredType,
+            InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm, MatchIdentifier,
+            Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig, VariableId,
         };
         use crate::{Value, ValueAndType};
         use bigdecimal::BigDecimal;

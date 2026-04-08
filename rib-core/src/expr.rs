@@ -1190,12 +1190,7 @@ impl Expr {
                     ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
                     ti::type_push_down::push_types_down_lowered(root, arena, types)?;
                     ti::identifier_inference::infer_all_identifiers_lowered(root, arena, types);
-                    ti::type_pull_up::type_pull_up_lowered(
-                        root,
-                        arena,
-                        types,
-                        component.as_ref(),
-                    )?;
+                    ti::type_pull_up::type_pull_up_lowered(root, arena, types, component.as_ref())?;
                     ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
                     ti::call_arguments_inference::infer_function_call_types_lowered(
                         root,

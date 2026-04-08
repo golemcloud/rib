@@ -62,10 +62,7 @@ impl InstanceType {
         component_dependency_key: &ComponentDependencyKey,
     ) {
         match self {
-            InstanceType::Global {
-                component,
-                ..
-            } => {
+            InstanceType::Global { component, .. } => {
                 Arc::make_mut(component).narrow_to_component(component_dependency_key);
             }
             // A resource is already narrowed down to a component
@@ -132,7 +129,6 @@ impl InstanceType {
         let resource_methods = resource_method_dict;
 
         if !resource_methods.is_empty() {
-
             let resource_method_dictionary = ResourceMethodDictionary {
                 map: resource_methods,
             };
@@ -280,8 +276,7 @@ fn search_function_in_instance(
     match package_map.len() {
         1 => {
             let interfaces = package_map.values().flatten().cloned().collect();
-            let function =
-                search_function_in_single_package(interfaces, functions, function_name)?;
+            let function = search_function_in_single_package(interfaces, functions, function_name)?;
             Ok((key, function))
         }
         _ => {

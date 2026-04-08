@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::analysis::TypeEnum;
-use crate::analysis::{WitExport, TypeVariant};
+use crate::analysis::{TypeVariant, WitExport};
 use crate::{
     ComponentDependencyKey, Expr, FunctionDictionary, FunctionName, FunctionType,
     FunctionTypeRegistry, InstanceCreationType,

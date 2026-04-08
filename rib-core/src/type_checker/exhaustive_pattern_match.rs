@@ -314,13 +314,19 @@ mod internal {
             TypeInternal::Variant(cases) => {
                 Cow::Owned(vec![ConstructorDetail::from_inferred_variant_cases(cases)])
             }
-            TypeInternal::Enum(cases) => Cow::Owned(vec![ConstructorDetail::from_enum_cases(cases)]),
-            TypeInternal::AllOf(_) | TypeInternal::Instance { .. } => Cow::Borrowed(fallback_cached),
+            TypeInternal::Enum(cases) => {
+                Cow::Owned(vec![ConstructorDetail::from_enum_cases(cases)])
+            }
+            TypeInternal::AllOf(_) | TypeInternal::Instance { .. } => {
+                Cow::Borrowed(fallback_cached)
+            }
             _ => Cow::Borrowed(fallback_cached),
         }
     }
 
-    pub(super) fn fallback_full(component_dependency: &ComponentDependency) -> Vec<ConstructorDetail> {
+    pub(super) fn fallback_full(
+        component_dependency: &ComponentDependency,
+    ) -> Vec<ConstructorDetail> {
         let mut constructor_details = vec![ConstructorDetail::option()];
         for variant in component_dependency.get_variants() {
             constructor_details.push(ConstructorDetail::from_variant(variant));
@@ -358,15 +364,13 @@ mod internal {
             types: &TypeTable,
         ) -> ExhaustiveCheckResult {
             match self {
-                ExhaustiveCheckResult(Ok(result)) if result.is_empty() => {
-                    check_exhaustive(
-                        match_source_span,
-                        patterns,
-                        constructor_details,
-                        arena,
-                        types,
-                    )
-                }
+                ExhaustiveCheckResult(Ok(result)) if result.is_empty() => check_exhaustive(
+                    match_source_span,
+                    patterns,
+                    constructor_details,
+                    arena,
+                    types,
+                ),
                 ExhaustiveCheckResult(Ok(_)) => self.clone(),
                 ExhaustiveCheckResult(Err(e)) => ExhaustiveCheckResult(Err(e.clone())),
             }
@@ -430,11 +434,7 @@ mod internal {
                     .map(|pv| pattern_view_to_arm_pattern(pv, arena, types))
                     .unwrap_or(ArmPattern::WildCard);
                 let dead = pattern_view_to_arm_pattern(pattern, arena, types);
-                return ExhaustiveCheckResult::dead_code(
-                    match_source_span.clone(),
-                    cause,
-                    dead,
-                );
+                return ExhaustiveCheckResult::dead_code(match_source_span.clone(), cause, dead);
             }
             process_pattern_view(
                 pattern,

@@ -184,12 +184,11 @@ mod tests {
             inferred_type: InferredType::string(),
         };
 
-        let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(
-                ComponentDependency::default(),
-                vec![type_spec],
-                vec![],
-            ));
+        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
+            ComponentDependency::default(),
+            vec![type_spec],
+            vec![],
+        ));
 
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 

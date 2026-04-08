@@ -633,7 +633,7 @@ mod desugar_tests {
 
     use super::*;
     use crate::analysis::{
-        WitExport, WitFunction, WitFunctionParameter, AnalysedType, TypeU32, TypeU64,
+        AnalysedType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
     };
     use crate::compiler::desugar::desugar_tests::expectations::expected_condition_with_identifiers;
     use crate::{

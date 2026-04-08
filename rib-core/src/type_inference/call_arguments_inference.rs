@@ -277,13 +277,13 @@ fn infer_args_and_result_type_arena(
     arena: &ExprArena,
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
-    let (_, function_type) = component_dependency
-        .get_function_type(key)
-        .map_err(|err| FunctionCallError::InvalidFunctionCall {
+    let (_, function_type) = component_dependency.get_function_type(key).map_err(|err| {
+        FunctionCallError::InvalidFunctionCall {
             function_name: function_details.to_string(),
             source_span: span.clone(),
             message: err.to_string(),
-        })?;
+        }
+    })?;
 
     let mut parameter_types: Vec<AnalysedType> = function_type
         .parameter_types
@@ -430,7 +430,7 @@ mod function_parameters_inference_tests {
     use test_r::test;
 
     use crate::analysis::{
-        WitExport, WitFunction, WitFunctionParameter, AnalysedType, TypeU32, TypeU64,
+        AnalysedType, TypeU32, TypeU64, WitExport, WitFunction, WitFunctionParameter,
     };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
