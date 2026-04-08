@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::analysis::TypeEnum;
-use crate::analysis::{AnalysedExport, TypeVariant};
+use crate::analysis::{WitExport, TypeVariant};
 use crate::{
     ComponentDependencyKey, Expr, FunctionDictionary, FunctionName, FunctionType,
     FunctionTypeRegistry, InstanceCreationType,
@@ -29,7 +29,7 @@ pub struct ComponentDependency {
 impl ComponentDependency {
     pub fn from_wit_metadata(
         key: ComponentDependencyKey,
-        exports: &[AnalysedExport],
+        exports: &[WitExport],
     ) -> Result<Self, String> {
         let function_type_registry = FunctionTypeRegistry::from_export_metadata(exports);
         let function_dictionary =

@@ -430,7 +430,7 @@ mod function_parameters_inference_tests {
     use test_r::test;
 
     use crate::analysis::{
-        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
+        WitExport, WitFunction, WitFunctionParameter, AnalysedType, TypeU32, TypeU64,
     };
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
@@ -460,17 +460,17 @@ mod function_parameters_inference_tests {
 
     fn get_component_dependency() -> ComponentDependency {
         let metadata = vec![
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "foo".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
                     typ: AnalysedType::U64(TypeU64),
                 }],
                 result: None,
             }),
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "baz".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
                     typ: AnalysedType::U32(TypeU32),
                 }],

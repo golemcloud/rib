@@ -1,5 +1,5 @@
 use crate::analysis::{
-    AnalysedFunction, AnalysedType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord,
+    WitFunction, AnalysedType, TypeEnum, TypeFlags, TypeList, TypeOption, TypeRecord,
     TypeResult, TypeTuple, TypeVariant,
 };
 use std::borrow::Cow;
@@ -109,7 +109,7 @@ impl WasmType for AnalysedType {
     }
 }
 
-impl WasmFunc for AnalysedFunction {
+impl WasmFunc for WitFunction {
     type Type = AnalysedType;
 
     fn params(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {

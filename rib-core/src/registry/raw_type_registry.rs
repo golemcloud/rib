@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{AnalysedExport, TypeVariant};
+use crate::analysis::{WitExport, TypeVariant};
 use crate::analysis::{AnalysedType, TypeResult};
 use crate::DynamicParsedFunctionName;
 use std::fmt::{Display, Formatter};
@@ -27,14 +27,14 @@ pub struct FunctionTypeRegistry {
 }
 
 impl FunctionTypeRegistry {
-    pub fn from_export_metadata(exports: &[AnalysedExport]) -> Self {
+    pub fn from_export_metadata(exports: &[WitExport]) -> Self {
         let mut map = vec![];
 
         let mut types = vec![];
 
         for export in exports {
             match export {
-                AnalysedExport::Instance(ty) => {
+                WitExport::Interface(ty) => {
                     let interface_name = &ty.name;
                     for fun in ty.functions.clone() {
                         let function_name = fun.name;
@@ -67,7 +67,7 @@ impl FunctionTypeRegistry {
                         map.push((registry_key, registry_value));
                     }
                 }
-                AnalysedExport::Function(fun0) => {
+                WitExport::Function(fun0) => {
                     let fun = fun0.clone();
                     let function_name = fun.name;
                     let parameter_types = fun

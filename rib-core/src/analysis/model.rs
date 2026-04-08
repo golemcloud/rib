@@ -2,19 +2,19 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
-pub enum AnalysedExport {
-    Function(AnalysedFunction),
-    Instance(AnalysedInstance),
+pub enum WitExport {
+    Function(WitFunction),
+    Interface(WitInterface),
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AnalysedFunction {
+pub struct WitFunction {
     pub name: String,
-    pub parameters: Vec<AnalysedFunctionParameter>,
-    pub result: Option<AnalysedFunctionResult>,
+    pub parameters: Vec<WitFunctionParameter>,
+    pub result: Option<WitFunctionResult>,
 }
 
-impl AnalysedFunction {
+impl WitFunction {
     pub fn is_constructor(&self) -> bool {
         self.name.starts_with("[constructor]")
             && self.result.is_some()
@@ -45,9 +45,9 @@ impl AnalysedFunction {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AnalysedInstance {
+pub struct WitInterface {
     pub name: String,
-    pub functions: Vec<AnalysedFunction>,
+    pub functions: Vec<WitFunction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
@@ -375,13 +375,13 @@ pub enum AnalysedResourceMode {
 pub struct AnalysedResourceId(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AnalysedFunctionParameter {
+pub struct WitFunctionParameter {
     pub name: String,
     pub typ: AnalysedType,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AnalysedFunctionResult {
+pub struct WitFunctionResult {
     pub typ: AnalysedType,
 }
 

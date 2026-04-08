@@ -1865,11 +1865,11 @@ mod compiler_tests {
         use uuid::Uuid;
 
         pub(crate) fn metadata_with_variants() -> ComponentDependency {
-            let instance = AnalysedExport::Instance(AnalysedInstance {
+            let instance = WitExport::Interface(WitInterface {
                 name: "golem:it/api".to_string(),
-                functions: vec![AnalysedFunction {
+                functions: vec![WitFunction {
                     name: "foo".to_string(),
-                    parameters: vec![AnalysedFunctionParameter {
+                    parameters: vec![WitFunctionParameter {
                         name: "param1".to_string(),
                         typ: variant(vec![
                             case("register-user", u64()),
@@ -1877,7 +1877,7 @@ mod compiler_tests {
                             unit_case("validate"),
                         ]),
                     }],
-                    result: Some(AnalysedFunctionResult {
+                    result: Some(WitFunctionResult {
                         typ: AnalysedType::Handle(TypeHandle {
                             resource_id: AnalysedResourceId(0),
                             mode: AnalysedResourceMode::Owned,
@@ -1907,7 +1907,7 @@ mod compiler_tests {
             let analysed_function_parameters = input_types
                 .into_iter()
                 .enumerate()
-                .map(|(index, typ)| AnalysedFunctionParameter {
+                .map(|(index, typ)| WitFunctionParameter {
                     name: format!("param{index}"),
                     typ,
                 })
@@ -1921,10 +1921,10 @@ mod compiler_tests {
                 root_package_version: None,
             };
 
-            let exports = vec![AnalysedExport::Function(AnalysedFunction {
+            let exports = vec![WitExport::Function(WitFunction {
                 name: function_name.to_string(),
                 parameters: analysed_function_parameters,
-                result: Some(AnalysedFunctionResult { typ: output }),
+                result: Some(WitFunctionResult { typ: output }),
             })];
             ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }

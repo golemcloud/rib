@@ -2428,7 +2428,7 @@ mod tests {
     mod test_utils {
         use crate::analysis::analysed_type::u64;
         use crate::analysis::{
-            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
+            WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
             AnalysedType, TypeU32,
         };
         use crate::call_type::CallType;
@@ -2690,17 +2690,17 @@ mod tests {
 
         pub fn get_test_compiler() -> RibCompiler {
             let metadata = vec![
-                AnalysedExport::Function(AnalysedFunction {
+                WitExport::Function(WitFunction {
                     name: "foo".to_string(),
-                    parameters: vec![AnalysedFunctionParameter {
+                    parameters: vec![WitFunctionParameter {
                         name: "my_parameter".to_string(),
                         typ: u64(),
                     }],
                     result: None,
                 }),
-                AnalysedExport::Function(AnalysedFunction {
+                WitExport::Function(WitFunction {
                     name: "baz".to_string(),
-                    parameters: vec![AnalysedFunctionParameter {
+                    parameters: vec![WitFunctionParameter {
                         name: "my_parameter".to_string(),
                         typ: AnalysedType::U32(TypeU32),
                     }],
@@ -2742,7 +2742,7 @@ mod tests {
             let analysed_function_parameters = input_types
                 .into_iter()
                 .enumerate()
-                .map(|(index, typ)| AnalysedFunctionParameter {
+                .map(|(index, typ)| WitFunctionParameter {
                     name: format!("param{index}"),
                     typ,
                 })
@@ -2756,10 +2756,10 @@ mod tests {
                 root_package_version: None,
             };
 
-            let exports = vec![AnalysedExport::Function(AnalysedFunction {
+            let exports = vec![WitExport::Function(WitFunction {
                 name: function_name.to_string(),
                 parameters: analysed_function_parameters,
-                result: Some(AnalysedFunctionResult { typ: output }),
+                result: Some(WitFunctionResult { typ: output }),
             })];
 
             RibCompiler::new(RibCompilerConfig::new(

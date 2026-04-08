@@ -844,8 +844,8 @@ mod compiler_error_tests {
             case, f32, field, handle, list, record, s32, str, tuple, u32, u64, variant,
         };
         use crate::analysis::{
-            AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedFunctionResult,
-            AnalysedInstance, AnalysedResourceId, AnalysedResourceMode, NameTypePair,
+            WitExport, WitFunction, WitFunctionParameter, WitFunctionResult,
+            AnalysedResourceId, AnalysedResourceMode, NameTypePair, WitInterface,
         };
         use crate::{ComponentDependency, ComponentDependencyKey};
         use uuid::Uuid;
@@ -874,9 +874,9 @@ mod compiler_error_tests {
         }
 
         pub(crate) fn get_metadata() -> ComponentDependency {
-            let function_export = AnalysedExport::Function(AnalysedFunction {
+            let function_export = WitExport::Function(WitFunction {
                 name: "foo".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "arg1".to_string(),
                     typ: record(vec![
                         NameTypePair {
@@ -924,30 +924,30 @@ mod compiler_error_tests {
                         },
                     ]),
                 }],
-                result: Some(AnalysedFunctionResult { typ: str() }),
+                result: Some(WitFunctionResult { typ: str() }),
             });
 
-            let resource_export = AnalysedExport::Instance(AnalysedInstance {
+            let resource_export = WitExport::Interface(WitInterface {
                 name: "golem:it/api".to_string(),
                 functions: vec![
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[constructor]cart".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "cons".to_string(),
                             typ: str(),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.add-item".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "item".to_string(),
                                 typ: record(vec![
                                     field("product-id", str()),
@@ -959,58 +959,58 @@ mod compiler_error_tests {
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.remove-item".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "product-id".to_string(),
                                 typ: str(),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.update-item-quantity".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "product-id".to_string(),
                                 typ: str(),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "quantity".to_string(),
                                 typ: u32(),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.checkout".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: variant(vec![
                                 case("error", str()),
                                 case("success", record(vec![field("order-id", str())])),
                             ]),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.get-cart-contents".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                         }],
-                        result: Some(AnalysedFunctionResult {
+                        result: Some(WitFunctionResult {
                             typ: list(record(vec![
                                 field("product-id", str()),
                                 field("name", str()),
@@ -1019,23 +1019,23 @@ mod compiler_error_tests {
                             ])),
                         }),
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[method]cart.merge-with".to_string(),
                         parameters: vec![
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "self".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
-                            AnalysedFunctionParameter {
+                            WitFunctionParameter {
                                 name: "other-cart".to_string(),
                                 typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Borrowed),
                             },
                         ],
                         result: None,
                     },
-                    AnalysedFunction {
+                    WitFunction {
                         name: "[drop]cart".to_string(),
-                        parameters: vec![AnalysedFunctionParameter {
+                        parameters: vec![WitFunctionParameter {
                             name: "self".to_string(),
                             typ: handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         }],

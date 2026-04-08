@@ -633,7 +633,7 @@ mod desugar_tests {
 
     use super::*;
     use crate::analysis::{
-        AnalysedExport, AnalysedFunction, AnalysedFunctionParameter, AnalysedType, TypeU32, TypeU64,
+        WitExport, WitFunction, WitFunctionParameter, AnalysedType, TypeU32, TypeU64,
     };
     use crate::compiler::desugar::desugar_tests::expectations::expected_condition_with_identifiers;
     use crate::{
@@ -644,17 +644,17 @@ mod desugar_tests {
 
     fn get_test_compiler() -> RibCompiler {
         let metadata = vec![
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "foo".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
                     typ: AnalysedType::U64(TypeU64),
                 }],
                 result: None,
             }),
-            AnalysedExport::Function(AnalysedFunction {
+            WitExport::Function(WitFunction {
                 name: "baz".to_string(),
-                parameters: vec![AnalysedFunctionParameter {
+                parameters: vec![WitFunctionParameter {
                     name: "my_parameter".to_string(),
                     typ: AnalysedType::U32(TypeU32),
                 }],

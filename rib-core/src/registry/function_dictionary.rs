@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::analysis::{AnalysedExport, AnalysedType, TypeEnum, TypeVariant};
+use crate::analysis::{WitExport, AnalysedType, TypeEnum, TypeVariant};
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
 use crate::{
@@ -118,7 +118,7 @@ impl From<&ResourceMethodDictionary> for FunctionDictionary {
 }
 
 impl FunctionDictionary {
-    pub fn from_exports(exports: &[AnalysedExport]) -> Result<FunctionDictionary, String> {
+    pub fn from_exports(exports: &[WitExport]) -> Result<FunctionDictionary, String> {
         let registry = FunctionTypeRegistry::from_export_metadata(exports);
         Self::from_function_type_registry(&registry)
     }
