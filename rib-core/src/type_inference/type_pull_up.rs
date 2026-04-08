@@ -23,7 +23,7 @@ use crate::type_inference::type_hint::{GetTypeHint, TypeHint};
 use crate::type_refinement::precise_types::{ListType, RecordType};
 use crate::type_refinement::TypeRefinement;
 use crate::{
-    ActualType, ComponentDependencies, ExpectedType, FullyQualifiedResourceMethod, FunctionName,
+    ActualType, ComponentDependency, ExpectedType, FullyQualifiedResourceMethod, FunctionName,
     InferredType, InterfaceName, PackageName, Path, TypeInternal, TypeMismatchError,
 };
 
@@ -33,7 +33,7 @@ pub fn type_pull_up_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
     // Collect post-order first to avoid borrow conflicts.
     let mut order = Vec::new();
@@ -273,7 +273,7 @@ fn handle_residual_method_invokes_arena(
     method: &str,
     source_span: &crate::rib_source_span::SourceSpan,
     args: &[ExprId],
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
     _arena: &ExprArena,
 ) -> Result<(ExprKind, InferredType), RibTypeErrorInternal> {
     match lhs_type.internal_type() {
@@ -319,7 +319,7 @@ fn handle_residual_method_invokes_arena(
 
             let fn_name = FunctionName::ResourceMethod(fqrm.clone());
             let (key, fn_type) = component_dependencies
-                .get_function_type(&None, &fn_name)
+                .get_function_type(&fn_name)
                 .unwrap();
 
             let inferred = fn_type.return_type.unwrap_or_else(InferredType::unit);
@@ -436,11 +436,11 @@ mod type_pull_up_tests {
 
     use crate::function_name::DynamicParsedFunctionName;
     use crate::rib_type_error::RibTypeErrorInternal;
-    use crate::{ArmPattern, ComponentDependencies, Expr, InferredType, MatchArm};
+    use crate::{ArmPattern, ComponentDependency, Expr, InferredType, MatchArm};
 
     fn type_pull_up_via_arena(
         expr: &mut Expr,
-        component_dependencies: &ComponentDependencies,
+        component_dependencies: &ComponentDependency,
     ) -> Result<(), RibTypeErrorInternal> {
         let (mut arena, mut types, root) = crate::expr_arena::lower(expr);
         super::type_pull_up_lowered(root, &mut arena, &mut types, component_dependencies)?;
@@ -453,7 +453,7 @@ mod type_pull_up_tests {
         let expr = "foo";
         let mut expr = Expr::from_text(expr).unwrap();
         expr.add_infer_type_mut(InferredType::string());
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::string());
     }
 
@@ -466,7 +466,7 @@ mod type_pull_up_tests {
             )]));
         let select_expr = Expr::select_field(record_identifier, "foo", None);
         let mut expr = Expr::select_field(select_expr, "bar", None);
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::u64());
     }
 
@@ -475,7 +475,7 @@ mod type_pull_up_tests {
         let identifier = Expr::identifier_global("foo", None)
             .merge_inferred_type(InferredType::list(InferredType::u64()));
         let mut expr = Expr::select_index(identifier.clone(), Expr::number(BigDecimal::from(0)));
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         let expected = Expr::select_index(identifier, Expr::number(BigDecimal::from(0)))
             .merge_inferred_type(InferredType::u64());
         assert_eq!(expr, expected);
@@ -490,7 +490,7 @@ mod type_pull_up_tests {
 
         let mut expr =
             Expr::sequence(elems.clone(), None).with_inferred_type(InferredType::unknown());
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -505,7 +505,7 @@ mod type_pull_up_tests {
             Expr::number_inferred(BigDecimal::from(1), None, InferredType::u64()),
         ]);
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         assert_eq!(
             expr.inferred_type(),
@@ -530,7 +530,7 @@ mod type_pull_up_tests {
             ("bar".to_string(), InferredType::unknown()),
         ]));
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         assert_eq!(
             expr,
@@ -550,7 +550,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_concat() {
         let mut expr = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")]);
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         let expected = Expr::concat(vec![Expr::literal("foo"), Expr::literal("bar")])
             .with_inferred_type(InferredType::string());
         assert_eq!(expr, expected);
@@ -559,7 +559,7 @@ mod type_pull_up_tests {
     #[test]
     pub fn test_pull_up_for_not() {
         let mut expr = Expr::not(Expr::boolean(true));
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -583,7 +583,7 @@ mod type_pull_up_tests {
             select_index4.clone(),
         );
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         let expected = Expr::cond(
             Expr::greater_than(
                 Expr::select_index(
@@ -629,7 +629,7 @@ mod type_pull_up_tests {
         let select_field2 = Expr::select_field(inner, "baz", None);
         let mut expr = Expr::greater_than(select_field1.clone(), select_field2.clone());
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         let expected = Expr::greater_than(
             select_field1.merge_inferred_type(InferredType::string()),
@@ -648,7 +648,7 @@ mod type_pull_up_tests {
         let select_index2 = Expr::select_index(inner, Expr::number(BigDecimal::from(1)));
         let mut expr = Expr::greater_than_or_equal_to(select_index1.clone(), select_index2.clone());
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         let expected = Expr::greater_than_or_equal_to(
             select_index1.merge_inferred_type(InferredType::u64()),
@@ -683,7 +683,7 @@ mod type_pull_up_tests {
             select_field_from_second.clone(),
         );
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         let new_select_field_from_first = Expr::select_field(
             Expr::select_index(inner.clone(), Expr::number(BigDecimal::from(0)))
@@ -714,7 +714,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(1)),
             Expr::number(BigDecimal::from(2)),
         );
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
 
@@ -725,7 +725,7 @@ mod type_pull_up_tests {
             Expr::number(BigDecimal::from(2)),
         );
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::bool());
     }
@@ -739,7 +739,7 @@ mod type_pull_up_tests {
             None,
         );
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         assert_eq!(expr.inferred_type(), InferredType::unknown());
     }
@@ -749,7 +749,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::option(Some(number)).unwrap();
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -761,7 +761,7 @@ mod type_pull_up_tests {
         let mut number = Expr::number(BigDecimal::from(1));
         number.with_inferred_type_mut(InferredType::f64());
         let mut expr = Expr::get_tag(Expr::option(Some(number)));
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
         assert_eq!(
             expr.inferred_type(),
             InferredType::option(InferredType::f64())
@@ -829,7 +829,7 @@ mod type_pull_up_tests {
             ],
         );
 
-        type_pull_up_via_arena(&mut expr, &ComponentDependencies::default()).unwrap();
+        type_pull_up_via_arena(&mut expr, &ComponentDependency::default()).unwrap();
 
         let expected = expected_pattern_match();
 

@@ -15,7 +15,7 @@
 use crate::analysis::AnalysedType;
 use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::ComponentDependencies;
+use crate::ComponentDependency;
 
 /// Enum constructor rewriting and type merge on lowered IR. Use from [`crate::expr_arena::lower`]
 /// / [`crate::expr_arena::rebuild_expr`] boundaries (e.g. [`Expr::infer_types`](crate::Expr::infer_types));
@@ -24,7 +24,7 @@ pub fn infer_enums_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
 ) {
     let enum_ids = collect_enum_identifiers(root, arena, types, component_dependencies);
 
@@ -49,7 +49,7 @@ fn collect_enum_identifiers(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
 ) -> Vec<ExprId> {
     let mut enum_ids = Vec::new();
     let mut stack = vec![root];

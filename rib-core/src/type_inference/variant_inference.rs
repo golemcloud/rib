@@ -14,13 +14,13 @@
 
 use crate::expr_arena::{CallTypeNode, ExprArena, ExprId, ExprKind, TypeTable};
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::{ComponentDependencies, InferredType};
+use crate::{ComponentDependency, InferredType};
 
 pub fn infer_variants_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
 ) {
     let info = collect_variant_info(root, arena, types, component_dependencies);
 
@@ -38,7 +38,7 @@ fn collect_variant_info(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
 ) -> VariantInfo {
     let mut no_arg_variants = Vec::new();
     let mut variants_with_args = Vec::new();

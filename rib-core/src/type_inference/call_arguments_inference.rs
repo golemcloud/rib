@@ -22,7 +22,7 @@ use crate::expr_arena::{
 use crate::inferred_type::TypeOrigin;
 use crate::type_inference::expr_visitor::arena::children_of;
 use crate::{
-    ComponentDependencies, CustomInstanceSpec, DynamicParsedFunctionName,
+    ComponentDependency, CustomInstanceSpec, DynamicParsedFunctionName,
     FullyQualifiedResourceMethod, FunctionCallError, FunctionName, InferredType, TypeInternal,
 };
 
@@ -88,7 +88,7 @@ pub fn infer_function_call_types_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), FunctionCallError> {
     let mut stack = vec![root];
@@ -133,7 +133,7 @@ fn resolve_call_argument_types_arena(
     span: &crate::rib_source_span::SourceSpan,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), FunctionCallError> {
     match call_type {
@@ -243,7 +243,7 @@ fn infer_resource_method_args_arena(
     span: &crate::rib_source_span::SourceSpan,
     fqrm: &FullyQualifiedResourceMethod,
     function_name: &crate::DynamicParsedFunctionName,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     args: &[ExprId],
     call_id: ExprId,
     arena: &ExprArena,
@@ -270,7 +270,7 @@ fn infer_resource_method_args_arena(
 fn infer_args_and_result_type_arena(
     span: &crate::rib_source_span::SourceSpan,
     function_details: &FunctionDetails,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     key: &FunctionName,
     args: &[ExprId],
     result_id: Option<ExprId>,
@@ -278,7 +278,7 @@ fn infer_args_and_result_type_arena(
     types: &mut TypeTable,
 ) -> Result<(), FunctionCallError> {
     let (_, function_type) = component_dependency
-        .get_function_type(&None, key)
+        .get_function_type(key)
         .map_err(|err| FunctionCallError::InvalidFunctionCall {
             function_name: function_details.to_string(),
             source_span: span.clone(),
@@ -435,7 +435,7 @@ mod function_parameters_inference_tests {
     use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
     use crate::rib_source_span::SourceSpan;
     use crate::{
-        ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
+        ComponentDependency, ComponentDependencyKey, CustomInstanceSpec, Expr, FunctionCallError,
         InferredType, ParsedFunctionSite,
     };
     use bigdecimal::BigDecimal;
@@ -443,7 +443,7 @@ mod function_parameters_inference_tests {
 
     fn infer_function_call_types_via_arena(
         expr: &mut Expr,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), FunctionCallError> {
         let (arena, mut types, root) = crate::expr_arena::lower(expr);
@@ -458,7 +458,7 @@ mod function_parameters_inference_tests {
         Ok(())
     }
 
-    fn get_component_dependencies() -> ComponentDependencies {
+    fn get_component_dependency() -> ComponentDependency {
         let metadata = vec![
             AnalysedExport::Function(AnalysedFunction {
                 name: "foo".to_string(),
@@ -486,7 +486,7 @@ mod function_parameters_inference_tests {
             root_package_version: None,
         };
 
-        ComponentDependencies::from_raw(vec![(component_info, metadata.as_ref())])
+        ComponentDependency::from_wit_metadata(component_info, metadata.as_slice())
             .expect("Failed to create component dependencies")
     }
 
@@ -497,7 +497,7 @@ mod function_parameters_inference_tests {
           foo(x)
         "#;
 
-        let function_type_registry = get_component_dependencies();
+        let function_type_registry = get_component_dependency();
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
         infer_function_call_types_via_arena(&mut expr, &function_type_registry, &[]).unwrap();

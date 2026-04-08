@@ -40,47 +40,50 @@ pub trait ReplPrinter {
 
     fn print_components_and_exports(
         &self,
-        exports: &ComponentDependencies,
+        exports: &ComponentDependency,
         function_signature_print_config: &FunctionSignaturePrintConfig,
     ) {
-        for (component_dependency_key, component) in &exports.dependencies {
-            let mut indent = Indent::new();
+        let component_dependency_key = &exports.key;
+        let mut indent = Indent::new();
 
+        println!(
+            "{} {}",
+            "📦 Component:".bold().bright_yellow(),
+            component_dependency_key
+                .component_name
+                .bold()
+                .truecolor(180, 180, 180)
+        );
+
+        indent.add();
+
+        if let Some(root_package) = &component_dependency_key.root_package_name {
             println!(
-                "{} {}",
-                "📦 Component:".bold().bright_yellow(),
-                component_dependency_key
-                    .component_name
-                    .bold()
-                    .truecolor(180, 180, 180)
+                "{} {} {}",
+                indent,
+                "Root Package:".bold().bright_cyan(),
+                root_package.bold().truecolor(180, 180, 180)
             );
 
             indent.add();
-
-            if let Some(root_package) = &component_dependency_key.root_package_name {
-                println!(
-                    "{} {} {}",
-                    indent,
-                    "Root Package:".bold().bright_cyan(),
-                    root_package.bold().truecolor(180, 180, 180)
-                );
-
-                indent.add();
-            }
-
-            if let Some(root_interface) = &component_dependency_key.root_package_version {
-                println!(
-                    "{} {} {}",
-                    indent,
-                    "Root Package Version:".bold().bright_cyan(),
-                    root_interface.bold().truecolor(180, 180, 180)
-                );
-
-                indent.add();
-            }
-
-            print_function_dictionary(&mut indent, component, function_signature_print_config);
         }
+
+        if let Some(root_interface) = &component_dependency_key.root_package_version {
+            println!(
+                "{} {} {}",
+                indent,
+                "Root Package Version:".bold().bright_cyan(),
+                root_interface.bold().truecolor(180, 180, 180)
+            );
+
+            indent.add();
+        }
+
+        print_function_dictionary(
+            &mut indent,
+            &exports.function_dictionary,
+            function_signature_print_config,
+        );
     }
 
     fn print_rib_compilation_error(&self, error: &RibCompilationError) {

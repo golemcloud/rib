@@ -18,10 +18,10 @@ pub use ir::*;
 pub use type_with_unit::*;
 pub use worker_functions_in_rib::*;
 
-use crate::analysis::{AnalysedExport, TypeEnum, TypeVariant};
+use crate::analysis::{TypeEnum, TypeVariant};
 use crate::rib_type_error::RibTypeError;
 use crate::{
-    ComponentDependencies, ComponentDependencyKey, CustomInstanceSpec, Expr,
+    ComponentDependency, CustomInstanceSpec, Expr,
     GlobalVariableTypeSpec, InferredExpr, RibInputTypeInfo, RibOutputTypeInfo,
 };
 use std::error::Error;
@@ -36,26 +36,17 @@ mod worker_functions_in_rib;
 
 #[derive(Default)]
 pub struct RibCompiler {
-    component_dependency: ComponentDependencies,
+    component: ComponentDependency,
     global_variable_type_spec: Vec<GlobalVariableTypeSpec>,
     custom_instance_spec: Vec<CustomInstanceSpec>,
 }
 
 impl RibCompiler {
     pub fn new(config: RibCompilerConfig) -> RibCompiler {
-        let component_dependencies = ComponentDependencies::from_raw(
-            config
-                .component_dependencies
-                .iter()
-                .map(|dep| (dep.component_dependency_key.clone(), &dep.component_exports))
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
-
         let global_variable_type_spec = config.input_spec;
 
         RibCompiler {
-            component_dependency: component_dependencies,
+            component: config.component,
             global_variable_type_spec,
             custom_instance_spec: config.custom_instance_spec,
         }
@@ -73,7 +64,7 @@ impl RibCompiler {
             );
             InferredExpr::from_expr(
                 expr_for_infer,
-                &self.component_dependency,
+                &self.component,
                 &self.global_variable_type_spec,
                 &self.custom_instance_spec,
             )
@@ -91,9 +82,8 @@ impl RibCompiler {
             .collect::<Vec<_>>()
     }
 
-    // Currently supports only 1 component and hence really only one InstanceType
-    pub fn get_component_dependencies(&self) -> ComponentDependencies {
-        self.component_dependency.clone()
+    pub fn get_component_dependency(&self) -> ComponentDependency {
+        self.component.clone()
     }
 
     pub fn compile(&self, expr: Expr) -> Result<CompilerOutput, RibCompilationError> {
@@ -106,7 +96,7 @@ impl RibCompiler {
         let function_calls_identified = {
             let _p =
                 crate::profile::Scope::new("compile: WorkerFunctionsInRib::from_inferred_expr");
-            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component_dependency)?
+            WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component)?
         };
 
         let global_input_type_info = {
@@ -156,11 +146,11 @@ impl RibCompiler {
     }
 
     pub fn get_variants(&self) -> Vec<TypeVariant> {
-        self.component_dependency.get_variants()
+        self.component.get_variants()
     }
 
     pub fn get_enums(&self) -> Vec<TypeEnum> {
-        self.component_dependency.get_enums()
+        self.component.get_enums()
     }
 }
 
@@ -180,39 +170,21 @@ impl RibCompiler {
 ///   be of type `string`. Note that not all global variables require a type specification.
 #[derive(Default)]
 pub struct RibCompilerConfig {
-    component_dependencies: Vec<ComponentDependency>,
+    pub component: ComponentDependency,
     input_spec: Vec<GlobalVariableTypeSpec>,
     custom_instance_spec: Vec<CustomInstanceSpec>,
 }
 
 impl RibCompilerConfig {
     pub fn new(
-        component_dependencies: Vec<ComponentDependency>,
+        component: ComponentDependency,
         input_spec: Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: Vec<CustomInstanceSpec>,
     ) -> RibCompilerConfig {
         RibCompilerConfig {
-            component_dependencies,
+            component,
             input_spec,
             custom_instance_spec,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ComponentDependency {
-    component_dependency_key: ComponentDependencyKey,
-    component_exports: Vec<AnalysedExport>,
-}
-
-impl ComponentDependency {
-    pub fn new(
-        component_dependency_key: ComponentDependencyKey,
-        component_exports: Vec<AnalysedExport>,
-    ) -> Self {
-        Self {
-            component_dependency_key,
-            component_exports,
         }
     }
 }
@@ -901,7 +873,7 @@ mod compiler_error_tests {
             result.strip_prefix("\n").unwrap_or(&result).to_string()
         }
 
-        pub(crate) fn get_metadata() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata() -> ComponentDependency {
             let function_export = AnalysedExport::Function(AnalysedFunction {
                 name: "foo".to_string(),
                 parameters: vec![AnalysedFunctionParameter {
@@ -1072,18 +1044,16 @@ mod compiler_error_tests {
                 ],
             });
 
-            let component_dependency = ComponentDependency {
-                component_dependency_key: ComponentDependencyKey {
-                    component_name: "some_name".to_string(),
-                    component_id: Uuid::new_v4(),
-                    component_revision: 0,
-                    root_package_name: None,
-                    root_package_version: None,
-                },
-                component_exports: vec![function_export, resource_export],
+            let key = ComponentDependencyKey {
+                component_name: "some_name".to_string(),
+                component_id: Uuid::new_v4(),
+                component_revision: 0,
+                root_package_name: None,
+                root_package_version: None,
             };
 
-            vec![component_dependency]
+            let exports = vec![function_export, resource_export];
+            ComponentDependency::from_wit_metadata(key, &exports).unwrap()
         }
     }
 }

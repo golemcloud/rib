@@ -76,7 +76,7 @@ mod tests {
         sequence, tuple,
     };
     use crate::{
-        ArmPattern, ComponentDependencies, DynamicParsedFunctionName,
+        ArmPattern, ComponentDependency, DynamicParsedFunctionName,
         DynamicParsedFunctionReference, Expr, InferredType, InstanceCreationType,
         InstanceIdentifier, InstanceType, MatchArm, Number, ParsedFunctionSite, RibCompiler,
         RibCompilerConfig, TypeName, VariableId,
@@ -98,14 +98,14 @@ mod tests {
             GlobalVariableTypeSpec::new("foo", Path::from_elems(vec![]), InferredType::string());
 
         let with_type_spec =
-            expr.infer_types(&ComponentDependencies::default(), &vec![type_spec], &[]);
+            expr.infer_types(&ComponentDependency::default(), &vec![type_spec], &[]);
 
         assert!(with_type_spec.is_ok());
 
         let mut new_expr = Expr::from_text(rib_expr).unwrap();
 
         let without_type_spec =
-            new_expr.infer_types(&ComponentDependencies::default(), &vec![], &[]);
+            new_expr.infer_types(&ComponentDependency::default(), &vec![], &[]);
 
         assert!(without_type_spec.is_err())
     }
@@ -126,7 +126,7 @@ mod tests {
         );
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &vec![type_spec], &[])
+            .infer_types(&ComponentDependency::default(), &vec![type_spec], &[])
             .is_ok());
     }
 
@@ -154,7 +154,7 @@ mod tests {
         ];
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &type_spec, &[])
+            .infer_types(&ComponentDependency::default(), &type_spec, &[])
             .is_ok());
     }
 
@@ -174,7 +174,7 @@ mod tests {
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
         assert!(expr
-            .infer_types(&ComponentDependencies::default(), &vec![], &[])
+            .infer_types(&ComponentDependency::default(), &vec![], &[])
             .is_ok());
     }
 
@@ -259,7 +259,7 @@ mod tests {
         );
 
         let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(vec![], vec![type_spec], vec![]));
+            RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), vec![type_spec], vec![]));
 
         // by default foo.bar.* will be inferred to be a string (given the above type spec) and
         // foo.bar.baz + 1u32 should fail compilation since we are adding string with a u32.
@@ -286,7 +286,7 @@ mod tests {
         let invalid_rib_expr = Expr::from_text(r#"foo + 1u32"#).unwrap();
 
         let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(vec![], vec![type_spec], vec![]));
+            RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), vec![type_spec], vec![]));
 
         let result = rib_compiler.compile(invalid_rib_expr);
 
@@ -427,13 +427,7 @@ mod tests {
 
         let rib_compiler = test_utils::get_test_compiler();
 
-        let component_dependency_key = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let component_dependency_key = rib_compiler.get_component_dependency().key.clone();
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
@@ -463,7 +457,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: rib_compiler.get_component_dependency().clone(),
             })),
         );
 
@@ -509,13 +503,7 @@ mod tests {
 
         let rib_compiler = test_utils::get_test_compiler();
 
-        let expected_component_in_function_call = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let expected_component_in_function_call = rib_compiler.get_component_dependency().key.clone();
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
@@ -557,7 +545,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: rib_compiler.get_component_dependency().clone(),
             })),
         );
 
@@ -800,7 +788,7 @@ mod tests {
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
         let expected =
-            test_utils::expected_expr_for_enum_test(&rib_compiler.get_component_dependencies());
+            test_utils::expected_expr_for_enum_test(&rib_compiler.get_component_dependency());
 
         assert_eq!(inferred_expr.get_expr(), &expected);
     }
@@ -1287,7 +1275,7 @@ mod tests {
 
         let mut expr = Expr::from_text(expr_str).unwrap();
 
-        expr.infer_types(&ComponentDependencies::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
             .unwrap();
 
         let expected = expr_block(
@@ -1370,13 +1358,7 @@ mod tests {
         let expr = Expr::from_text(rib_expr).unwrap();
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
-        let expected_component_key = rib_compiler
-            .get_component_dependencies()
-            .dependencies
-            .first_key_value()
-            .unwrap()
-            .0
-            .clone();
+        let expected_component_key = rib_compiler.get_component_dependency().key.clone();
 
         let let_binding1 = let_binding(
             VariableId::local("x", 0),
@@ -1414,7 +1396,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component_dependency: rib_compiler.get_component_dependencies().clone(),
+                component: rib_compiler.get_component_dependency().clone(),
             })),
         );
 
@@ -2208,7 +2190,7 @@ mod tests {
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 
         let expected =
-            test_utils::expected_expr_for_select_index(&rib_compiler.get_component_dependencies());
+            test_utils::expected_expr_for_select_index(&rib_compiler.get_component_dependency());
 
         assert_eq!(inferred_expr.get_expr(), &expected);
     }
@@ -2454,7 +2436,7 @@ mod tests {
         use crate::parser::type_name::TypeName;
         use crate::rib_source_span::SourceSpan;
         use crate::{
-            ArmPattern, ComponentDependencies, ComponentDependency, ComponentDependencyKey, Expr,
+            ArmPattern, ComponentDependency, ComponentDependencyKey, Expr,
             InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
             MatchIdentifier, Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig,
             VariableId,
@@ -2735,10 +2717,11 @@ mod tests {
             };
 
             RibCompiler::new(RibCompilerConfig::new(
-                vec![ComponentDependency::new(
+                ComponentDependency::from_wit_metadata(
                     component_dependency_key.clone(),
-                    metadata.clone(),
-                )],
+                    metadata.as_slice(),
+                )
+                .unwrap(),
                 vec![],
                 vec![],
             ))
@@ -2780,23 +2763,15 @@ mod tests {
             })];
 
             RibCompiler::new(RibCompilerConfig::new(
-                vec![ComponentDependency::new(
-                    component_dependency_key.clone(),
-                    exports,
-                )],
+                ComponentDependency::from_wit_metadata(component_dependency_key.clone(), &exports)
+                    .unwrap(),
                 vec![],
                 vec![],
             ))
         }
 
-        pub fn expected_expr_for_enum_test(component_dependencies: &ComponentDependencies) -> Expr {
-            let expected_component_in_function_calls = component_dependencies
-                .clone()
-                .dependencies
-                .first_key_value()
-                .unwrap()
-                .0
-                .clone();
+        pub fn expected_expr_for_enum_test(component_dependencies: &ComponentDependency) -> Expr {
+            let expected_component_in_function_calls = component_dependencies.key.clone();
 
             expr_block(
                 vec![
@@ -2880,7 +2855,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component_dependency: component_dependencies.clone(),
+                                component: component_dependencies.clone(),
                             },
                         )),
                     ),
@@ -3204,15 +3179,9 @@ mod tests {
         }
 
         pub fn expected_expr_for_select_index(
-            component_dependencies: &ComponentDependencies,
+            component_dependencies: &ComponentDependency,
         ) -> Expr {
-            let expected_component_in_function_calls = component_dependencies
-                .clone()
-                .dependencies
-                .first_key_value()
-                .unwrap()
-                .0
-                .clone();
+            let expected_component_in_function_calls = component_dependencies.key.clone();
 
             expr_block(
                 vec![
@@ -3402,7 +3371,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component_dependency: component_dependencies.clone(),
+                                component: component_dependencies.clone(),
                             },
                         )),
                     ),

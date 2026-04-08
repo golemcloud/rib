@@ -16,7 +16,7 @@ use crate::analysis::AnalysedType;
 use crate::call_type::InstanceCreationType;
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
+use crate::{ComponentDependency, CustomInstanceSpec, Expr};
 use crate::{CustomError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin};
 
 use crate::expr_arena::{
@@ -28,7 +28,7 @@ pub fn identify_instance_creation(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependencies,
+    component_dependencies: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
     search_for_invalid_instance_declarations_arena(root, arena, types)?;
@@ -85,7 +85,7 @@ fn identify_instance_creation_with_worker_arena(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
     // Collect Call nodes bottom-up (post-order)
@@ -219,7 +219,7 @@ fn get_instance_creation_details_arena(
     args: &[ExprId],
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<Option<InstanceCreationType>, String> {
     match call_type {

@@ -1534,8 +1534,8 @@ mod tests {
         get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
     };
     use crate::{
-        CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredType, InstructionId, Path,
-        RibCompiler, RibCompilerConfig, VariableId,
+        ComponentDependency, CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredType,
+        InstructionId, Path, RibCompiler, RibCompilerConfig, VariableId,
     };
     use crate::{IntoValue, IntoValueAndType, Value, ValueAndType};
 
@@ -1939,7 +1939,7 @@ mod tests {
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
-        let compiler = RibCompiler::new(RibCompilerConfig::new(vec![], type_spec, vec![]));
+        let compiler = RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), type_spec, vec![]));
         let compiled = compiler.compile(expr).unwrap();
 
         let result = interpreter
@@ -2003,7 +2003,7 @@ mod tests {
 
         let expr = Expr::from_text(rib_expr).unwrap();
 
-        let compiler = RibCompiler::new(RibCompilerConfig::new(vec![], type_spec, vec![]));
+        let compiler = RibCompiler::new(RibCompilerConfig::new(ComponentDependency::default(), type_spec, vec![]));
 
         let compiled = compiler.compile(expr).unwrap();
 
@@ -2050,7 +2050,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_global_functions();
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -2106,7 +2106,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_global_functions();
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -2732,7 +2732,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2763,7 +2763,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2798,7 +2798,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2831,7 +2831,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2859,7 +2859,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2891,7 +2891,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2923,7 +2923,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2952,7 +2952,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -2978,7 +2978,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
 
         let compiled = compiler.compile(expr).unwrap();
@@ -3007,7 +3007,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
 
         let compiler = RibCompiler::new(compiler_config);
 
@@ -3039,7 +3039,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3545,7 +3545,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_for_pass_through_function();
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3580,7 +3580,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_global_functions();
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3600,7 +3600,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3620,7 +3620,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3640,7 +3640,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let error = compiler.compile(expr).unwrap_err();
 
@@ -3660,7 +3660,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3681,7 +3681,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3710,7 +3710,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3733,7 +3733,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_for_pass_through_function();
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3763,7 +3763,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3785,7 +3785,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3811,7 +3811,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies,
+            test_deps.component,
             vec![],
             vec![],
         ));
@@ -3835,7 +3835,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies, vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component, vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3860,7 +3860,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3889,7 +3889,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3913,7 +3913,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3937,7 +3937,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -3960,7 +3960,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -3983,7 +3983,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies, vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component, vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4006,7 +4006,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -4028,7 +4028,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -4054,7 +4054,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4079,7 +4079,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![],
         ));
@@ -4108,7 +4108,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4134,7 +4134,7 @@ mod tests {
         let expr = Expr::from_text(expr).unwrap();
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4164,7 +4164,7 @@ mod tests {
         let expr = Expr::from_text(expr).unwrap();
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4204,7 +4204,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler.compile(expr).unwrap();
 
@@ -4251,7 +4251,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(Some(rib_input));
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
 
         let compiler = RibCompiler::new(compiler_config);
 
@@ -4304,7 +4304,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(Some(rib_input));
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
 
         let compiler = RibCompiler::new(compiler_config);
 
@@ -4379,7 +4379,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(Some(rib_input));
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
 
         let compiler = RibCompiler::new(compiler_config);
 
@@ -4439,7 +4439,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(Some(rib_input));
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
 
         let compiler = RibCompiler::new(compiler_config);
 
@@ -4506,7 +4506,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces_simple(None);
 
         let compiler_config = RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
+            test_deps.component.clone(),
             vec![],
             vec![custom_spec1, custom_spec2],
         );
@@ -4557,7 +4557,7 @@ mod tests {
         let test_deps = RibTestDeps::test_deps_with_variant_conflicts(None);
 
         let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
+            RibCompilerConfig::new(test_deps.component.clone(), vec![], vec![]);
         let compiler = RibCompiler::new(compiler_config);
         let compiled = compiler
             .compile(expr)
@@ -4682,7 +4682,7 @@ mod tests {
             function_name: &str,
             input_types: Vec<AnalysedType>,
             output: Option<AnalysedType>,
-        ) -> Vec<ComponentDependency> {
+        ) -> ComponentDependency {
             let analysed_function_parameters = input_types
                 .into_iter()
                 .enumerate()
@@ -4702,28 +4702,26 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(
-                component_info,
-                vec![AnalysedExport::Function(AnalysedFunction {
-                    name: function_name.to_string(),
-                    parameters: analysed_function_parameters,
-                    result,
-                })],
-            )]
+            let exports = vec![AnalysedExport::Function(AnalysedFunction {
+                name: function_name.to_string(),
+                parameters: analysed_function_parameters,
+                result,
+            })];
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
-        pub(crate) fn get_metadata_with_resource_with_params() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata_with_resource_with_params() -> ComponentDependency {
             get_metadata_with_resource(vec![AnalysedFunctionParameter {
                 name: "user-id".to_string(),
                 typ: str(),
             }])
         }
 
-        pub(crate) fn get_metadata_with_resource_without_params() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata_with_resource_without_params() -> ComponentDependency {
             get_metadata_with_resource(vec![])
         }
 
-        pub(crate) fn get_metadata_simple_with_variant_conflicts() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata_simple_with_variant_conflicts() -> ComponentDependency {
             let func1 = AnalysedFunction {
                 name: "func1".to_string(),
                 parameters: vec![AnalysedFunctionParameter {
@@ -4752,16 +4750,14 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(
-                component_info,
-                vec![
-                    AnalysedExport::Function(func1),
-                    AnalysedExport::Function(func2),
-                ],
-            )]
+            let exports = vec![
+                AnalysedExport::Function(func1),
+                AnalysedExport::Function(func2),
+            ];
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
-        pub(crate) fn get_metadata_with_multiple_interfaces_simple() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata_with_multiple_interfaces_simple() -> ComponentDependency {
             // Exist in only amazon:shopping-cart/api1
             let get_weather = AnalysedFunction {
                 name: "get-weather".to_string(),
@@ -4814,13 +4810,11 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(
-                component_info,
-                vec![analysed_export1, analysed_export2, analysed_export3],
-            )]
+            let exports = vec![analysed_export1, analysed_export2, analysed_export3];
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
-        pub(crate) fn get_metadata_with_multiple_interfaces() -> Vec<ComponentDependency> {
+        pub(crate) fn get_metadata_with_multiple_interfaces() -> ComponentDependency {
             // Exist in only amazon:shopping-cart/api1
             let analysed_function_in_api1 = AnalysedFunction {
                 name: "foo".to_string(),
@@ -4907,15 +4901,13 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(
-                component_info,
-                vec![analysed_export1, analysed_export2, analysed_export3],
-            )]
+            let exports = vec![analysed_export1, analysed_export2, analysed_export3];
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
         fn get_metadata_with_resource(
             resource_constructor_params: Vec<AnalysedFunctionParameter>,
-        ) -> Vec<ComponentDependency> {
+        ) -> ComponentDependency {
             let instance = AnalysedExport::Instance(AnalysedInstance {
                 name: "golem:it/api".to_string(),
                 functions: vec![
@@ -5071,7 +5063,7 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(component_info, vec![instance])]
+            ComponentDependency::from_wit_metadata(component_info, &[instance]).unwrap()
         }
 
         pub(crate) fn get_value_and_type(
@@ -5477,17 +5469,17 @@ mod tests {
         }
 
         pub(crate) struct RibTestDeps {
-            pub(crate) component_dependencies: Vec<ComponentDependency>,
+            pub(crate) component: ComponentDependency,
             pub(crate) interpreter: Interpreter,
         }
 
         impl RibTestDeps {
             pub(crate) fn test_deps_with_global_functions() -> RibTestDeps {
-                let component_dependencies = get_component_dependency_with_global_functions();
+                let component = get_component_dependency_with_global_functions();
                 let interpreter = interpreter_for_global_functions(None);
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
@@ -5495,11 +5487,11 @@ mod tests {
             pub(crate) fn test_deps_with_resource_functions(
                 rib_input: Option<RibInput>,
             ) -> RibTestDeps {
-                let component_dependencies = get_metadata_with_resource_without_params();
+                let component = get_metadata_with_resource_without_params();
                 let interpreter = interpreter_with_resource_function_invoke_impl(rib_input);
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
@@ -5507,11 +5499,11 @@ mod tests {
             pub(crate) fn test_deps_with_indexed_resource_functions(
                 rib_input: Option<RibInput>,
             ) -> RibTestDeps {
-                let component_dependencies = get_metadata_with_resource_with_params();
+                let component = get_metadata_with_resource_with_params();
                 let interpreter = interpreter_with_resource_function_invoke_impl(rib_input);
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
@@ -5550,7 +5542,8 @@ mod tests {
                     root_package_version: None,
                 };
 
-                let exports = vec![ComponentDependency::new(component_info, exports)];
+                let component =
+                    ComponentDependency::from_wit_metadata(component_info, &exports).unwrap();
 
                 let interpreter = Interpreter::new(
                     RibInput::default(),
@@ -5559,7 +5552,7 @@ mod tests {
                 );
 
                 RibTestDeps {
-                    component_dependencies: exports,
+                    component,
                     interpreter,
                 }
             }
@@ -5567,7 +5560,7 @@ mod tests {
             pub(crate) fn test_deps_with_multiple_interfaces_simple(
                 rib_input: Option<RibInput>,
             ) -> RibTestDeps {
-                let component_dependencies = get_metadata_with_multiple_interfaces_simple();
+                let component = get_metadata_with_multiple_interfaces_simple();
                 let interpreter = Interpreter::new(
                     rib_input.unwrap_or_default(),
                     Arc::new(CustomInstanceFunctionInvoke),
@@ -5575,7 +5568,7 @@ mod tests {
                 );
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
@@ -5583,7 +5576,7 @@ mod tests {
             pub(crate) fn test_deps_with_variant_conflicts(
                 rib_input: Option<RibInput>,
             ) -> RibTestDeps {
-                let component_dependencies = get_metadata_simple_with_variant_conflicts();
+                let component = get_metadata_simple_with_variant_conflicts();
                 let interpreter = Interpreter::new(
                     rib_input.unwrap_or_default(),
                     Arc::new(SimpleVariantConflictInvoke),
@@ -5591,7 +5584,7 @@ mod tests {
                 );
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
@@ -5599,7 +5592,7 @@ mod tests {
             pub(crate) fn test_deps_with_multiple_interfaces(
                 rib_input: Option<RibInput>,
             ) -> RibTestDeps {
-                let component_dependencies = get_metadata_with_multiple_interfaces();
+                let component = get_metadata_with_multiple_interfaces();
                 let interpreter = Interpreter::new(
                     rib_input.unwrap_or_default(),
                     Arc::new(MultiplePackageFunctionInvoke),
@@ -5607,13 +5600,13 @@ mod tests {
                 );
 
                 RibTestDeps {
-                    component_dependencies,
+                    component,
                     interpreter,
                 }
             }
         }
 
-        fn get_component_dependency_with_global_functions() -> Vec<ComponentDependency> {
+        fn get_component_dependency_with_global_functions() -> ComponentDependency {
             let exports = vec![
                 AnalysedExport::Function(AnalysedFunction {
                     name: "add-u32".to_string(),
@@ -5685,7 +5678,7 @@ mod tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency::new(component_info, exports)]
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
         struct TestInvoke3;

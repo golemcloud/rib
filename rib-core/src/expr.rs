@@ -20,7 +20,7 @@ use crate::parser::type_name::TypeName;
 use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{
-    from_string, text, type_checker, type_inference, ComponentDependencies, ComponentDependencyKey,
+    from_string, text, type_checker, type_inference, ComponentDependency, ComponentDependencyKey,
     CustomInstanceSpec, DynamicParsedFunctionName, GlobalVariableTypeSpec, InferredType,
     InstanceIdentifier, VariableId,
 };
@@ -1110,7 +1110,7 @@ impl Expr {
 
     pub fn infer_types(
         &mut self,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
@@ -1247,7 +1247,7 @@ impl Expr {
 
     pub fn infer_types_initial_phase(
         &mut self,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
         global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::{ComponentDependencies, FunctionName, InferredExpr, RibCompilationError};
+use crate::{ComponentDependency, FunctionName, InferredExpr, RibCompilationError};
 
 // An easier data type that focus just on the side effecting function calls in Rib script.
 // These will not include variant or enum calls, that were originally
@@ -30,7 +30,7 @@ pub struct WorkerFunctionsInRib {
 impl WorkerFunctionsInRib {
     pub fn from_inferred_expr(
         inferred_expr: &InferredExpr,
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
     ) -> Result<Option<WorkerFunctionsInRib>, RibCompilationError> {
         let worker_invoke_registry_keys = inferred_expr.worker_invoke_registry_keys();
 
@@ -38,7 +38,7 @@ impl WorkerFunctionsInRib {
 
         for key in worker_invoke_registry_keys {
             let (_, function_type) = component_dependency
-                .get_function_type(&None, &key)
+                .get_function_type(&key)
                 .map_err(|e| RibCompilationError::RibStaticAnalysisError(e.to_string()))?;
 
             let function_call_in_rib = WorkerFunctionType {

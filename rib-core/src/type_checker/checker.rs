@@ -26,7 +26,7 @@ use crate::type_checker::exhaustive_pattern_match::{
 use crate::type_checker::{Path, PathElem};
 use crate::type_inference::arena::children_of;
 use crate::{
-    ComponentDependencies, Expr, FunctionCallError, FunctionName, InvalidWorkerName,
+    ComponentDependency, Expr, FunctionCallError, FunctionName, InvalidWorkerName,
     UnResolvedTypesError,
 };
 use std::collections::VecDeque;
@@ -35,7 +35,7 @@ pub fn type_check(
     root: ExprId,
     arena: &ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
     check_unresolved_types_lowered(root, arena, types)?;
     check_invalid_function_args_lowered(root, arena, types, component_dependency)?;
@@ -94,7 +94,7 @@ fn check_invalid_function_args_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
     let mut order = Vec::new();
     post_order_collect(root, arena, &mut order);
@@ -131,7 +131,7 @@ fn check_invalid_function_args_lowered(
 fn get_missing_record_keys_lowered(
     call_type: &CallType,
     args: &[ExprId],
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     arena: &ExprArena,
     types: &TypeTable,
     function_call_expr: &Expr,
@@ -144,7 +144,7 @@ fn get_missing_record_keys_lowered(
         })?;
 
     let (_, function_type) = component_dependency
-        .get_function_type(&None, &function_name)
+        .get_function_type(&function_name)
         .map_err(|err| FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
             source_span: function_call_expr.source_span(),
@@ -307,7 +307,7 @@ fn check_exhaustive_pattern_match_lowered(
     root: ExprId,
     arena: &ExprArena,
     types: &TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), ExhaustivePatternMatchError> {
     let mut order = Vec::new();
     post_order_collect(root, arena, &mut order);

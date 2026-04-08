@@ -164,7 +164,7 @@ fn collect_post_order_global_var(root: ExprId, arena: &ExprArena, out: &mut Vec<
 mod tests {
     use super::*;
     use crate::rib_source_span::SourceSpan;
-    use crate::{Expr, Id, RibCompiler, RibCompilerConfig, TypeName};
+    use crate::{ComponentDependency, Expr, Id, RibCompiler, RibCompilerConfig, TypeName};
     use test_r::test;
 
     #[test]
@@ -185,7 +185,11 @@ mod tests {
         };
 
         let rib_compiler =
-            RibCompiler::new(RibCompilerConfig::new(vec![], vec![type_spec], vec![]));
+            RibCompiler::new(RibCompilerConfig::new(
+                ComponentDependency::default(),
+                vec![type_spec],
+                vec![],
+            ));
 
         let inferred_expr = rib_compiler.infer_types(expr).unwrap();
 

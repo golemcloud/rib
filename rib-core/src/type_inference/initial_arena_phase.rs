@@ -18,13 +18,13 @@
 use crate::expr_arena::{ExprArena, ExprId, TypeTable};
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference as ti;
-use crate::{ComponentDependencies, CustomInstanceSpec, GlobalVariableTypeSpec};
+use crate::{ComponentDependency, CustomInstanceSpec, GlobalVariableTypeSpec};
 
 pub fn run_initial_binding_and_instance_phases(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
     global_variable_type_spec: &[GlobalVariableTypeSpec],
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {

@@ -629,7 +629,7 @@ mod component_metadata {
     use rib::{ComponentDependency, ComponentDependencyKey};
     use uuid::Uuid;
 
-    pub(crate) fn component_metadata() -> Vec<ComponentDependency> {
+    pub(crate) fn component_metadata() -> ComponentDependency {
         let mut exports = vec![];
         exports.extend(function_metadata::function_unit_response());
         exports.extend(function_metadata::function_no_arg());
@@ -693,7 +693,7 @@ mod component_metadata {
             root_package_version: None,
         };
 
-        vec![ComponentDependency::new(component_info, exports)]
+        ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
     }
 }
 

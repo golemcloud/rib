@@ -34,7 +34,7 @@ pub fn infer_worker_function_invokes_lowered(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    _component_dependencies: &crate::ComponentDependencies,
+    _component_dependencies: &crate::ComponentDependency,
 ) -> Result<(), RibTypeErrorInternal> {
     let mut stack = vec![root];
 

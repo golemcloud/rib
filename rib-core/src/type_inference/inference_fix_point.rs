@@ -227,7 +227,7 @@ mod tests {
 
     use crate::parser::type_name::TypeName;
     use crate::type_inference::inference_fix_point::{compare_expr_types, compare_inferred_types};
-    use crate::{ComponentDependencies, Expr, InferredType, VariableId};
+    use crate::{ComponentDependency, Expr, InferredType, VariableId};
 
     #[test]
     fn test_inferred_type_equality_1() {
@@ -379,7 +379,7 @@ mod tests {
 
         let mut expr = Expr::from_text(expr).unwrap();
 
-        expr.infer_types(&ComponentDependencies::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
             .unwrap();
         let expected = Expr::expr_block(vec![
             Expr::let_binding_with_variable_id(

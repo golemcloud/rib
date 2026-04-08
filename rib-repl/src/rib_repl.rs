@@ -21,8 +21,7 @@ use crate::repl_state::ReplState;
 use crate::rib_context::ReplContext;
 use crate::rib_edit::RibEdit;
 use crate::{
-    CommandRegistry, ReplBootstrapError, ReplComponentDependencies, RibExecutionError,
-    UntypedCommand,
+    CommandRegistry, ReplBootstrapError, ReplComponentBundle, RibExecutionError, UntypedCommand,
 };
 use colored::Colorize;
 use rib::{RibCompiler, RibCompilerConfig, RibResult};
@@ -93,16 +92,16 @@ impl RibRepl {
             }
         }
 
-        let component_dependencies = match config.component_source {
+        let bundle = match config.component_source {
             Some(ref details) => {
-                let component_dependency = config
+                let component = config
                     .dependency_manager
                     .add_component(&details.source_path, details.component_name.clone())
                     .await
                     .map_err(|err| ReplBootstrapError::ComponentLoadError(err.to_string()))?;
 
-                Ok(ReplComponentDependencies {
-                    component_dependencies: vec![component_dependency],
+                Ok(ReplComponentBundle {
+                    component,
                     custom_instance_spec: vec![],
                 })
             }
@@ -111,7 +110,7 @@ impl RibRepl {
 
                 match dependencies {
                     Ok(dependencies) => {
-                        if dependencies.component_dependencies.is_empty() {
+                        if dependencies.component.function_dictionary.name_and_types.is_empty() {
                             return Err(ReplBootstrapError::NoComponentsFound);
                         }
 
@@ -129,16 +128,16 @@ impl RibRepl {
         let repl_state = ReplState::new(
             config.worker_function_invoke,
             RibCompiler::new(RibCompilerConfig::new(
-                component_dependencies.component_dependencies,
+                bundle.component.clone(),
                 vec![],
-                component_dependencies.custom_instance_spec.clone(),
+                bundle.custom_instance_spec.clone(),
             )),
             history_file_path.clone(),
         );
 
         rl.helper_mut()
             .unwrap()
-            .update_custom_instances(component_dependencies.custom_instance_spec);
+            .update_custom_instances(bundle.custom_instance_spec);
 
         Ok(RibRepl {
             printer: config

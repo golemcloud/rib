@@ -1864,7 +1864,7 @@ mod compiler_tests {
         use std::collections::HashMap;
         use uuid::Uuid;
 
-        pub(crate) fn metadata_with_variants() -> Vec<ComponentDependency> {
+        pub(crate) fn metadata_with_variants() -> ComponentDependency {
             let instance = AnalysedExport::Instance(AnalysedInstance {
                 name: "golem:it/api".to_string(),
                 functions: vec![AnalysedFunction {
@@ -1896,17 +1896,14 @@ mod compiler_tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency {
-                component_dependency_key: component_info,
-                component_exports: vec![instance],
-            }]
+            ComponentDependency::from_wit_metadata(component_info, &[instance]).unwrap()
         }
 
         pub(crate) fn get_component_metadata(
             function_name: &str,
             input_types: Vec<AnalysedType>,
             output: AnalysedType,
-        ) -> Vec<ComponentDependency> {
+        ) -> ComponentDependency {
             let analysed_function_parameters = input_types
                 .into_iter()
                 .enumerate()
@@ -1924,14 +1921,12 @@ mod compiler_tests {
                 root_package_version: None,
             };
 
-            vec![ComponentDependency {
-                component_dependency_key: component_info,
-                component_exports: vec![AnalysedExport::Function(AnalysedFunction {
-                    name: function_name.to_string(),
-                    parameters: analysed_function_parameters,
-                    result: Some(AnalysedFunctionResult { typ: output }),
-                })],
-            }]
+            let exports = vec![AnalysedExport::Function(AnalysedFunction {
+                name: function_name.to_string(),
+                parameters: analysed_function_parameters,
+                result: Some(AnalysedFunctionResult { typ: output }),
+            })];
+            ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
         }
 
         pub(crate) fn rib_input_type_info(types: Vec<(&str, AnalysedType)>) -> RibInputTypeInfo {

@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use crate::rib_source_span::SourceSpan;
-use crate::{ArmPattern, ComponentDependencies, Expr};
+use crate::{ArmPattern, ComponentDependency, Expr};
 
 pub(crate) fn check_exhaustive_pattern_match_with_arms(
     pattern_match_expr: &Expr,
     arm_patterns: &[ArmPattern],
-    component_dependency: &ComponentDependencies,
+    component_dependency: &ComponentDependency,
 ) -> Result<(), ExhaustivePatternMatchError> {
     internal::check_exhaustive_pattern_match(pattern_match_expr, arm_patterns, component_dependency)
 }
@@ -39,7 +39,7 @@ pub enum ExhaustivePatternMatchError {
 mod internal {
     use crate::analysis::TypeVariant;
     use crate::type_checker::exhaustive_pattern_match::ExhaustivePatternMatchError;
-    use crate::{ArmPattern, ComponentDependencies, Expr};
+    use crate::{ArmPattern, ComponentDependency, Expr};
     use std::collections::HashMap;
 
     use std::ops::Deref;
@@ -47,7 +47,7 @@ mod internal {
     pub(crate) fn check_exhaustive_pattern_match(
         predicate: &Expr,
         arms: &[ArmPattern],
-        component_dependency: &ComponentDependencies,
+        component_dependency: &ComponentDependency,
     ) -> Result<(), ExhaustivePatternMatchError> {
         let mut exhaustive_check_result =
             check_exhaustive(predicate, arms, ConstructorDetail::option());
