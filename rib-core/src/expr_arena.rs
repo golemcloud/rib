@@ -51,7 +51,6 @@ use std::collections::HashMap;
 
 use crate::call_type::{CallType, InstanceCreationType, InstanceIdentifier};
 use crate::expr::{ArmPattern, Expr, MatchArm, Number, Range};
-use crate::generic_type_parameter::GenericTypeParameter;
 use crate::parser::type_name::TypeName;
 use crate::rib_source_span::SourceSpan;
 use crate::{InferredType, VariableId};
@@ -193,13 +192,11 @@ pub enum ExprKind {
     },
     Call {
         call_type: CallTypeNode,
-        generic_type_parameter: Option<GenericTypeParameter>,
         args: Vec<ExprId>,
     },
     InvokeMethodLazy {
         lhs: ExprId,
         method: String,
-        generic_type_parameter: Option<GenericTypeParameter>,
         args: Vec<ExprId>,
     },
     Unwrap {
@@ -1494,15 +1491,10 @@ pub fn rebuild_expr(id: ExprId, arena: &ExprArena, types: &TypeTable) -> Expr {
             inferred_type: inferred,
             source_span: span,
         },
-        ExprKind::Call {
-            call_type,
-            generic_type_parameter,
-            args,
-        } => {
+        ExprKind::Call { call_type, args } => {
             let old_call_type = rebuild_call_type(call_type, arena, types);
             Expr::Call {
                 call_type: old_call_type,
-                generic_type_parameter: generic_type_parameter.clone(),
                 args: args
                     .iter()
                     .map(|&a| rebuild_expr(a, arena, types))
@@ -1512,15 +1504,9 @@ pub fn rebuild_expr(id: ExprId, arena: &ExprArena, types: &TypeTable) -> Expr {
                 source_span: span,
             }
         }
-        ExprKind::InvokeMethodLazy {
-            lhs,
-            method,
-            generic_type_parameter,
-            args,
-        } => Expr::InvokeMethodLazy {
+        ExprKind::InvokeMethodLazy { lhs, method, args } => Expr::InvokeMethodLazy {
             lhs: Box::new(rebuild_expr(*lhs, arena, types)),
             method: method.clone(),
-            generic_type_parameter: generic_type_parameter.clone(),
             args: args
                 .iter()
                 .map(|&a| rebuild_expr(a, arena, types))
@@ -2203,7 +2189,6 @@ fn lower_expr(expr: &Expr, arena: &mut ExprArena, types: &mut TypeTable) -> Expr
 
         Expr::Call {
             call_type,
-            generic_type_parameter,
             args,
             type_annotation,
             inferred_type,
@@ -2214,7 +2199,6 @@ fn lower_expr(expr: &Expr, arena: &mut ExprArena, types: &mut TypeTable) -> Expr
             (
                 ExprKind::Call {
                     call_type: call_node,
-                    generic_type_parameter: generic_type_parameter.clone(),
                     args: arg_ids,
                 },
                 source_span.clone(),
@@ -2226,7 +2210,6 @@ fn lower_expr(expr: &Expr, arena: &mut ExprArena, types: &mut TypeTable) -> Expr
         Expr::InvokeMethodLazy {
             lhs,
             method,
-            generic_type_parameter,
             args,
             type_annotation,
             inferred_type,
@@ -2238,7 +2221,6 @@ fn lower_expr(expr: &Expr, arena: &mut ExprArena, types: &mut TypeTable) -> Expr
                 ExprKind::InvokeMethodLazy {
                     lhs: lhs_id,
                     method: method.clone(),
-                    generic_type_parameter: generic_type_parameter.clone(),
                     args: arg_ids,
                 },
                 source_span.clone(),

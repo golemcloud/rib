@@ -16,11 +16,8 @@ use crate::analysis::AnalysedType;
 use crate::call_type::InstanceCreationType;
 use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
-use crate::type_parameter::TypeParameter;
 use crate::{ComponentDependencies, CustomInstanceSpec, Expr};
-use crate::{
-    CustomError, FunctionCallError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin,
-};
+use crate::{CustomError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin};
 
 use crate::expr_arena::{
     rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
@@ -101,30 +98,14 @@ fn identify_instance_creation_with_worker_arena(
 
         if let ExprKind::Call {
             ref call_type,
-            ref generic_type_parameter,
             ref args,
             ..
         } = kind
         {
-            let type_parameter = generic_type_parameter
-                .as_ref()
-                .map(|gtp| {
-                    TypeParameter::from_text(&gtp.value).map_err(|err| {
-                        FunctionCallError::invalid_generic_type_parameter(
-                            &gtp.value,
-                            err,
-                            span.clone(),
-                        )
-                    })
-                })
-                .transpose()
-                .map_err(RibTypeErrorInternal::from)?;
-
             let args_ids: Vec<ExprId> = args.clone();
 
             let result = get_instance_creation_details_arena(
                 call_type,
-                type_parameter,
                 &args_ids,
                 arena,
                 types,
@@ -138,20 +119,18 @@ fn identify_instance_creation_with_worker_arena(
                 ))
             })?;
 
-            if let Some((instance_creation_type, new_type_parameter)) = result {
+            if let Some(instance_creation_type) = result {
                 let worker_name = instance_creation_type.worker_name();
 
-                let new_instance_type = InstanceType::from(
-                    component_dependency,
-                    worker_name.as_ref(),
-                    new_type_parameter,
-                )
-                .map_err(|err| {
-                    RibTypeErrorInternal::from(CustomError::new(
-                        span.clone(),
-                        format!("failed to create instance: {err}"),
-                    ))
-                })?;
+                let new_instance_type =
+                    InstanceType::from(component_dependency, worker_name.as_ref()).map_err(
+                        |err| {
+                            RibTypeErrorInternal::from(CustomError::new(
+                                span.clone(),
+                                format!("failed to create instance: {err}"),
+                            ))
+                        },
+                    )?;
 
                 let new_type = InferredType::new(
                     TypeInternal::Instance {
@@ -237,13 +216,12 @@ fn lower_expr_into_arena(expr: Expr, arena: &mut ExprArena, types: &mut TypeTabl
 
 fn get_instance_creation_details_arena(
     call_type: &CallTypeNode,
-    type_parameter: Option<TypeParameter>,
     args: &[ExprId],
     arena: &mut ExprArena,
     types: &mut TypeTable,
     component_dependency: &ComponentDependencies,
     custom_instance_spec: &[CustomInstanceSpec],
-) -> Result<Option<(InstanceCreationType, Option<TypeParameter>)>, String> {
+) -> Result<Option<InstanceCreationType>, String> {
     match call_type {
         CallTypeNode::Function { function_name, .. } => {
             let fn_ref = function_name.to_parsed_function_name().function;
@@ -251,9 +229,9 @@ fn get_instance_creation_details_arena(
                 ParsedFunctionReference::Function { function } if function == "instance" => {
                     // Get the first arg as an optional worker name
                     let worker_name_expr = args.first().map(|&id| rebuild_expr(id, arena, types));
-                    let instance_creation = component_dependency
-                        .get_worker_instance_type(type_parameter.clone(), worker_name_expr)?;
-                    Ok(Some((instance_creation, type_parameter)))
+                    let instance_creation =
+                        component_dependency.get_worker_instance_type(worker_name_expr)?;
+                    Ok(Some(instance_creation))
                 }
                 ParsedFunctionReference::Function { function } => {
                     let spec = custom_instance_spec
@@ -299,10 +277,9 @@ fn get_instance_creation_details_arena(
                             }
                             concat_parts.push(Expr::literal(")"));
                             let worker_name_expr = Expr::concat(concat_parts);
-                            let tp = spec.interface_name.map(TypeParameter::Interface);
                             let instance_creation = component_dependency
-                                .get_worker_instance_type(tp.clone(), Some(worker_name_expr))?;
-                            Ok(Some((instance_creation, tp)))
+                                .get_worker_instance_type(Some(worker_name_expr))?;
+                            Ok(Some(instance_creation))
                         }
                     }
                 }
@@ -334,7 +311,7 @@ fn get_instance_creation_details_arena(
                     }
                 }
             };
-            Ok(Some((ict, type_parameter)))
+            Ok(Some(ict))
         }
         CallTypeNode::VariantConstructor(_) | CallTypeNode::EnumConstructor(_) => Ok(None),
     }

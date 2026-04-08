@@ -479,15 +479,11 @@ fn fold_with_selections_or_fractions(
     for field_expr in exprs {
         match field_expr.base {
             SelectionOrFraction::SelectFieldExpr(Expr::Call {
-                call_type,
-                generic_type_parameter,
-                args,
-                ..
+                call_type, args, ..
             }) => {
                 base = Expr::invoke_worker_function(
                     base.clone(),
                     call_type.function_name().unwrap().to_string(),
-                    generic_type_parameter,
                     args,
                 );
                 base = fold_with_index_exprs(base, field_expr.index_expr)
@@ -549,7 +545,6 @@ fn combine_with_range_info(
 
 #[cfg(test)]
 mod tests {
-    use crate::generic_type_parameter::GenericTypeParameter;
     use crate::ParsedFunctionSite::PackagedInterface;
     use crate::{
         ArmPattern, DynamicParsedFunctionName, DynamicParsedFunctionReference, Expr, InferredType,
@@ -1012,50 +1007,7 @@ mod tests {
 
         assert_eq!(
             expr,
-            Expr::invoke_worker_function(worker_variable, function_name, None, vec![])
-        );
-    }
-
-    #[test]
-    fn test_worker_function_invoke_2() {
-        let expr = Expr::from_text("worker.function-name[foo]()").unwrap();
-        let worker_variable = Expr::identifier_global("worker", None);
-        let function_name = "function-name".to_string();
-        let type_parameter = GenericTypeParameter {
-            value: "foo".to_string(),
-        };
-
-        assert_eq!(
-            expr,
-            Expr::invoke_worker_function(
-                worker_variable,
-                function_name,
-                Some(type_parameter),
-                vec![]
-            )
-        );
-    }
-
-    #[test]
-    fn test_worker_function_invoke_3() {
-        let expr = Expr::from_text(r#"worker.function-name[foo](foo, bar)"#).unwrap();
-        let worker_variable = Expr::identifier_global("worker", None);
-        let type_parameter = GenericTypeParameter {
-            value: "foo".to_string(),
-        };
-        let function_name = "function-name".to_string();
-
-        assert_eq!(
-            expr,
-            Expr::invoke_worker_function(
-                worker_variable,
-                function_name,
-                Some(type_parameter),
-                vec![
-                    Expr::identifier_global("foo", None),
-                    Expr::identifier_global("bar", None)
-                ]
-            )
+            Expr::invoke_worker_function(worker_variable, function_name, vec![])
         );
     }
 
@@ -1070,7 +1022,6 @@ mod tests {
             Expr::invoke_worker_function(
                 worker_variable,
                 function_name,
-                None,
                 vec![
                     Expr::identifier_global("foo", None),
                     Expr::identifier_global("bar", None)
@@ -1095,7 +1046,6 @@ mod tests {
                 Expr::call_worker_function(
                     DynamicParsedFunctionName::parse("instance").unwrap(),
                     None,
-                    None,
                     vec![Expr::literal("my-worker")],
                     None,
                 ),
@@ -1104,89 +1054,6 @@ mod tests {
             Expr::invoke_worker_function(
                 worker_variable,
                 function_name,
-                None,
-                vec![
-                    Expr::identifier_global("foo", None),
-                    Expr::identifier_global("bar", None),
-                    Expr::identifier_global("baz", None),
-                ],
-            ),
-        ]);
-        assert_eq!(expr, expected);
-    }
-
-    #[test]
-    fn test_worker_function_invoke_6() {
-        let rib_expr = r#"
-          let worker = instance("my-worker");
-          worker.function-name[foo](foo, bar, baz)
-        "#;
-        let expr = Expr::from_text(rib_expr).unwrap();
-        let worker_variable = Expr::identifier_global("worker", None);
-        let function_name = "function-name".to_string();
-        let type_parameter = GenericTypeParameter {
-            value: "foo".to_string(),
-        };
-
-        let expected = Expr::expr_block(vec![
-            Expr::let_binding(
-                "worker",
-                Expr::call_worker_function(
-                    DynamicParsedFunctionName::parse("instance").unwrap(),
-                    None,
-                    None,
-                    vec![Expr::literal("my-worker")],
-                    None,
-                ),
-                None,
-            ),
-            Expr::invoke_worker_function(
-                worker_variable,
-                function_name,
-                Some(type_parameter),
-                vec![
-                    Expr::identifier_global("foo", None),
-                    Expr::identifier_global("bar", None),
-                    Expr::identifier_global("baz", None),
-                ],
-            ),
-        ]);
-        assert_eq!(expr, expected);
-    }
-
-    #[test]
-    fn test_worker_function_invoke_7() {
-        let rib_expr = r#"
-          let worker = instance[foo]("my-worker");
-          worker.function-name[bar](foo, bar, baz)
-        "#;
-        let expr = Expr::from_text(rib_expr).unwrap();
-        let worker_variable = Expr::identifier_global("worker", None);
-        let function_name = "function-name".to_string();
-        let type_parameter1 = GenericTypeParameter {
-            value: "foo".to_string(),
-        };
-
-        let type_parameter2 = GenericTypeParameter {
-            value: "bar".to_string(),
-        };
-
-        let expected = Expr::expr_block(vec![
-            Expr::let_binding(
-                "worker",
-                Expr::call_worker_function(
-                    DynamicParsedFunctionName::parse("instance").unwrap(),
-                    Some(type_parameter1),
-                    None,
-                    vec![Expr::literal("my-worker")],
-                    None,
-                ),
-                None,
-            ),
-            Expr::invoke_worker_function(
-                worker_variable,
-                function_name,
-                Some(type_parameter2),
                 vec![
                     Expr::identifier_global("foo", None),
                     Expr::identifier_global("bar", None),
@@ -1310,7 +1177,6 @@ mod tests {
                             method: "do-something-static".to_string(),
                         },
                     },
-                    None,
                     None,
                     vec![
                         Expr::identifier_global("baz", None),

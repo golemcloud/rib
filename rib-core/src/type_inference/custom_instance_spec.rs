@@ -13,33 +13,19 @@
 // limitations under the License.
 
 use crate::analysis::AnalysedType;
-use crate::InterfaceName;
 
 #[derive(Clone, Debug)]
 pub struct CustomInstanceSpec {
     pub instance_name: String,
     pub parameter_types: Vec<AnalysedType>,
-    pub interface_name: Option<InterfaceName>,
 }
 
 impl CustomInstanceSpec {
-    // Constructs a new `CustomInstanceSpec`, which allows users to create instances other than the key word
-    // `instance` that takes specific types of arguments and not just optional string
-    //
-    // Parameters:
-    // - `instance_name`: The function name that can be used to create an instance.
-    // - `parameter_types`: The types of parameters that the custom instance creation function takes.
-    // - `interface_name`: If provided, it will associate this instance creation with the particular instance
-    //                    and has to be part of the ComponentDependencies
-    pub fn new(
-        instance_name: String,
-        parameter_types: Vec<AnalysedType>,
-        interface_name: Option<InterfaceName>,
-    ) -> Self {
+    /// Allows instance creation under a custom name (not only `instance`) with typed parameters.
+    pub fn new(instance_name: String, parameter_types: Vec<AnalysedType>) -> Self {
         CustomInstanceSpec {
             instance_name,
             parameter_types,
-            interface_name,
         }
     }
 }

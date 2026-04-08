@@ -269,12 +269,6 @@ pub enum FunctionCallError {
         invalid_lhs_source_span: SourceSpan,
     },
 
-    InvalidGenericTypeParameter {
-        generic_type_parameter: String,
-        source_span: SourceSpan,
-        message: String,
-    },
-
     ArgumentSizeMisMatch {
         function_name: String,
         source_span: SourceSpan,
@@ -293,17 +287,6 @@ impl FunctionCallError {
             function_name: function_name.to_string(),
             source_span: function_source_span,
             message: message.as_ref().to_string(),
-        }
-    }
-    pub fn invalid_generic_type_parameter(
-        generic_type_parameter: &str,
-        message: impl AsRef<str>,
-        source_span: SourceSpan,
-    ) -> FunctionCallError {
-        FunctionCallError::InvalidGenericTypeParameter {
-            generic_type_parameter: generic_type_parameter.to_string(),
-            message: message.as_ref().to_string(),
-            source_span,
         }
     }
 }

@@ -140,7 +140,6 @@ fn convert_identifier_nodes(
         let node = arena.expr_mut(id);
         node.kind = ExprKind::Call {
             call_type: CallTypeNode::VariantConstructor(name),
-            generic_type_parameter: None,
             args: vec![],
         };
     }
@@ -175,7 +174,6 @@ fn convert_call_nodes(root: ExprId, arena: &mut ExprArena, variants_with_args: &
         let node = arena.expr_mut(id);
         node.kind = ExprKind::Call {
             call_type: CallTypeNode::VariantConstructor(name),
-            generic_type_parameter: None,
             args,
         };
     }

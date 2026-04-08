@@ -362,10 +362,7 @@ impl<W: Write> Writer<W> {
             },
 
             Expr::Call {
-                call_type,
-                generic_type_parameter,
-                args,
-                ..
+                call_type, args, ..
             } => {
                 let function_name = match call_type {
                     CallType::Function { function_name, .. } => {
@@ -382,12 +379,6 @@ impl<W: Write> Writer<W> {
                 };
 
                 self.write_str(function_name)?;
-
-                if let Some(type_parameter) = generic_type_parameter {
-                    self.write_str("[")?;
-                    self.write_str(type_parameter.value.clone())?;
-                    self.write_str("]")?;
-                }
 
                 match call_type {
                     CallType::Function { .. } | CallType::InstanceCreation(_) => {
@@ -493,20 +484,11 @@ impl<W: Write> Writer<W> {
             }
 
             Expr::InvokeMethodLazy {
-                lhs,
-                method,
-                generic_type_parameter,
-                args,
-                ..
+                lhs, method, args, ..
             } => {
                 self.write_expr(lhs)?;
                 self.write_str(".")?;
                 self.write_str(method)?;
-                if let Some(type_parameter) = generic_type_parameter {
-                    self.write_str("[")?;
-                    self.write_str(type_parameter.value.clone())?;
-                    self.write_str("]")?;
-                }
                 self.write_display("(")?;
                 for (idx, param) in args.iter().enumerate() {
                     if idx != 0 {

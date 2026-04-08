@@ -42,7 +42,6 @@ mod compiler;
 mod expr;
 pub mod expr_arena;
 mod function_name;
-mod generic_type_parameter;
 mod inferred_type;
 mod instance_type;
 mod interpreter;

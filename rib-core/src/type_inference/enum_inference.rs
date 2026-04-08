@@ -37,7 +37,6 @@ pub fn infer_enums_lowered(
             let node_mut = arena.expr_mut(id);
             node_mut.kind = ExprKind::Call {
                 call_type: CallTypeNode::EnumConstructor(name),
-                generic_type_parameter: None,
                 args: vec![],
             };
             node_mut.type_annotation = annotation;

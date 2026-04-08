@@ -280,19 +280,6 @@ impl From<FunctionCallError> for RibTypeErrorInternal {
                 additional_error_details: vec![],
                 help_messages: vec![],
             },
-            FunctionCallError::InvalidGenericTypeParameter {
-                generic_type_parameter,
-                message,
-                source_span,
-            } => RibTypeErrorInternal {
-                cause: format!(
-                    "invalid generic type parameter: `{generic_type_parameter}`"
-                ),
-                source_span,
-                additional_error_details: vec![message],
-                help_messages: vec![],
-            },
-
             FunctionCallError::ArgumentSizeMisMatch {
                 function_name,
                 source_span: argument_source_span,

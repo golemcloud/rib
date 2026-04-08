@@ -397,7 +397,6 @@ mod name_binding_tests {
                 },
                 None,
             ),
-            None,
             vec![Expr::identifier_local("x", 0, None)],
         );
 
@@ -441,7 +440,6 @@ mod name_binding_tests {
                 },
                 None,
             ),
-            None,
             vec![Expr::identifier_local("x", 0, None)],
         );
 
@@ -455,7 +453,6 @@ mod name_binding_tests {
                 },
                 None,
             ),
-            None,
             vec![Expr::identifier_local("x", 1, None)],
         );
 

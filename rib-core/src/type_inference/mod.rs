@@ -459,7 +459,6 @@ mod tests {
                     component_info: None,
                     worker_name: Some(Box::new(Expr::literal("foo"))),
                 }),
-                None,
                 vec![Expr::literal("foo")],
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
@@ -482,7 +481,6 @@ mod tests {
                 },
                 Some(component_dependency_key),
             ),
-            None,
             vec![identifier(
                 VariableId::local("x", 0),
                 None,
@@ -555,7 +553,6 @@ mod tests {
                     component_info: None,
                     worker_name: Some(Box::new(Expr::literal("foo"))),
                 }),
-                None,
                 vec![Expr::literal("foo")],
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
@@ -578,7 +575,6 @@ mod tests {
                 },
                 Some(expected_component_in_function_call.clone()),
             ),
-            None,
             vec![identifier(
                 VariableId::local("x", 0),
                 None,
@@ -601,7 +597,6 @@ mod tests {
                 },
                 Some(expected_component_in_function_call.clone()),
             ),
-            None,
             vec![identifier(
                 VariableId::local("y", 0),
                 None,
@@ -1415,7 +1410,6 @@ mod tests {
                     component_info: None,
                     worker_name: Some(Box::new(Expr::literal("foo"))),
                 }),
-                None,
                 vec![Expr::literal("foo")],
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
@@ -1449,7 +1443,6 @@ mod tests {
                             },
                             Some(expected_component_key.clone()),
                         ),
-                        None,
                         vec![identifier(
                             VariableId::local("x", 0),
                             None,
@@ -1480,7 +1473,6 @@ mod tests {
                             },
                             Some(expected_component_key.clone()),
                         ),
-                        None,
                         vec![identifier(
                             VariableId::local("y", 0),
                             None,
@@ -2459,7 +2451,6 @@ mod tests {
         };
         use crate::call_type::CallType;
         use crate::function_name::{DynamicParsedFunctionName, DynamicParsedFunctionReference};
-        use crate::generic_type_parameter::GenericTypeParameter;
         use crate::parser::type_name::TypeName;
         use crate::rib_source_span::SourceSpan;
         use crate::{
@@ -2647,15 +2638,9 @@ mod tests {
                 type_annotation: None,
             }
         }
-        pub fn call(
-            call_type: CallType,
-            generic_type_parameter: Option<GenericTypeParameter>,
-            args: Vec<Expr>,
-            inferred_type: InferredType,
-        ) -> Expr {
+        pub fn call(call_type: CallType, args: Vec<Expr>, inferred_type: InferredType) -> Expr {
             Expr::Call {
                 call_type,
-                generic_type_parameter,
                 args,
                 inferred_type,
                 source_span: SourceSpan::default(),
@@ -2848,7 +2833,6 @@ mod tests {
                         None,
                         call(
                             CallType::EnumConstructor("foo".to_string()),
-                            None,
                             vec![],
                             InferredType::enum_(vec![
                                 "foo".to_string(),
@@ -2862,7 +2846,6 @@ mod tests {
                         None,
                         call(
                             CallType::EnumConstructor("bar".to_string()),
-                            None,
                             vec![],
                             InferredType::enum_(vec![
                                 "foo".to_string(),
@@ -2876,7 +2859,6 @@ mod tests {
                         None,
                         call(
                             CallType::EnumConstructor("foo-bar".to_string()),
-                            None,
                             vec![],
                             InferredType::enum_(vec![
                                 "foo".to_string(),
@@ -2893,7 +2875,6 @@ mod tests {
                                 component_info: None,
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
                             }),
-                            None,
                             vec![Expr::literal("foo")],
                         )
                         .with_inferred_type(InferredType::instance(
@@ -2920,7 +2901,6 @@ mod tests {
                                 },
                                 Some(expected_component_in_function_calls.clone()),
                             ),
-                            None,
                             vec![
                                 identifier(
                                     VariableId::local("query1", 0),
@@ -2979,7 +2959,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("success".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "success".to_string(),
@@ -3002,7 +2981,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("failure".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "success".to_string(),
@@ -3025,7 +3003,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("in-progress".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "success".to_string(),
@@ -3059,7 +3036,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("foo".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3082,7 +3058,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("bar".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3105,7 +3080,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("foo-bar".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3139,7 +3113,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("foo".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3162,7 +3135,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("bar".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3185,7 +3157,6 @@ mod tests {
                                 MatchArm {
                                     arm_pattern: ArmPattern::Literal(Box::new(call(
                                         CallType::EnumConstructor("foo-bar".to_string()),
-                                        None,
                                         vec![],
                                         InferredType::enum_(vec![
                                             "foo".to_string(),
@@ -3426,7 +3397,6 @@ mod tests {
                                 component_info: None,
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
                             }),
-                            None,
                             vec![Expr::literal("foo")],
                         )
                         .with_inferred_type(InferredType::instance(
@@ -3453,7 +3423,6 @@ mod tests {
                                 },
                                 Some(expected_component_in_function_calls.clone()),
                             ),
-                            None,
                             vec![identifier(
                                 VariableId::local("x", 0),
                                 None,

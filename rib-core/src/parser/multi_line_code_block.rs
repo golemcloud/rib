@@ -101,13 +101,11 @@ mod tests {
             Expr::call_worker_function(
                 DynamicParsedFunctionName::parse("foo").unwrap(),
                 None,
-                None,
                 vec![Expr::identifier_global("x", None)],
                 None,
             ),
             Expr::call_worker_function(
                 DynamicParsedFunctionName::parse("foo").unwrap(),
-                None,
                 None,
                 vec![Expr::identifier_global("y", None)],
                 None,
@@ -138,13 +136,11 @@ mod tests {
                 Expr::call_worker_function(
                     DynamicParsedFunctionName::parse("foo").unwrap(),
                     None,
-                    None,
                     vec![Expr::identifier_global("x", None)],
                     None,
                 ),
                 Expr::call_worker_function(
                     DynamicParsedFunctionName::parse("foo").unwrap(),
-                    None,
                     None,
                     vec![Expr::identifier_global("y", None)],
                     None,
@@ -186,13 +182,11 @@ mod tests {
                     Expr::call_worker_function(
                         DynamicParsedFunctionName::parse("foo").unwrap(),
                         None,
-                        None,
                         vec![Expr::identifier_global("x", None)],
                         None,
                     ),
                     Expr::call_worker_function(
                         DynamicParsedFunctionName::parse("foo").unwrap(),
-                        None,
                         None,
                         vec![Expr::identifier_global("y", None)],
                         None,
@@ -241,13 +235,11 @@ mod tests {
                         Expr::call_worker_function(
                             DynamicParsedFunctionName::parse("foo").unwrap(),
                             None,
-                            None,
                             vec![Expr::identifier_global("x", None)],
                             None,
                         ),
                         Expr::call_worker_function(
                             DynamicParsedFunctionName::parse("foo").unwrap(),
-                            None,
                             None,
                             vec![Expr::identifier_global("y", None)],
                             None,

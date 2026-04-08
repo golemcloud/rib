@@ -22,7 +22,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Publish rib-repl
+      - name: Publish workspace crates (rib-core, then rib-repl)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish -p rib-repl
+        run: cargo publish --workspace

@@ -19,7 +19,6 @@ use crate::expr_arena::{
 };
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference::expr_visitor::arena::children_of;
-use crate::type_parameter::TypeParameter;
 use crate::InstanceType;
 use crate::{
     CustomError, DynamicParsedFunctionName, FullyQualifiedResourceConstructor, FunctionCallError,
@@ -53,7 +52,7 @@ pub fn infer_worker_function_invokes_lowered(
 
                 if let TypeInternal::Instance { instance_type } = lhs_type.internal_type() {
                     let (component, function) = instance_type
-                        .get_function(&field, None)
+                        .get_function(&field)
                         .map_err(|err| {
                             FunctionCallError::invalid_function_call(&field, span.clone(), err)
                         })
@@ -126,7 +125,6 @@ pub fn infer_worker_function_invokes_lowered(
                                     resource_name: fully_qualified_resource_constructor,
                                 },
                             ),
-                            generic_type_parameter: None,
                             args: vec![],
                         };
                         types.set(id, new_type);
@@ -141,32 +139,16 @@ pub fn infer_worker_function_invokes_lowered(
             ExprKind::InvokeMethodLazy {
                 lhs: lhs_id,
                 ref method,
-                ref generic_type_parameter,
                 ref args,
             } => {
                 let method = method.clone();
-                let gtp = generic_type_parameter.clone();
                 let args_ids: Vec<ExprId> = args.clone();
                 let lhs_type = types.get(lhs_id).clone();
 
                 match lhs_type.internal_type() {
                     TypeInternal::Instance { instance_type } => {
-                        let type_parameter = gtp
-                            .as_ref()
-                            .map(|g| {
-                                TypeParameter::from_text(&g.value).map_err(|err| {
-                                    FunctionCallError::invalid_generic_type_parameter(
-                                        &g.value,
-                                        err,
-                                        span.clone(),
-                                    )
-                                })
-                            })
-                            .transpose()
-                            .map_err(RibTypeErrorInternal::from)?;
-
                         let (component, function) = instance_type
-                            .get_function(&method, type_parameter)
+                            .get_function(&method)
                             .map_err(|err| {
                                 FunctionCallError::invalid_function_call(&method, span.clone(), err)
                             })
@@ -208,7 +190,6 @@ pub fn infer_worker_function_invokes_lowered(
                                         instance_identifier: Some(ii_node),
                                         function_name: dpfn,
                                     },
-                                    generic_type_parameter: None,
                                     args: args_ids,
                                 };
                                 node_mut.source_span = span;
@@ -278,7 +259,6 @@ pub fn infer_worker_function_invokes_lowered(
                                             resource_name: fqrc,
                                         },
                                     ),
-                                    generic_type_parameter: None,
                                     args: args_ids,
                                 };
                                 types.set(id, new_type);
@@ -370,7 +350,6 @@ pub fn infer_worker_function_invokes_lowered(
                                         instance_identifier: Some(ii_node),
                                         function_name: dpfn,
                                     },
-                                    generic_type_parameter: None,
                                     args: args_ids,
                                 };
                                 types.set(id, new_inferred_type);
