@@ -14,7 +14,6 @@
 
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
-use crate::generic_type_parameter::GenericTypeParameter;
 use crate::inferred_type::DefaultType;
 use crate::parser::block::block;
 use crate::parser::type_name::TypeName;
@@ -236,14 +235,12 @@ pub enum Expr {
         inferred_type: InferredType,
         source_span: SourceSpan,
     },
-    // instance[t]("my-worker") will be parsed sd Expr::Call { "instance", Some(t }, vec!["my-worker"] }
-    // will be parsed as Expr::Call { "instance", vec!["my-worker"] }.
+    // `instance("my-worker")` is parsed as Expr::Call { "instance", vec!["my-worker"] }.
     // During function call inference phase, the type of this `Expr::Call` will be `Expr::Call { InstanceCreation,.. }
     // with inferred-type as `InstanceType`. This way any variables attached to the instance creation
     // will be having the `InstanceType`.
     Call {
         call_type: CallType,
-        generic_type_parameter: Option<GenericTypeParameter>,
         args: Vec<Expr>,
         type_annotation: Option<TypeName>,
         inferred_type: InferredType,
@@ -257,7 +254,6 @@ pub enum Expr {
     InvokeMethodLazy {
         lhs: Box<Expr>,
         method: String,
-        generic_type_parameter: Option<GenericTypeParameter>,
         args: Vec<Expr>,
         type_annotation: Option<TypeName>,
         inferred_type: InferredType,
@@ -567,7 +563,6 @@ impl Expr {
 
     pub fn call_worker_function(
         dynamic_parsed_fn_name: DynamicParsedFunctionName,
-        generic_type_parameter: Option<GenericTypeParameter>,
         module_identifier: Option<InstanceIdentifier>,
         args: Vec<Expr>,
         component_info: Option<ComponentDependencyKey>,
@@ -578,7 +573,6 @@ impl Expr {
                 instance_identifier: module_identifier.map(Box::new),
                 component_info,
             },
-            generic_type_parameter,
             args,
             inferred_type: InferredType::unknown(),
             source_span: SourceSpan::default(),
@@ -586,14 +580,9 @@ impl Expr {
         }
     }
 
-    pub fn call(
-        call_type: CallType,
-        generic_type_parameter: Option<GenericTypeParameter>,
-        args: Vec<Expr>,
-    ) -> Self {
+    pub fn call(call_type: CallType, args: Vec<Expr>) -> Self {
         Expr::Call {
             call_type,
-            generic_type_parameter,
             args,
             inferred_type: InferredType::unknown(),
             source_span: SourceSpan::default(),
@@ -601,16 +590,10 @@ impl Expr {
         }
     }
 
-    pub fn invoke_worker_function(
-        lhs: Expr,
-        function_name: String,
-        generic_type_parameter: Option<GenericTypeParameter>,
-        args: Vec<Expr>,
-    ) -> Self {
+    pub fn invoke_worker_function(lhs: Expr, function_name: String, args: Vec<Expr>) -> Self {
         Expr::InvokeMethodLazy {
             lhs: Box::new(lhs),
             method: function_name,
-            generic_type_parameter,
             args,
             inferred_type: InferredType::unknown(),
             source_span: SourceSpan::default(),

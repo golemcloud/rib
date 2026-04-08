@@ -17,7 +17,6 @@ use crate::analysis::{AnalysedExport, TypeVariant};
 use crate::{
     ComponentDependencyKey, Expr, FullyQualifiedInterfaceName, FunctionDictionary, FunctionName,
     FunctionType, FunctionTypeRegistry, InstanceCreationType, InterfaceName, PackageName,
-    TypeParameter,
 };
 use std::collections::BTreeMap;
 
@@ -252,73 +251,12 @@ impl ComponentDependencies {
     // or it could represent the package or interface within a component
     pub fn get_worker_instance_type(
         &self,
-        type_parameter: Option<TypeParameter>,
         worker_name: Option<Expr>,
     ) -> Result<InstanceCreationType, String> {
-        match type_parameter {
-            None => Ok(InstanceCreationType::WitWorker {
-                component_info: None,
-                worker_name: worker_name.map(Box::new),
-            }),
-
-            Some(TypeParameter::PackageName(package_name)) => {
-                // If the user has specified the root package name, annotate the InstanceCreationType with the component already
-                let result = self
-                    .dependencies
-                    .iter()
-                    .find(|(x, _)| match &x.root_package_name {
-                        Some(name) => {
-                            let pkg = match &x.root_package_version {
-                                None => name.to_string(),
-                                Some(version) => format!("{name}@{version}"),
-                            };
-
-                            pkg == package_name.to_string()
-                        }
-
-                        None => false,
-                    });
-
-                if let Some(result) = result {
-                    Ok(InstanceCreationType::WitWorker {
-                        component_info: Some(result.0.clone()),
-                        worker_name: worker_name.map(Box::new),
-                    })
-                } else {
-                    Ok(InstanceCreationType::WitWorker {
-                        component_info: None,
-                        worker_name: worker_name.map(Box::new),
-                    })
-                }
-            }
-
-            Some(TypeParameter::Interface(interface_name)) => {
-                let filtered_by_interface = self.filter_by_interface(&interface_name)?;
-
-                let dependency_key = if filtered_by_interface.dependencies.len() == 1 {
-                    filtered_by_interface
-                        .dependencies
-                        .iter()
-                        .next()
-                        .map(|(k, _)| k.clone())
-                        .unwrap()
-                } else {
-                    return Err(format!(
-                        "interface `{interface_name}` is ambiguous across components"
-                    ));
-                };
-
-                Ok(InstanceCreationType::WitWorker {
-                    component_info: Some(dependency_key.clone()),
-                    worker_name: worker_name.map(Box::new),
-                })
-            }
-
-            _ => Ok(InstanceCreationType::WitWorker {
-                component_info: None,
-                worker_name: worker_name.map(Box::new),
-            }),
-        }
+        Ok(InstanceCreationType::WitWorker {
+            component_info: None,
+            worker_name: worker_name.map(Box::new),
+        })
     }
 
     pub fn from_raw(

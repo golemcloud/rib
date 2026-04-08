@@ -301,7 +301,6 @@ mod test {
                         }
                     },
                     None,
-                    None,
                     vec![],
                     None
                 ),
@@ -312,7 +311,6 @@ mod test {
                             function: "bar".to_string(),
                         }
                     },
-                    None,
                     None,
                     vec![],
                     None

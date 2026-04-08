@@ -56,11 +56,9 @@ pub fn type_pull_up_lowered(
             ExprKind::InvokeMethodLazy {
                 lhs,
                 ref method,
-                ref generic_type_parameter,
                 ref args,
             } => {
                 let method = method.clone();
-                let gtp = generic_type_parameter.clone();
                 let args_ids: Vec<ExprId> = args.clone();
                 let lhs_type = types.get(lhs).clone();
                 let new_call = handle_residual_method_invokes_arena(
@@ -76,7 +74,6 @@ pub fn type_pull_up_lowered(
                 let node_mut = arena.expr_mut(id);
                 node_mut.kind = new_call.0;
                 types.set(id, new_call.1);
-                let _ = gtp;
             }
 
             ExprKind::SelectField {
@@ -343,7 +340,6 @@ fn handle_residual_method_invokes_arena(
                     instance_identifier: Some(ii_node),
                     function_name: dpfn,
                 },
-                generic_type_parameter: None,
                 args: args.to_vec(),
             };
 
@@ -738,7 +734,6 @@ mod type_pull_up_tests {
     pub fn test_pull_up_for_call() {
         let mut expr = Expr::call_worker_function(
             DynamicParsedFunctionName::parse("global_fn").unwrap(),
-            None,
             None,
             vec![Expr::number(BigDecimal::from(1))],
             None,

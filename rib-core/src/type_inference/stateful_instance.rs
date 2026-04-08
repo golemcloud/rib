@@ -70,7 +70,6 @@ pub fn ensure_stateful_instance(root: ExprId, arena: &mut ExprArena, types: &mut
                     component_info: ci,
                     worker_name: Some(gen_id),
                 }),
-                generic_type_parameter: None,
                 args: new_args,
             };
 

@@ -24,7 +24,6 @@ mod comment;
 mod cond;
 mod errors;
 mod flag;
-mod generic_type_parameter;
 mod identifier;
 mod integer;
 mod let_binding;

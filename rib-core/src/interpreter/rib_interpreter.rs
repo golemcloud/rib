@@ -1534,8 +1534,8 @@ mod tests {
         get_analysed_type_variant, get_value_and_type, strip_spaces, RibTestDeps,
     };
     use crate::{
-        CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredType, InstructionId,
-        InterfaceName, Path, RibCompiler, RibCompilerConfig, VariableId,
+        CustomInstanceSpec, Expr, GlobalVariableTypeSpec, InferredType, InstructionId, Path,
+        RibCompiler, RibCompilerConfig, VariableId,
     };
     use crate::{IntoValue, IntoValueAndType, Value, ValueAndType};
 
@@ -3690,7 +3690,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. specify an interface name as type parameter from: api1, api2\n".to_string()
+            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3701,7 +3701,7 @@ mod tests {
                 let invokes: list<u8> = [1, 2, 3, 4];
 
                 for i in invokes {
-                    yield worker.qux[wasi:clocks]("bar");
+                    yield worker.baz("bar");
                 };
 
                 "success"
@@ -3800,31 +3800,6 @@ mod tests {
     }
 
     #[test]
-    async fn test_interpreter_durable_worker_3() {
-        let expr = r#"
-                let my_worker = instance("my-worker");
-                let result = my_worker.foo[api1]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("foo".to_string())
-        );
-    }
-
-    #[test]
     async fn test_interpreter_durable_worker_4() {
         let expr = r#"
                 let worker = instance("my-worker");
@@ -3845,57 +3820,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. specify an interface name as type parameter from: api1, api2\n".to_string()
-        );
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_5() {
-        let expr = r#"
-                let worker = instance("my-worker");
-                let result = worker.bar[api1]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("api1-bar".to_string())
-        );
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_6() {
-        let expr = r#"
-                let worker = instance("my-worker");
-                let result = worker.bar[api2]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("api2-bar".to_string())
+            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3944,57 +3869,7 @@ mod tests {
 
         assert_eq!(
             compiled,
-            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages. specify a package name as type parameter from: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
-        );
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_9() {
-        let expr = r#"
-                let worker = instance("my-worker");
-                let result = worker.qux[amazon:shopping-cart]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("qux".to_string())
-        );
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_10() {
-        let expr = r#"
-                let worker = instance("my-worker");
-                let result = worker.qux[wasi:clocks]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("clock-qux".to_string())
+            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages; use a fully qualified WIT call site to disambiguate: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
         );
     }
 
@@ -4005,7 +3880,7 @@ mod tests {
                 let invokes: list<u8> = [1, 2, 3, 4];
 
                 for i in invokes {
-                    yield worker.qux[wasi:clocks]("bar");
+                    yield worker.baz("bar");
                 };
 
                 "success"
@@ -4056,7 +3931,7 @@ mod tests {
     async fn test_interpreter_durable_worker_with_resource_0() {
         let expr = r#"
                 let worker = instance("my-worker");
-                worker.cart[golem:it]("bar")
+                worker.cart("bar")
             "#;
         let expr = Expr::from_text(expr).unwrap();
         let test_deps = RibTestDeps::test_deps_with_indexed_resource_functions(None);
@@ -4078,7 +3953,7 @@ mod tests {
     async fn test_interpreter_durable_worker_with_resource_1() {
         let expr = r#"
                 let worker = instance("my-worker");
-                worker.cart[golem:it]("bar");
+                worker.cart("bar");
                 "success"
             "#;
         let expr = Expr::from_text(expr).unwrap();
@@ -4100,7 +3975,7 @@ mod tests {
     async fn test_interpreter_durable_worker_with_resource_2() {
         let expr = r#"
                 let worker = instance("my-worker");
-                let cart = worker.cart[golem:it]("bar");
+                let cart = worker.cart("bar");
                 let result = cart.add-item({product-id: "mac", name: "macbook", price: 1:f32, quantity: 1:u32});
                 result
             "#;
@@ -4123,7 +3998,7 @@ mod tests {
     async fn test_interpreter_durable_worker_with_resource_3() {
         let expr = r#"
                 let worker = instance("my-worker");
-                let cart = worker.cart[golem:it]("bar");
+                let cart = worker.cart("bar");
                 cart.add-items({product-id: "mac", name: "macbook", price: 1:f32, quantity: 1:u32});
                 "success"
             "#;
@@ -4145,7 +4020,7 @@ mod tests {
     async fn test_interpreter_durable_worker_with_resource_4() {
         let expr = r#"
                 let worker = instance("my-worker");
-                let cart = worker.carts[golem:it]("bar");
+                let cart = worker.carts("bar");
                 cart.add-item({product-id: "mac", name: "macbook", price: 1:f32, quantity: 1:u32});
                 "success"
             "#;
@@ -4162,7 +4037,7 @@ mod tests {
 
         assert_eq!(
             compiled,
-            "error in the following rib found at line 3, column 28\n`worker.carts[golem:it](\"bar\")`\ncause: invalid function call `carts`\nfunction 'carts' not found in package 'golem:it'\n".to_string()
+            "error in the following rib found at line 3, column 28\n`worker.carts(\"bar\")`\ncause: invalid function call `carts`\nfunction 'carts' not found\n".to_string()
         );
     }
 
@@ -4171,7 +4046,7 @@ mod tests {
         // Ephemeral
         let expr = r#"
                 let worker = instance();
-                let cart = worker.cart[golem:it]("bar");
+                let cart = worker.cart("bar");
                 cart.add-item({product-id: "mac", name: "macbook", price: 1, quantity: 1});
                 "success"
             "#;
@@ -4195,7 +4070,7 @@ mod tests {
         // Ephemeral
         let expr = r#"
                 let worker = instance();
-                let cart = worker.cart[golem:it]("bar");
+                let cart = worker.cart("bar");
                 cart.add-item({product-id: "mac", name: 1, quantity: 1, price: 1});
                 "success"
             "#;
@@ -4349,166 +4224,6 @@ mod tests {
 
     #[test]
     #[ignore]
-    async fn test_interpreter_durable_worker_with_resource_11() {
-        let expr = r#"
-                let worker = instance(request.path.user-id: string);
-                let result = worker.qux[amazon:shopping-cart]("bar");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-
-        let mut input = HashMap::new();
-
-        // Passing request data as input to interpreter
-        let rib_input_key = "request";
-        let rib_input_value = ValueAndType::new(
-            Value::Record(vec![Value::Record(vec![Value::String("user".to_string())])]),
-            record(vec![field("path", record(vec![field("user-id", str())]))]),
-        );
-
-        input.insert(rib_input_key.to_string(), rib_input_value);
-
-        let rib_input = RibInput::new(input);
-
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(Some(rib_input));
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-        let compiler = RibCompiler::new(compiler_config);
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(
-            result.get_val().unwrap().value,
-            Value::String("qux".to_string())
-        )
-    }
-
-    #[test]
-    #[ignore]
-    async fn test_interpreter_durable_worker_with_resource_12() {
-        let expr = r#"
-                let user_id1: string = request.path.user-id;
-                let user_id2: string = request.path.user-id;
-                let worker1 = instance(user_id1);
-                let result1 = worker1.qux[amazon:shopping-cart]("bar");
-                let worker2 = instance(user_id2);
-                let result2 = worker2.qux[amazon:shopping-cart]("bar");
-                user_id2
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-
-        let mut input = HashMap::new();
-
-        let rib_input_key = "request";
-
-        let rib_input_value = ValueAndType::new(
-            Value::Record(vec![Value::Record(vec![Value::String("user".to_string())])]),
-            record(vec![field("path", record(vec![field("user-id", str())]))]),
-        );
-
-        input.insert(rib_input_key.to_string(), rib_input_value);
-
-        let rib_input = RibInput::new(input);
-
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(Some(rib_input));
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-
-        let compiler = RibCompiler::new(compiler_config);
-
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        assert_eq!(result.get_val().unwrap(), "user".into_value_and_type());
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_with_resource_13() {
-        let expr = r#"
-                let worker1 = instance("foo");
-                let result = worker.qux[amazon:shopping-cart]("bar");
-                "success"
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
-            vec![],
-            vec![],
-        ));
-
-        let error = compiler.compile(expr).unwrap_err().to_string();
-
-        assert_eq!(error, "error in the following rib found at line 3, column 30\n`worker.qux[amazon:shopping-cart](\"bar\")`\ncause: invalid method invocation `worker.qux`. make sure `worker` is defined and is a valid instance type (i.e, resource or worker)\n");
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_with_resource_14() {
-        let expr = r#"
-                let worker = instance(1: u32);
-                let result = worker.qux[amazon:shopping-cart]("bar");
-                "success"
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler = RibCompiler::new(RibCompilerConfig::new(
-            test_deps.component_dependencies.clone(),
-            vec![],
-            vec![],
-        ));
-
-        let error = compiler.compile(expr).unwrap_err().to_string();
-
-        let expected = r#"
-            error in the following rib found at line 2, column 39
-            `1: u32`
-            cause: expected string, found u32
-            "#;
-
-        assert_eq!(error, strip_spaces(expected));
-    }
-
-    #[test]
-    async fn test_interpreter_durable_worker_with_resource_15() {
-        let expr = r#"
-                let worker = instance("my-worker-name");
-                let result = worker.qux[amazon:shopping-cart]("param1");
-                result
-            "#;
-        let expr = Expr::from_text(expr).unwrap();
-
-        let test_deps = RibTestDeps::test_deps_with_multiple_interfaces(None);
-
-        let compiler_config =
-            RibCompilerConfig::new(test_deps.component_dependencies.clone(), vec![], vec![]);
-
-        let compiler = RibCompiler::new(compiler_config);
-
-        let compiled = compiler.compile(expr).unwrap();
-
-        let mut rib_interpreter = test_deps.interpreter;
-
-        let result = rib_interpreter.run(compiled.byte_code).await.unwrap();
-
-        let result_val = result.get_val().unwrap();
-
-        assert_eq!(result_val.value, Value::String("qux".to_string()));
-    }
-
-    #[test]
-    #[ignore]
     async fn test_interpreter_durable_worker_with_resource_16() {
         let expr = r#"
                 let x: string = request.path.user-id;
@@ -4625,7 +4340,7 @@ mod tests {
             let final = 5;
             let range = initial..final;
             let worker = instance("my-worker");
-            let cart = worker.cart[golem:it]("bar");
+            let cart = worker.cart("bar");
 
             for i in range {
                 yield cart.add-item(request.body);
@@ -4687,7 +4402,7 @@ mod tests {
 
             for i in range {
                 let worker = instance("my-worker");
-                let cart = worker.cart[golem:it]("bar");
+                let cart = worker.cart("bar");
                 yield cart.add-item(request.body);
             };
 
@@ -4780,23 +4495,12 @@ mod tests {
             ]),
         ];
 
-        let custom_spec1 = CustomInstanceSpec {
-            instance_name: "weather-agent".to_string(),
-            parameter_types: weather_agent_constructor_param_types,
-            interface_name: Some(InterfaceName {
-                name: "weather-agent".to_string(),
-                version: None,
-            }),
-        };
+        let custom_spec1 = CustomInstanceSpec::new(
+            "weather-agent".to_string(),
+            weather_agent_constructor_param_types,
+        );
 
-        let custom_spec2 = CustomInstanceSpec {
-            instance_name: "assistant-agent".to_string(),
-            parameter_types: vec![str()],
-            interface_name: Some(InterfaceName {
-                name: "assistant-agent".to_string(),
-                version: None,
-            }),
-        };
+        let custom_spec2 = CustomInstanceSpec::new("assistant-agent".to_string(), vec![str()]);
 
         let expr = Expr::from_text(expr).unwrap();
         let test_deps = RibTestDeps::test_deps_with_multiple_interfaces_simple(None);
@@ -5407,10 +5111,7 @@ mod tests {
         }
 
         // The interpreter that always returns a record value consisting of function name, worker name etc
-        // for every function calls in Rib.
-        // Example : `my-instance.qux[amazon:shopping-cart]("bar")` will return a record
-        // that contains the actual worker-name of my-instance, the function name `qux` and arguments
-        // It helps ensures that interpreter invokes the function at the expected worker.
+        // for every function calls in Rib, so tests can assert the invoke target (worker name, function, args).
         pub(crate) fn interpreter_with_resource_function_invoke_impl(
             rib_input: Option<RibInput>,
         ) -> Interpreter {
