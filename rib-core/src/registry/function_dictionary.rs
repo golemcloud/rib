@@ -15,6 +15,7 @@
 use crate::analysis::{WitExport, AnalysedType, TypeEnum, TypeVariant};
 use crate::parser::{PackageName, TypeParameter};
 use crate::type_parameter::InterfaceName;
+use crate::expr_arena::CallTypeNode;
 use crate::{
     CallType, DynamicParsedFunctionName, DynamicParsedFunctionReference, FunctionTypeRegistry,
     InferredType, ParsedFunctionSite, RegistryKey, RegistryValue, SemVer,
@@ -441,6 +442,21 @@ impl FunctionName {
                 Some(Self::from_dynamic_parsed_function_name(function_name))
             }
             CallType::InstanceCreation(_) => None,
+        }
+    }
+
+    /// Like [`FunctionName::from_call_type`] but reads directly from lowered [`CallTypeNode`]
+    /// (no `rebuild_call_type` / embedded expressions).
+    pub fn from_call_type_node(call_type: &CallTypeNode) -> Option<FunctionName> {
+        match call_type {
+            CallTypeNode::VariantConstructor(variant_name) => {
+                Some(FunctionName::Variant(variant_name.clone()))
+            }
+            CallTypeNode::EnumConstructor(enum_name) => Some(FunctionName::Enum(enum_name.clone())),
+            CallTypeNode::Function { function_name, .. } => {
+                Some(Self::from_dynamic_parsed_function_name(function_name))
+            }
+            CallTypeNode::InstanceCreation(_) => None,
         }
     }
 

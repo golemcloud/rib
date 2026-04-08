@@ -48,6 +48,7 @@
 
 use la_arena::{Arena, Idx};
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::call_type::{CallType, InstanceCreationType, InstanceIdentifier};
 use crate::expr::{ArmPattern, Expr, MatchArm, Number, Range};
@@ -256,6 +257,37 @@ pub enum CallTypeNode {
     VariantConstructor(String),
     EnumConstructor(String),
     InstanceCreation(InstanceCreationNode),
+}
+
+impl CallTypeNode {
+    /// Same notion as [`crate::CallType::is_resource_method`], without lowering to [`crate::CallType`].
+    pub fn is_resource_method(&self) -> bool {
+        match self {
+            CallTypeNode::Function { function_name, .. } => function_name
+                .to_parsed_function_name()
+                .function
+                .resource_method_name()
+                .is_some(),
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for CallTypeNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CallTypeNode::Function { function_name, .. } => write!(f, "{function_name}"),
+            CallTypeNode::VariantConstructor(name) => write!(f, "{name}"),
+            CallTypeNode::EnumConstructor(name) => write!(f, "{name}"),
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitWorker { .. }) => {
+                write!(f, "instance")
+            }
+            CallTypeNode::InstanceCreation(InstanceCreationNode::WitResource {
+                resource_name,
+                ..
+            }) => write!(f, "{}", resource_name.resource_name),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
