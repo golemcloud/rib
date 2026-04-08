@@ -19,6 +19,9 @@
 pub use anyhow;
 pub use uuid;
 
+/// Core Rib compiler and value types; pulled in transitively so embedders only add `rib-repl`.
+pub use rib;
+
 pub use command::*;
 pub use dependency_manager::*;
 pub use invoke::*;
