@@ -15,10 +15,11 @@
 use crate::analysis::AnalysedType;
 use crate::call_type::CallType;
 use crate::expr_arena::{
-    rebuild_arm_pattern, rebuild_call_type, rebuild_expr, ArmPatternNode, CallTypeNode, ExprArena,
-    ExprId, ExprKind, InstanceCreationNode, InstanceIdentifierNode, MatchArmNode, RangeKind,
+    rebuild_arm_pattern, rebuild_call_type, ArmPatternNode, CallTypeNode, ExprArena, ExprId,
+    ExprKind, InstanceCreationNode, InstanceIdentifierNode, MatchArmNode, RangeKind,
     ResultExprKind, TypeTable,
 };
+use crate::rib_source_span::SourceSpan;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_checker::exhaustive_pattern_match::{
     check_exhaustive_pattern_match_with_arms, ExhaustivePatternMatchError,
@@ -26,8 +27,7 @@ use crate::type_checker::exhaustive_pattern_match::{
 use crate::type_checker::{Path, PathElem};
 use crate::type_inference::arena::children_of;
 use crate::{
-    ComponentDependency, Expr, FunctionCallError, FunctionName, InvalidWorkerName,
-    UnResolvedTypesError,
+    ComponentDependency, FunctionCallError, FunctionName, InvalidWorkerName, UnResolvedTypesError,
 };
 use std::collections::VecDeque;
 
@@ -113,14 +113,12 @@ fn check_invalid_function_args_lowered(
         }
 
         let call_ty = rebuild_call_type(call_type, arena, types);
-        let function_call_expr = rebuild_expr(id, arena, types);
         get_missing_record_keys_lowered(
             &call_ty,
             args,
             component_dependency,
             arena,
-            types,
-            &function_call_expr,
+            node.source_span.clone(),
         )?;
     }
 
@@ -133,13 +131,12 @@ fn get_missing_record_keys_lowered(
     args: &[ExprId],
     component_dependency: &ComponentDependency,
     arena: &ExprArena,
-    types: &TypeTable,
-    function_call_expr: &Expr,
+    call_source_span: SourceSpan,
 ) -> Result<(), FunctionCallError> {
     let function_name =
         FunctionName::from_call_type(call_type).ok_or(FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
-            source_span: function_call_expr.source_span(),
+            source_span: call_source_span.clone(),
             message: "invalid function call type".to_string(),
         })?;
 
@@ -147,7 +144,7 @@ fn get_missing_record_keys_lowered(
         .get_function_type(&function_name)
         .map_err(|err| FunctionCallError::InvalidFunctionCall {
             function_name: call_type.to_string(),
-            source_span: function_call_expr.source_span(),
+            source_span: call_source_span,
             message: err.to_string(),
         })?;
 
@@ -167,10 +164,9 @@ fn get_missing_record_keys_lowered(
             find_missing_fields_in_record_lowered(*actual_arg_id, arena, &expected_arg_type);
 
         if !missing_fields.is_empty() {
-            let actual_expr = rebuild_expr(*actual_arg_id, arena, types);
             return Err(FunctionCallError::MissingRecordFields {
                 function_name: call_type.to_string(),
-                argument_source_span: actual_expr.source_span(),
+                argument_source_span: arena.expr(*actual_arg_id).source_span.clone(),
                 missing_fields,
             });
         }
@@ -314,16 +310,19 @@ fn check_exhaustive_pattern_match_lowered(
 
     for id in order {
         let node = arena.expr(id);
-        if let ExprKind::PatternMatch { match_arms, .. } = &node.kind {
-            // Match tree `check_exhaustive_pattern_match`: internal uses this for `source_span`
-            // on errors, so pass the full `PatternMatch` expression, not only the predicate.
-            let match_expr = rebuild_expr(id, arena, types);
+        if let ExprKind::PatternMatch {
+            predicate,
+            match_arms,
+        } = &node.kind
+        {
+            let scrutinee_type = types.get(*predicate);
             let arm_patterns: Vec<_> = match_arms
                 .iter()
                 .map(|arm| rebuild_arm_pattern(arm.arm_pattern, arena, types))
                 .collect();
             check_exhaustive_pattern_match_with_arms(
-                &match_expr,
+                node.source_span.clone(),
+                scrutinee_type,
                 &arm_patterns,
                 component_dependency,
             )?;
