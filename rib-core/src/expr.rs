@@ -1115,6 +1115,9 @@ impl Expr {
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
         use crate::type_inference as ti;
+        use std::sync::Arc;
+
+        let component = Arc::new(component_dependency.clone());
 
         let (mut arena, mut types, root) = {
             let _p = crate::profile::Scope::new("infer_types: lower");
@@ -1129,7 +1132,7 @@ impl Expr {
                 root,
                 &mut arena,
                 &mut types,
-                component_dependency,
+                component.clone(),
                 global_variable_type_spec.as_slice(),
                 custom_instance_spec,
             )?;
@@ -1138,13 +1141,13 @@ impl Expr {
                 root,
                 &mut arena,
                 &mut types,
-                component_dependency,
+                component.as_ref(),
             );
             ti::enum_inference::infer_enums_lowered(
                 root,
                 &mut arena,
                 &mut types,
-                component_dependency,
+                component.as_ref(),
             );
             ti::instance_type_binding::bind_instance_types_lowered(root, &arena, &mut types);
         }
@@ -1159,7 +1162,7 @@ impl Expr {
                         root,
                         arena,
                         types,
-                        component_dependency,
+                        component.as_ref(),
                     )
                 },
                 root,
@@ -1174,7 +1177,7 @@ impl Expr {
                 root,
                 &arena,
                 &mut types,
-                component_dependency,
+                component.as_ref(),
                 custom_instance_spec,
             )
             .map_err(RibTypeErrorInternal::from)?;
@@ -1191,14 +1194,14 @@ impl Expr {
                         root,
                         arena,
                         types,
-                        component_dependency,
+                        component.as_ref(),
                     )?;
                     ti::global_input_inference::infer_global_inputs_lowered(root, arena, types);
                     ti::call_arguments_inference::infer_function_call_types_lowered(
                         root,
                         arena,
                         types,
-                        component_dependency,
+                        component.as_ref(),
                         custom_instance_spec,
                     )
                     .map_err(RibTypeErrorInternal::from)?;
@@ -1217,7 +1220,7 @@ impl Expr {
                 root,
                 &mut arena,
                 &mut types,
-                component_dependency,
+                component.as_ref(),
             )?;
             ti::global_input_inference::infer_global_inputs_lowered(root, &arena, &mut types);
             ti::identifier_inference::infer_all_identifiers_lowered(root, &arena, &mut types);
@@ -1229,7 +1232,7 @@ impl Expr {
 
         {
             let _p = crate::profile::Scope::new("infer_types: type_check");
-            type_checker::checker::type_check(root, &arena, &mut types, component_dependency)?;
+            type_checker::checker::type_check(root, &arena, &mut types, component.as_ref())?;
         }
 
         {
@@ -1252,13 +1255,16 @@ impl Expr {
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
         use crate::type_inference as ti;
+        use std::sync::Arc;
+
+        let component = Arc::new(component_dependency.clone());
 
         let (mut arena, mut types, root) = crate::expr_arena::lower(self);
         ti::initial_arena_phase::run_initial_binding_and_instance_phases(
             root,
             &mut arena,
             &mut types,
-            component_dependency,
+            component.clone(),
             global_variable_type_spec.as_slice(),
             custom_instance_spec,
         )?;
@@ -1266,9 +1272,9 @@ impl Expr {
             root,
             &mut arena,
             &mut types,
-            component_dependency,
+            component.as_ref(),
         );
-        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component_dependency);
+        ti::enum_inference::infer_enums_lowered(root, &mut arena, &mut types, component.as_ref());
         *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         Ok(())
     }

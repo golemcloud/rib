@@ -19,12 +19,13 @@ use crate::expr_arena::{ExprArena, ExprId, TypeTable};
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference as ti;
 use crate::{ComponentDependency, CustomInstanceSpec, GlobalVariableTypeSpec};
+use std::sync::Arc;
 
 pub fn run_initial_binding_and_instance_phases(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependency,
+    component: Arc<ComponentDependency>,
     global_variable_type_spec: &[GlobalVariableTypeSpec],
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
@@ -43,7 +44,7 @@ pub fn run_initial_binding_and_instance_phases(
         root,
         arena,
         types,
-        component_dependency,
+        component,
         custom_instance_spec,
     )?;
     ti::stateful_instance::ensure_stateful_instance(root, arena, types);

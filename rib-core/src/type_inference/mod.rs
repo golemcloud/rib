@@ -82,6 +82,7 @@ mod tests {
         RibCompilerConfig, TypeName, VariableId,
     };
     use bigdecimal::BigDecimal;
+    use std::sync::Arc;
 
     use crate::analysis::analysed_type;
     use test_r::test;
@@ -457,7 +458,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component: rib_compiler.get_component_dependency().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -545,7 +546,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component: rib_compiler.get_component_dependency().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -1396,7 +1397,7 @@ mod tests {
             )
             .with_inferred_type(InferredType::instance(InstanceType::Global {
                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                component: rib_compiler.get_component_dependency().clone(),
+                component: Arc::new(rib_compiler.get_component_dependency()),
             })),
         );
 
@@ -2443,6 +2444,7 @@ mod tests {
         };
         use crate::{Value, ValueAndType};
         use bigdecimal::BigDecimal;
+        use std::sync::Arc;
         use uuid::Uuid;
 
         pub fn result(
@@ -2855,7 +2857,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component: component_dependencies.clone(),
+                                component: Arc::new(component_dependencies.clone()),
                             },
                         )),
                     ),
@@ -3371,7 +3373,7 @@ mod tests {
                         .with_inferred_type(InferredType::instance(
                             InstanceType::Global {
                                 worker_name: Some(Box::new(Expr::literal("foo"))),
-                                component: component_dependencies.clone(),
+                                component: Arc::new(component_dependencies.clone()),
                             },
                         )),
                     ),

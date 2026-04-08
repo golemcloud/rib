@@ -18,6 +18,7 @@ use crate::instance_type::InstanceType;
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::{ComponentDependency, CustomInstanceSpec, Expr};
 use crate::{CustomError, InferredType, ParsedFunctionReference, TypeInternal, TypeOrigin};
+use std::sync::Arc;
 
 use crate::expr_arena::{
     rebuild_expr, CallTypeNode, ExprArena, ExprId, ExprKind, InstanceCreationNode, TypeTable,
@@ -28,7 +29,7 @@ pub fn identify_instance_creation(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependencies: &ComponentDependency,
+    component: Arc<ComponentDependency>,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
     search_for_invalid_instance_declarations_arena(root, arena, types)?;
@@ -36,7 +37,7 @@ pub fn identify_instance_creation(
         root,
         arena,
         types,
-        component_dependencies,
+        component,
         custom_instance_spec,
     )
 }
@@ -85,7 +86,7 @@ fn identify_instance_creation_with_worker_arena(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
-    component_dependency: &ComponentDependency,
+    component: Arc<ComponentDependency>,
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
     // Collect Call nodes bottom-up (post-order)
@@ -109,7 +110,7 @@ fn identify_instance_creation_with_worker_arena(
                 &args_ids,
                 arena,
                 types,
-                component_dependency,
+                component.as_ref(),
                 custom_instance_spec,
             )
             .map_err(|err| {
@@ -123,7 +124,7 @@ fn identify_instance_creation_with_worker_arena(
                 let worker_name = instance_creation_type.worker_name();
 
                 let new_instance_type =
-                    InstanceType::from(component_dependency, worker_name.as_ref()).map_err(
+                    InstanceType::from(component.clone(), worker_name.as_ref()).map_err(
                         |err| {
                             RibTypeErrorInternal::from(CustomError::new(
                                 span.clone(),

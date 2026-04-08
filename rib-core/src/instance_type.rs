@@ -20,6 +20,7 @@ use crate::{
     FunctionDictionary, FunctionType, ResourceMethodDictionary,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -36,7 +37,8 @@ pub enum InstanceType {
     // Worker instance: one component's exports (all packages/interfaces merged in the dictionary)
     Global {
         worker_name: Option<Box<Expr>>,
-        component: ComponentDependency,
+        /// Shared across all worker-instance types for one compile — avoids cloning [`FunctionDictionary`] per node.
+        component: Arc<ComponentDependency>,
     },
 
     // Holds the resource creation and the functions in the resource
@@ -64,7 +66,7 @@ impl InstanceType {
                 component,
                 ..
             } => {
-                component.narrow_to_component(component_dependency_key);
+                Arc::make_mut(component).narrow_to_component(component_dependency_key);
             }
             // A resource is already narrowed down to a component
             InstanceType::Resource { .. } => {}
@@ -214,7 +216,7 @@ impl InstanceType {
 
     pub fn component_dependency(&self) -> ComponentDependency {
         match self {
-            InstanceType::Global { component, .. } => component.clone(),
+            InstanceType::Global { component, .. } => (**component).clone(),
             InstanceType::Resource {
                 resource_method_dictionary,
                 component_dependency_key,
@@ -231,12 +233,12 @@ impl InstanceType {
     }
 
     pub fn from(
-        dependency: &ComponentDependency,
+        dependency: Arc<ComponentDependency>,
         worker_name: Option<&Expr>,
     ) -> Result<InstanceType, String> {
         Ok(InstanceType::Global {
             worker_name: worker_name.cloned().map(Box::new),
-            component: dependency.clone(),
+            component: dependency,
         })
     }
 }
