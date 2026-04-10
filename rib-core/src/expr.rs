@@ -1119,13 +1119,14 @@ impl Expr {
         let component = Arc::new(component_dependency.clone());
 
         let (mut arena, mut types, root) = {
-            let _p = crate::profile::Scope::new("infer_types: lower");
+            let _p = crate::profile::Scope::new("type inference: lower to expr arena");
+
             crate::expr_arena::lower(self)
         };
 
         {
             let _p = crate::profile::Scope::new(
-                "infer_types: initial_arena + variants/enums/bind_instance",
+                "type inference: run_initial_binding_and_instance_phases",
             );
             ti::run_initial_binding_and_instance_phases(
                 root,
@@ -1138,22 +1139,18 @@ impl Expr {
 
             ti::infer_variants_lowered(root, &mut arena, &mut types, component.as_ref());
             ti::infer_enums(root, &mut arena, &mut types, component.as_ref());
-            ti::bind_instance_types_lowered(root, &arena, &mut types);
+            ti::bind_instance_types(root, &arena, &mut types);
         }
 
         {
-            let _p =
-                crate::profile::Scope::new("infer_types: fixpoint 1 (instance + worker invokes)");
+            let _p = crate::profile::Scope::new(
+                "type inference: fixpoint - resolve function calls and instance bindings",
+            );
 
             ti::type_inference_fix_point(
                 |root, arena, types| -> Result<(), RibTypeErrorInternal> {
-                    ti::bind_instance_types_lowered(root, arena, types);
-                    ti::infer_worker_function_invokes_lowered(
-                        root,
-                        arena,
-                        types,
-                        component.as_ref(),
-                    )
+                    ti::bind_instance_types(root, arena, types);
+                    ti::infer_function_invokes(root, arena, types, component.as_ref())
                 },
                 root,
                 &mut arena,
@@ -1162,7 +1159,7 @@ impl Expr {
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: infer_function_call_types_lowered");
+            let _p = crate::profile::Scope::new("type inference: infer_function_call_types");
 
             ti::infer_function_call_types(
                 root,
@@ -1175,7 +1172,9 @@ impl Expr {
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: fixpoint 2 (main scan)");
+            let _p = crate::profile::Scope::new(
+                "type inference: fixpoint - main scan for type inference",
+            );
 
             ti::type_inference_fix_point(
                 |root, arena, types| -> Result<(), RibTypeErrorInternal> {
@@ -1201,24 +1200,26 @@ impl Expr {
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: final arena refinement + sync/bind");
+            let _p = crate::profile::Scope::new(
+                "type inference: sync_embedded_worker_exprs_from_calls + bind_instance_types",
+            );
 
             ti::sync_embedded_worker_exprs_from_calls(root, &arena, &mut types);
-            ti::bind_instance_types_lowered(root, &arena, &mut types);
+            ti::bind_instance_types(root, &arena, &mut types);
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: type_check");
+            let _p = crate::profile::Scope::new("type inference: type check");
             type_checker::checker::type_check(root, &arena, &mut types, component.as_ref())?;
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: unify_types");
+            let _p = crate::profile::Scope::new("type inference: unify types");
             type_inference::unify_types(root, &arena, &mut types)?;
         }
 
         {
-            let _p = crate::profile::Scope::new("infer_types: rebuild_expr");
+            let _p = crate::profile::Scope::new("type inference: rebuild_expr");
             *self = crate::expr_arena::rebuild_expr(root, &arena, &types);
         }
 

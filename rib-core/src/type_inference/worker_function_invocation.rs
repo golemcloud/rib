@@ -30,7 +30,7 @@ use crate::{
 ///
 /// Run on lowered IR inside the same `lower` / `rebuild_expr` boundary as
 /// [`crate::Expr::infer_types`].
-pub fn infer_worker_function_invokes_lowered(
+pub fn infer_function_invokes(
     root: ExprId,
     arena: &mut ExprArena,
     types: &mut TypeTable,
@@ -58,7 +58,7 @@ pub fn infer_worker_function_invokes_lowered(
                         })
                         .map_err(RibTypeErrorInternal::from)?;
 
-                    let module = get_instance_identifier_from_arena(instance_type, lhs_id, arena);
+                    let module = get_instance_identifier(instance_type, lhs_id, arena);
 
                     // Narrow the instance type on the lhs
                     let lhs_type_narrowed = {
@@ -154,8 +154,7 @@ pub fn infer_worker_function_invokes_lowered(
                             })
                             .map_err(RibTypeErrorInternal::from)?;
 
-                        let module =
-                            get_instance_identifier_from_arena(instance_type, lhs_id, arena);
+                        let module = get_instance_identifier(instance_type, lhs_id, arena);
 
                         // Narrow the lhs type
                         let lhs_narrowed = {
@@ -387,7 +386,7 @@ pub fn infer_worker_function_invokes_lowered(
     Ok(())
 }
 
-fn get_instance_identifier_from_arena(
+fn get_instance_identifier(
     instance_type: &InstanceType,
     lhs_id: ExprId,
     arena: &ExprArena,

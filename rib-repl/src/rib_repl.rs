@@ -15,13 +15,13 @@
 use crate::compiler::compile_rib_script;
 use crate::dependency_manager::RibDependencyManager;
 use crate::eval::eval;
-use crate::invoke::WorkerFunctionInvoke;
 use crate::repl_printer::{DefaultReplResultPrinter, ReplPrinter};
 use crate::repl_state::ReplState;
 use crate::rib_context::ReplContext;
 use crate::rib_edit::RibEdit;
 use crate::{
-    CommandRegistry, ReplBootstrapError, ReplComponentBundle, RibExecutionError, UntypedCommand,
+    CommandRegistry, ComponentFunctionInvoke, ReplBootstrapError, ReplComponentBundle,
+    RibExecutionError, UntypedCommand,
 };
 use colored::Colorize;
 use rib::{RibCompiler, RibCompilerConfig, RibResult};
@@ -47,7 +47,7 @@ use std::sync::Arc;
 pub struct RibReplConfig {
     pub history_file: Option<PathBuf>,
     pub dependency_manager: Arc<dyn RibDependencyManager + Sync + Send>,
-    pub worker_function_invoke: Arc<dyn WorkerFunctionInvoke + Sync + Send>,
+    pub worker_function_invoke: Arc<dyn ComponentFunctionInvoke + Sync + Send>,
     pub printer: Option<Box<dyn ReplPrinter>>,
     pub component_source: Option<ComponentSource>,
     pub prompt: Option<String>,

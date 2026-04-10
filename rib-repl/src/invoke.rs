@@ -24,7 +24,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait WorkerFunctionInvoke {
+pub trait ComponentFunctionInvoke {
     async fn invoke(
         &self,
         component_id: Uuid,

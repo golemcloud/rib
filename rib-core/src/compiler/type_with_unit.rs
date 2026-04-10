@@ -22,7 +22,7 @@ use crate::wit_type::{
 use crate::{GetTypeHint, InferredType, InstanceType, TypeInternal};
 use serde::{Deserialize, Serialize};
 
-// An absence of analysed type is really `Unit`, however, we avoid
+// An absence of wit type is really `Unit`, however, we avoid
 // Option<WitType> in favor of `WitTypeWithUnit` for clarity.
 // and conversions such as what to print if its `unit` becomes more precise
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
