@@ -2,12 +2,12 @@
 resolver = "2"
 
 members = [
-    "rib-core",
+    "rib-lang",
     "rib-repl",
 ]
 
 [workspace.dependencies]
-rib-core = { version = "=0.0.0", path = "rib-core" }
+rib-lang = { version = "=0.0.0", path = "rib-lang" }
 rib-repl = { version = "=0.0.0", path = "rib-repl" }
 
 anyhow = "1.0.97"

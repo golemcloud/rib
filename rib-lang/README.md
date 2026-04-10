@@ -1,4 +1,4 @@
-# rib-core
+# rib-lang
 
 Core library for the Rib language: parser, type inference, compiler, and interpreter.
 

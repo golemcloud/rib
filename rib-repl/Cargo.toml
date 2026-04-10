@@ -12,7 +12,7 @@ path = "src/lib.rs"
 harness = false
 
 [dependencies]
-rib-core = { workspace = true }
+rib-lang = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
