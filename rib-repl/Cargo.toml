@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 description = "Repl for Rib language"
+repository = "https://github.com/golemcloud/rib"
 
 license-file = "../LICENSE"
 
