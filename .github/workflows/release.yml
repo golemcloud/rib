@@ -22,9 +22,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Same as golemcloud/golem: org secret CARGO_REGISTRY_TOKEN → Cargo's env var.
-      # 403 = rotate token at org level and/or ensure this repo can use that secret;
-      # crates.io user must be allowed to publish rib-lang / rib-repl.
       - name: Publish workspace to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
