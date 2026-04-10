@@ -8,9 +8,9 @@ A programming language to interact with WebAssembly components
 to call functions and manipulate data in WASM components running in a Wasmtime environment.
 This work is on it's way.
 
-## Developing rib-core
+## Developing rib-lang
 
-[rib-core/README.md](rib-core/README.md).
+[rib-lang/README.md](rib-lang/README.md).
 
 ## Contributing
 
