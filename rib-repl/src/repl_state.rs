@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::worker_name_gen::ReplWorkerNameGen;
-use crate::{RawRibScript, WorkerFunctionInvoke};
+use crate::instance_name_gen::ReplInstanceNameGen;
+use crate::{ComponentFunctionInvoke, RawRibScript};
 use rib::ValueAndType;
 use rib::{InstructionId, RibCompiler};
 use std::collections::HashMap;
@@ -22,16 +22,16 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 pub struct ReplState {
     rib_script: RwLock<RawRibScript>,
-    worker_function_invoke: Arc<dyn WorkerFunctionInvoke + Sync + Send>,
+    worker_function_invoke: Arc<dyn ComponentFunctionInvoke + Sync + Send>,
     invocation_results: InvocationResultCache,
     last_executed_instruction: RwLock<Option<InstructionId>>,
     rib_compiler: RwLock<RibCompiler>,
     history_file_path: PathBuf,
-    worker_name_gen: RwLock<ReplWorkerNameGen>,
+    worker_name_gen: RwLock<ReplInstanceNameGen>,
 }
 
 impl ReplState {
-    pub fn worker_function_invoke(&self) -> &Arc<dyn WorkerFunctionInvoke + Sync + Send> {
+    pub fn worker_function_invoke(&self) -> &Arc<dyn ComponentFunctionInvoke + Sync + Send> {
         &self.worker_function_invoke
     }
 
@@ -101,7 +101,7 @@ impl ReplState {
     }
 
     pub fn new(
-        worker_function_invoke: Arc<dyn WorkerFunctionInvoke + Sync + Send>,
+        worker_function_invoke: Arc<dyn ComponentFunctionInvoke + Sync + Send>,
         rib_compiler: RibCompiler,
         history_file: PathBuf,
     ) -> Self {
@@ -114,7 +114,7 @@ impl ReplState {
             last_executed_instruction: RwLock::new(None),
             rib_compiler: RwLock::new(rib_compiler),
             history_file_path: history_file,
-            worker_name_gen: RwLock::new(ReplWorkerNameGen::new()),
+            worker_name_gen: RwLock::new(ReplInstanceNameGen::new()),
         }
     }
 }

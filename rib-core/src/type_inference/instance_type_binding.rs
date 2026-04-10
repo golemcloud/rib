@@ -90,7 +90,7 @@ fn worker_name_expr_id_from_call_node(ct: &CallTypeNode) -> Option<ExprId> {
 
 /// Propagates instance types from `let` rhs to bound identifiers. Use from the same
 /// `lower` / `rebuild_expr` boundary as [`crate::Expr::infer_types`].
-pub fn bind_instance_types_lowered(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
+pub fn bind_instance_types(root: ExprId, arena: &ExprArena, types: &mut TypeTable) {
     let mut instance_variables: HashMap<VariableId, Box<InstanceType>> = HashMap::new();
 
     let mut order = Vec::new();

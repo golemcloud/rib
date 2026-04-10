@@ -54,10 +54,9 @@ impl RibCompiler {
 
     pub fn infer_types(&self, expr: Expr) -> Result<InferredExpr, RibCompilationError> {
         let _infer_profile = crate::profile::InferOnlyProfileGuard::new();
-        let expr_for_infer = {
-            let _p = crate::profile::Scope::new("compile: RibCompiler.infer_types expr.clone()");
-            expr.clone()
-        };
+
+        let expr_for_infer = { expr.clone() };
+
         let result = {
             let _p = crate::profile::Scope::new(
                 "compile: RibCompiler.infer_types InferredExpr::from_expr",
@@ -94,17 +93,16 @@ impl RibCompiler {
         };
 
         let function_calls_identified = {
-            let _p =
-                crate::profile::Scope::new("compile: WorkerFunctionsInRib::from_inferred_expr");
+            let _p = crate::profile::Scope::new("compile: identity function call");
             WorkerFunctionsInRib::from_inferred_expr(&inferred_expr, &self.component)?
         };
 
         let global_input_type_info = {
-            let _p = crate::profile::Scope::new("compile: RibInputTypeInfo::from_expr");
+            let _p = crate::profile::Scope::new("compile: identify input types of rib");
             RibInputTypeInfo::from_expr(&inferred_expr)?
         };
         let output_type_info = {
-            let _p = crate::profile::Scope::new("compile: RibOutputTypeInfo::from_expr");
+            let _p = crate::profile::Scope::new("compile: identify output types of rib");
             RibOutputTypeInfo::from_expr(&inferred_expr)?
         };
 
@@ -133,7 +131,7 @@ impl RibCompiler {
         }
 
         let byte_code = {
-            let _p = crate::profile::Scope::new("compile: RibByteCode::from_expr");
+            let _p = crate::profile::Scope::new("compile: byte code generation");
             RibByteCode::from_expr(&inferred_expr)?
         };
 

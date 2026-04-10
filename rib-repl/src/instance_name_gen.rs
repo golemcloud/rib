@@ -22,14 +22,14 @@ use std::sync::Arc;
 // however it shouldn't result in a variable having a different instance of worker,
 // meaning different worker name. Rib internally generates a worker name at compile time
 // for instances without worker-name, i.e, `instance()` compared to `instance("my-worker")`.
-pub struct ReplWorkerNameGen {
+pub struct ReplInstanceNameGen {
     pub instance_count: u64,
     pub worker_name_cache: HashMap<u64, String>,
 }
 
-impl ReplWorkerNameGen {
+impl ReplInstanceNameGen {
     pub fn new() -> Self {
-        ReplWorkerNameGen {
+        ReplInstanceNameGen {
             instance_count: 0,
             worker_name_cache: HashMap::new(),
         }

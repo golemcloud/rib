@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::instance_name_gen::DynamicWorkerGen;
 use crate::invoke::ReplRibFunctionInvoke;
 use crate::repl_state::ReplState;
-use crate::worker_name_gen::DynamicWorkerGen;
 use rib::{InstructionId, Interpreter, RibByteCode, RibInput, RibResult, RibRuntimeError};
 use std::sync::Arc;
 
