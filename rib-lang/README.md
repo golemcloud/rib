@@ -1,8 +1,80 @@
-# rib-lang
+# `rib-lang` (library: `rib`)
 
-Core library for the Rib language: parser, type inference, compiler, and interpreter.
+**Crate:** [`rib-lang`](https://crates.io/crates/rib-lang) on crates.io — Rust import path: `rib` (`use rib::…`).
 
-## Grammar
+`rib-lang` implements **Rib**: a compact expression language aligned with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) and **WIT**-shaped types, with value text compatible with **[Wasm Wave](https://github.com/bytecodealliance/wasm-wave)** where applicable. The crate provides the full pipeline—**parse**, **type inference**, **checking against embedder-supplied export metadata**, **compile**, and **interpret**—so component hosts can offer typed scripting without maintaining a parallel type system.
+
+**Familiarity** — Rib’s **syntax is deliberately Rust-like** (`let`, `match`, blocks, calls, records, string syntax). Authors comfortable with Rust typically write well-formed Rib quickly. **Runtime literals** (records, lists, scalars, `option`, `result`, etc.) follow **Wasm Wave** text rules, so experience with the Wasm **component / WIT / Wave** stack carries over directly.
+
+---
+
+## Audience
+
+- **Wasm-time and other runtime maintainers** integrating a typed shell, diagnostics command, or test harness on top of `wasmtime::component::…` (or equivalent): analysed types and `Val` / resource tables already exist in the embedding; Rib centralises turning **user-authored text** into those calls with **static checking** first.
+
+- **Tooling authors** standardising on **Wave-shaped literals** for records, variants, lists, and `option` / `result` instead of per-product JSON or ad-hoc parsers.
+
+- **Rust embeddings that already load components** via `wasmtime::component` (or similar): Rib occupies the space between hand-written marshalling for every scenario and embedding a general-purpose scripting runtime.
+ 
+---
+
+## Design constraints
+
+1. **Types mirror WIT** — Scalars (`s32`, `string`, …), `list<T>`, `option<T>`, `result`, records, variant `match`, and qualified **export paths** in the grammar.
+
+2. **Wave integration** — `WitType` implements `wasm_wave::wasm::WasmType`; `ValueAndType` implements `WasmValue`. Parsing and printing use **`wasm-wave`**, consistent with other Bytecode Alliance tooling. Resource **handles** are not treated as arbitrary Wave-printable values; the API documents that boundary.
+
+3. **Pluggable invocation** — On `call`, the interpreter defers to **`RibComponentFunctionInvoke`** (see `interpreter`). The crate does not assume Wasmtime; it requires analysed exports and an embedder capable of performing the call.
+
+---
+
+## Subsystem overview
+
+| Subsystem | Role |
+|-----------|------|
+| **Parser** | Rib source → AST |
+| **Type inference & checker** | Programs checked against the embedder’s registry / `WitExport` view |
+| **Compiler** | Lowers to bytecode consumed by the interpreter |
+| **Interpreter** | Evaluation and invocation dispatch |
+| **`wit_type`** | Structured representation of WIT-level types and exports |
+| **`wave` / `wasm_wave_text`** | Wave bridge for `ValueAndType` |
+| **`registry`** | Export and dependency metadata supplied to the compiler |
+
+The semver-sensitive public API is defined by `rib-lang/src/lib.rs` (re-exports and modules).
+
+---
+
+## Embedding workflow
+
+1. Obtain **analysed interface** data from the host stack (`wasmtime::component::…`, `wit-component`, etc.) and map it into Rib’s **`WitExport`** / **`WitType`** representation.
+
+2. Construct a **registry** (and any instance or worker metadata required by the deployment model).
+
+3. Run **parse → infer → check → compile**, then execute with an implementation of **`RibComponentFunctionInvoke`** that performs the actual cross-boundary call.
+
+The **`rib-repl`** crate in this repository consumes the same pipeline for interactive input; CLIs and tests can call `rib-lang` directly without the REPL.
+
+---
+
+## Illustrative scenario
+
+An embedding already holds a **`wasmtime::component::Instance`** (or equivalent). A line of text—entered at a REPL or read from a test fixture—such as a `checkout({ … })`-shaped expression is passed to `rib-lang` together with the export table. If the expression is ill-typed relative to WIT, the failure is reported **before** any Wasm entrypoint runs. If it type-checks, **`RibComponentFunctionInvoke`** maps the interpreted call to the host’s normal **`call`**, lifting/lowering, and resource rules.
+
+---
+
+## Further reading
+
+- [WebAssembly Component Model — introduction](https://component-model.bytecodealliance.org/)  
+- [WIT](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)  
+- [Wasm Wave](https://github.com/bytecodealliance/wasm-wave)  
+- Repository overview: [README.md](../README.md)  
+- REPL built on this crate: [rib-repl/README.md](../rib-repl/README.md)  
+
+---
+
+## Formal grammar
+
+The language syntax in EBNF-style form:
 
 ```
 letter        ::= ? Unicode letter ? ;
