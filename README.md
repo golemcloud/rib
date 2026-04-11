@@ -1,6 +1,6 @@
 # Rib
 
-Rib is a small **expression language** and an optional **REPL** for working with **WebAssembly components** using types aligned with **WIT** (records, variants, `option`, `result`, lists, and related shapes). It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
+[Rib](rib-lang/README.md) is a small **expression language** and an optional **REPL** for working with **WebAssembly components** using types aligned with **WIT** (records, variants, `option`, `result`, lists, and related shapes). It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
 
 ---
 
