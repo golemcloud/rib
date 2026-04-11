@@ -1,14 +1,7 @@
 # Rib
 
 [Rib](rib-lang/README.md) is a small **expression language** and an optional **REPL** for working with **WebAssembly components** using types aligned with **WIT** (records, variants, `option`, `result`, lists, and related shapes). It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
-
----
-
-## Problem
-
-A component exposes a **typed contract** (typically described in **WIT**): which exports exist and which values may cross the boundary. Calling those exports correctly still requires either **repeated host code** (constructing arguments, matching signatures, handling `result` and resources) or **ad-hoc string formats** that drift from the real interface.
-
-Rib adds a **checked expression layer**: source is validated against the same export metadata before lowering to host calls, so many shape errors surface as **Rib type errors** rather than failed invocations.
+**Rib** lets you write interaction with deployed WASM components using  **short Rib expression**. It is statically typed that if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual WASM call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
 
 ---
 
