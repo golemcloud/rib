@@ -1,6 +1,4 @@
-# `rib-lang` (library: `rib`)
-
-**Crate:** [`rib-lang`](https://crates.io/crates/rib-lang) on crates.io — Rust import path: `rib` (`use rib::…`).
+# `rib-lang` 
 
 `rib-lang` implements **Rib**: a compact expression language aligned with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) and **WIT**-shaped types, with value text compatible with **[Wasm Wave](https://github.com/bytecodealliance/wasm-wave)** where applicable. The crate provides the full pipeline—**parse**, **type inference**, **checking against embedder-supplied export metadata**, **compile**, and **interpret**—so component hosts can offer typed scripting without maintaining a parallel type system.
 
