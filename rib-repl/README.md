@@ -80,12 +80,6 @@ All interactive input is **Rib** source. Grammar and static semantics: **[`rib-l
 
 ---
 
-## Example session
-
-![Rib REPL session with instance(), increment-and-get, and a + b](repl-session.png)
-
----
-
 ## Repository and license
 
 Source: [github.com/golemcloud/rib](https://github.com/golemcloud/rib).  
