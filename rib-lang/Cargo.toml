@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 description = "Parser for Golem's Rib language"
+repository = "https://github.com/golemcloud/rib"
 
 license-file = "../LICENSE"
 
