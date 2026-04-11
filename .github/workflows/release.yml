@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
 
 permissions:
   contents: read
@@ -13,6 +13,7 @@ env:
 
 jobs:
   publish:
+    if: startsWith(github.ref, 'refs/tags/v')
     name: Publish to crates.io
     runs-on: ubuntu-latest
     steps:
@@ -22,7 +23,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Same pattern as golemcloud/golem publish-golem-rust.yaml:
+      # get-version-action + sed 0.0.0 → tag version + cargo publish --allow-dirty.
+      - id: get_version
+        uses: battila7/get-version-action@v2
+
       - name: Publish workspace to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --workspace
+        run: |
+          VERSION="${{ steps.get_version.outputs.version-without-v }}"
+          sed -i "s/0.0.0/$VERSION/g" rib-lang/Cargo.toml
+          sed -i "s/0.0.0/$VERSION/g" rib-repl/Cargo.toml
+          sed -i "s/0.0.0/$VERSION/g" Cargo.toml
+          cargo publish --workspace --allow-dirty
