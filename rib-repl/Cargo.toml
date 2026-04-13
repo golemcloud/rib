@@ -6,7 +6,7 @@ edition = "2021"
 description = "Embeddable Rib REPL for WebAssembly components (Wasmtime-friendly)"
 repository = "https://github.com/golemcloud/rib"
 
-license-file = "../LICENSE"
+license-file = "LICENSE"
 
 [lib]
 path = "src/lib.rs"

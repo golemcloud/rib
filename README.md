@@ -1,11 +1,24 @@
 # Rib
 
-[Rib](rib-lang/README.md) is a small **expression language** and an optional [REPL](rib-repl/README.md) for working with **WebAssembly components** using types aligned with **WIT** (records, variants, `option`, `result`, lists, and related shapes). It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
+[Rib](rib-lang/README.md) is a small **expression language** with a [REPL](rib-repl/README.md) for working with **WebAssembly components** using types aligned with **WIT** . It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
 **Rib** lets you write interaction with deployed WASM components using  **short Rib expression**. It is statically typed that if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual WASM call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
+The runtimes can depend on `rib-repl` to quickly add a REPL to their CLI, with full auto complete features including function argument stubs generated from WIT signatures in WASM-WAVE syntax. 
+For the most part, the usage pattern is through REPL, unless ruintimes choose to use `rib-lang` directly in their codebase, for example in tests or as a scripting language for users. 
+
+```rust
+// define a variable `counter` and assign it to the instance of the component that's loaded by the runtime
+let counter = instance();
+
+// calls the export `increment_and_get` and assigns the result to `num`
+let a = counter.increment_and_get(); 
+
+let b = counter.increment_and_get();
+
+// adds the two numbers together and returns the result
+a + b
+```
 
 Find more details: [language](rib-lang/README.md) and [REPL](rib-repl/README.md)
-
-
 ---
 
 ## Component model, WIT, and execution context
@@ -47,7 +60,7 @@ Rib was first developed for **[Golem Cloud](https://www.golem.cloud/)** against 
 
 ## License
 
-**Golem Source License v1.0** — see [`LICENSE`](LICENSE). Review the license before redistribution or commercial integration.
+**Apache License, Version 2.0** — see [`LICENSE`](LICENSE). The file includes the **LLVM Exception** appendix (the same dual-appendix pattern used by Rust and many Wasmtime-related projects). Each published crate also ships a copy as `rib-lang/LICENSE` and `rib-repl/LICENSE`.
 
 ---
 
