@@ -6,7 +6,7 @@ edition = "2021"
 description = "Rib language: parser, typechecker, compiler, and interpreter for WebAssembly component (WIT) workflows"
 repository = "https://github.com/golemcloud/rib"
 
-license-file = "../LICENSE"
+license-file = "LICENSE"
 
 [features]
 default = ["json_in_errors"]

@@ -83,4 +83,4 @@ All interactive input is **Rib** source. Grammar and static semantics: **[`rib-l
 ## Repository and license
 
 Source: [github.com/golemcloud/rib](https://github.com/golemcloud/rib).  
-License: **Golem Source License v1.0** — see [`LICENSE`](../LICENSE) in the repository root.
+License: **Apache License, Version 2.0** (with **LLVM Exception** appendix) — see [`LICENSE`](LICENSE) in this crate, or the repository root [`LICENSE`](../LICENSE).
