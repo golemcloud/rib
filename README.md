@@ -1,9 +1,13 @@
 # Rib
 
 [Rib](rib-lang/README.md) is a small **expression language** with a [REPL](rib-repl/README.md) for working with **WebAssembly components** using types aligned with **WIT** . It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
-**Rib** lets you write interaction with deployed WASM components using  **short Rib expression**. It is statically typed that if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual WASM call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
-The runtimes can depend on `rib-repl` to quickly add a REPL to their CLI, with full auto complete features including function argument stubs generated from WIT signatures in WASM-WAVE syntax. 
-For the most part, the usage pattern is through REPL, unless ruintimes choose to use `rib-lang` directly in their codebase, for example in tests or as a scripting language for users. 
+**Rib** lets you write interaction with deployed WASM components using  **short Rib expression**. 
+
+It is statically typed that if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual WASM call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
+
+The runtimes can depend on `rib-repl` to quickly add a REPL to their CLI without worry about `rib-lang` at all, with full auto complete features including function argument stubs generated from WIT signatures in WASM-WAVE syntax. This will allow users to experiment with runtime with least number of mistakes (syntax, type mismatch etc)
+
+For the most part, the usage pattern of `rib` is through REPL, unless ruintimes choose to use `rib-lang` directly in their codebase, for example in tests or as a scripting language for users. 
 
 ```rust
 // define a variable `counter` and assign it to the instance of the component that's loaded by the runtime
