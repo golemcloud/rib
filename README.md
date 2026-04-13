@@ -14,9 +14,9 @@ For the most part, the usage pattern of `rib` is through REPL, unless ruintimes 
 let counter = instance();
 
 // calls the export `increment_and_get` and assigns the result to `num`
-let a = counter.increment_and_get(); 
+let a = counter.increment-and-get(); 
 
-let b = counter.increment_and_get();
+let b = counter.increment-and-get();
 
 // adds the two numbers together and returns the result
 a + b
