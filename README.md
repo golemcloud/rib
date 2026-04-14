@@ -27,7 +27,7 @@ a + b
 
 | | |
 |:---|:---|
-| [Rib language guide](https://golemcloud.github.io/rib/guide.html) | Features, REPL workflow, Grammer |
+| [Rib language guide](https://golemcloud.github.io/rib/guide.html) | Features, REPL workflow, Grammar |
 | [Grammar (EBNF)](rib-lang/README.md) | Formal syntax for implementers and tooling. |
 | [REPL](rib-repl/README.md) | Session behaviour, commands, and embedding notes. |
 
