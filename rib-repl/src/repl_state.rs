@@ -46,8 +46,8 @@ impl ReplState {
     }
 
     // This reset is to ensure the rib compiler the REPL can reuse the previous
-    // compilations (within the same session) worker names generated. i.e, before every compilation we reset the instance count,
-    // and there by, for the new script, the instance creation will end up reusing already generated worker names.
+    // compilations (within the same session) instance names generated. i.e, before every compilation we reset the instance count,
+    // and thereby, for the new script, the instance creation will end up reusing already generated instance names.
     pub fn reset_instance_count(&self) {
         self.worker_name_gen.write().unwrap().reset_instance_count();
     }

@@ -342,7 +342,7 @@ fn handle_residual_method_invokes_arena(
                 source_span: source_span.clone(),
                 help_message: vec![],
                 message: format!(
-                    "invalid method invocation `{lhs_name}.{method}`. make sure `{lhs_name}` is defined and is a valid instance type (i.e, resource or worker)"
+                    "invalid method invocation `{lhs_name}.{method}`. make sure `{lhs_name}` is defined and is a valid instance type (including resources)"
                 ),
             }
             .into())

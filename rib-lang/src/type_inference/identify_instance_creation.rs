@@ -51,10 +51,10 @@ fn search_for_invalid_instance_declarations_arena(
                 if variable_id.name() == "instance" && variable_id.is_global() {
                     return Err(CustomError::new(span, "`instance` is a reserved keyword")
                         .with_help_message(
-                            "use `instance()` instead of `instance` to create an ephemeral worker instance.",
+                            "use `instance()` instead of `instance` to create an ephemeral instance.",
                         )
                         .with_help_message(
-                            "for a durable worker, use `instance(\"foo\")` where `\"foo\"` is the worker name",
+                            "for a named instance, use `instance(\"foo\")` where `\"foo\"` is the instance name",
                         )
                         .into());
                 }

@@ -17,13 +17,13 @@ use std::ops::Deref;
 // the type of instance becomes more and more precise.
 //
 // Please look at `InstanceCreationType`
-// for a tangible view on the fact that an instance can be either worker or a resource.
+// for a tangible view on the fact that an instance can be either a component instance or a resource.
 #[derive(Debug, Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InstanceType {
-    // Worker instance: one component's exports (all packages/interfaces merged in the dictionary)
+    // Component instance: one component's exports (all packages/interfaces merged in the dictionary)
     Global {
         worker_name: Option<Box<Expr>>,
-        /// Shared across all worker-instance types for one compile — avoids cloning [`FunctionDictionary`] per node.
+        /// Shared across all instance types for one compile — avoids cloning [`FunctionDictionary`] per node.
         component: Arc<ComponentDependency>,
     },
 
@@ -292,7 +292,7 @@ fn search_function_in_single_package(
         interfaces.sort();
 
         Err(format!(
-            "multiple interfaces contain function '{function_name}'. Rib does not currently support disambiguating worker method names across interfaces. interfaces: {}",
+            "multiple interfaces contain function '{function_name}'. Rib does not currently support disambiguating instance method names across interfaces. interfaces: {}",
             interfaces.join(", ")
         ))
     }
@@ -303,7 +303,7 @@ fn search_function_in_multiple_packages(
     package_map: HashMap<Option<PackageName>, HashSet<Option<InterfaceName>>>,
 ) -> Result<Function, String> {
     let mut error_msg = format!(
-        "function '{function_name}' exists in multiple packages. Rib does not currently support disambiguating worker method names in this case. Conflicting exports: "
+        "function '{function_name}' exists in multiple packages. Rib does not currently support disambiguating instance method names in this case. Conflicting exports: "
     );
 
     let mut package_interface_list = package_map

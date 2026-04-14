@@ -53,7 +53,7 @@ impl Display for RibByteCodeGenerationError {
                 write!(f, "Unresolved wasm component for function: {function}")
             }
             RibByteCodeGenerationError::UnresolvedWorkerName => {
-                write!(f, "inline invocation of functions on a worker instance is currently not supported")
+                write!(f, "inline invocation of functions on an instance expression is currently not supported")
             }
             _ => {
                 write!(f, "inline invocation of methods on resource constructor instance is currently not supported")

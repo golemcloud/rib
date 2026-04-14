@@ -350,7 +350,7 @@ pub fn infer_function_invokes(
                             FunctionCallError::invalid_function_call(
                                 &method,
                                 span.clone(),
-                                "invalid worker function invoke. Expected to be an instance type",
+                                "invalid instance method invoke. expected lhs to be an instance type",
                             ),
                         ));
                     }
