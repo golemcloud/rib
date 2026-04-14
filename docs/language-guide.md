@@ -4,6 +4,8 @@ Rib is a small **expression language** for **WebAssembly components**: types fol
 
 **Repository:** [github.com/golemcloud/rib](https://github.com/golemcloud/rib) · **Grammar (EBNF):** [rib-lang/README.md](../rib-lang/README.md)
 
+**Why “Rib”?** — Think **potter’s rib**: the tiny paddle that saves your pot from thumbprints. Here, Rib is the paddle for **components**—same idea, less clay in your keyboard. **[Full story →](../README.md#why-the-name-rib)**
+
 ### Rib at the REPL (you do not need this whole guide first)
 
 **The REPL is the main place Rib is meant to shine.** When the host has already **loaded your component’s WIT**, the prompt can **auto-complete** exports and **shape** arguments for you—almost everything you type is guided from that contract. The experience we aim for: **once you are in a wired-up REPL, you should not keep jumping back to WIT source files** for ordinary work; the session reflects the types you shipped, and you stay in flow.
@@ -50,7 +52,6 @@ This guide lists **language features** you can use in scripts and in the **REPL*
 15. [String interpolation](#15-string-interpolation)  
 16. [WIT resources](#16-wit-resources)  
 17. [Qualified WIT export paths](#17-qualified-wit-export-paths)  
-18. [Publishing this guide on GitHub Pages](#18-publishing-this-guide-on-github-pages)  
 
 ---
 
@@ -146,7 +147,7 @@ Scalars and structured values use **Wasm Wave** text rules. The right column tie
 
 | Kind | Examples | From `inventory` (when relevant) |
 |------|-----------|-----------------------------------|
-| Boolean | `true`, `false` | `validate-qty` expects nothing boolean-only here — use in `if` |
+| Boolean | `true`, `false` | Conditions, e.g. with **`validate-qty`** (`u32` → `bool`) |
 | Integer | `0`, `-42`, `42u32` | `qty` is `u32`; point fields are `s32` |
 | String | `"hello"` | `sku` values |
 | List | `[1, 2, 3]`, `["a"]` | Any `list<…>` you compose at the prompt |
@@ -316,7 +317,7 @@ match home {
 
 ## 10. More call shapes
 
-**§1** already covers **`let my-instance = instance();`** and **receiver-style export calls** such as **`my-instance.lookup-sku(42)`** and **`my-instance.format-stage(draft)`** against **[`example.wit`](example.wit)**.
+**§1** already covers **`let my-instance = instance();`** and **dot-syntax export calls** (same idea as method calls) such as **`my-instance.lookup-sku(42)`** and **`my-instance.format-stage(draft)`** against **[`example.wit`](example.wit)**.
 
 Other shapes you may see:
 
@@ -433,20 +434,6 @@ When you need to disambiguate **package / interface / version** and **function**
 `package-namespace:package-name / interface-name @ version . { export }`
 
 Inner **export** forms include plain functions, **`[constructor]`**, **`[method]`**, **`[static]`**, **`[drop]`**, etc., as generated from your WIT. Prefer **`let my-instance = instance();`** then **`my-instance.some-export()`** (kebab-case export names) in REPLs unless you must spell the full path.
-
----
-
-## 18. Publishing this guide on GitHub Pages
-
-Today this file is plain **Markdown** in the repo: it renders on GitHub at  
-`https://github.com/golemcloud/rib/blob/main/docs/language-guide.md`.
-
-To turn it into a **small site** later you can:
-
-1. Add a static site generator (e.g. **mdBook**, **Docusaurus**, **MkDocs**) under `docs/` or `book/`.  
-2. Enable **GitHub Actions** to build HTML and push to the **`gh-pages`** branch, or use **GitHub Pages** from **Actions** / **folder** output.
-
-No change is required on GitHub’s side to **read** the guide—only if you want a separate branded URL.
 
 ---
 

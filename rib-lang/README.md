@@ -32,7 +32,7 @@
 |-----------|------|
 | **Parser** | Rib source → AST |
 | **Type inference & checker** | Programs checked against the embedder’s registry / `WitExport` view |
-| **Compiler** | Lowers to bytecode consumed by the interpreter |
+| **Compiler** | Lowers to **Rib IR** consumed by the interpreter |
 | **Interpreter** | Evaluation and invocation dispatch |
 | **`wit_type`** | Structured representation of WIT-level types and exports |
 | **`wave` / `wasm_wave_text`** | Wave bridge for `ValueAndType` |
@@ -54,9 +54,11 @@ The **`rib-repl`** crate in this repository consumes the same pipeline for inter
 
 ---
 
-## Illustrative scenario
+## Advanced usage (beyond the REPL)
 
-An embedding already holds a **`wasmtime::component::Instance`** (or equivalent). A line of text—entered at a REPL or read from a test fixture—such as a `checkout({ … })`-shaped expression is passed to `rib-lang` together with the export table. If the expression is ill-typed relative to WIT, the failure is reported **before** any Wasm entrypoint runs. If it type-checks, **`RibComponentFunctionInvoke`** maps the interpreted call to the host’s normal **`call`**, lifting/lowering, and resource rules.
+Most people meet Rib in a **REPL**; **`rib-lang`** is also for **embedding** in your own Rust binary. There, Rib helps when components grow **many exports**, when you **revise WIT or ship new component versions often**, or when you want **short, typed programs** plugged into the **output** of component calls—post-process, reshape, validate—without hand-writing and re-hand-writing the same glue in Rust (or JSON shims) for every export and every shape change. You wire **analysed exports** into the registry once; Rib text is **checked against that surface** on each compile, so updating the component tends to surface mistakes in the script **before** a bad call reaches Wasm.
+
+**Golem Cloud** used that **direct `rib-lang` embedding** pattern in production for **more than a year** (Rib in the path where worker/API behaviour met component definitions and return data). The product has **since shifted** so typical **end users** rely **less on raw WIT details** in day-to-day flows—but the embedding model is still the right tool for **advanced** hosts, gateways, tests, and automation that want a **small, statically checked** layer on top of components.
 
 ---
 
