@@ -2,11 +2,53 @@
 
 Rib is a small expression language for WebAssembly components: WIT-shaped types, [Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave) literals where they apply. Syntax is Rust-like (`let`, blocks, `if` / `then` / `else`, `match`, `instance()` plus dotted export calls)—common in the Wasm toolchain. Grammar stays small: skim the first sections (~5 min), keep the rest for reference.
 
+You do not need this whole guide first—[Rib at the REPL](#rib-at-the-repl) is enough to get oriented at the prompt.
+
 Repository: [github.com/golemcloud/rib](https://github.com/golemcloud/rib) · Grammar (EBNF): [rib-lang/README.md](../rib-lang/README.md)
 
-### Rib at the REPL (you do not need this whole guide first)
+### Rib at the REPL
 
 The REPL is the main place Rib is meant to shine. When the host has already loaded your component, the prompt can auto-complete exports and shape arguments for you—almost everything you type is guided from that contract. The experience we aim for: once you are in a wired-up REPL, you should not keep jumping back to WIT source files for ordinary work; the session reflects the types you shipped, and you stay in flow.
+
+**Typical launch** — the exact command is embedder-specific, but the pattern is: point your host’s Rib-enabled CLI at a component, then work at a `>>>` prompt—for example `my-runtime-cli rib path/to/component.wasm`.
+
+```console
+>>> let a = instance()
+
+>>> let b = a.increment-and-get()
+
+>>> let c = a.increment-and-get()
+
+>>> b + c
+3
+```
+
+**Tab completion** covers two different things:
+
+- **Function names** — after the dot on whatever `instance()` returned (or on a resource handle), **Tab** completes **kebab-case** names from your WIT. Keep pressing **Tab** **before** you type **`(`** to cycle through **every** callable on that value—including **resource constructors**—in one list.
+
+- **Arguments** — **after** you pick a name, type **`(`**, then **Tab** to insert **Wave-shaped** placeholders that match the WIT parameter types (record fields, `option` / `result` shells, numeric literals where it helps, …). Edit the stub in place instead of copying from WIT by hand.
+
+```console
+>>> let a = instance()
+
+>>> a.add-to-cart({ product-id: 1, product: "t-shirt" })
+
+()
+```
+
+**Resource in the same session** — when your world exposes a **`cart`** resource (as in [`example.wit`](example.wit) `shopping`), the constructor is just another dotted name on `instance()`; the handle then gets its own **function names** after the dot—same rhythm as above.
+
+```console
+>>> let w = instance()
+
+>>> let cart = w.cart("checkout-1")
+
+>>> cart.add-line({ sku: "mug", qty: 2u32 })
+
+>>> cart.line-count()
+1
+```
 
 Day-to-day use stays small: `instance()`, a `let` binding (e.g. `let my-instance = instance();`), then exports with dot syntax—[§1 *`instance()` and calling exports*](#1-instance-and-calling-exports) is enough to be productive. You are still speaking the component model’s types and Wasm Wave literals, not inventing a parallel schema in your head.
 
@@ -37,7 +79,7 @@ Companion WIT — [`example.wit`](example.wit) exports `inventory` (records, enu
 2. [Programs, blocks, and semicolons](#2-programs-blocks-and-semicolons)  
 3. [Comments](#3-comments)  
 4. [Literals and Wave-shaped values](#4-literals-and-wave-shaped-values)  
-5. [Types and annotations](#5-types-and-annotations)  
+5. [Types and annotations](#5-types-and-annotations) ([inference sketch](#type-inference-sketch))  
 6. [`let` bindings](#6-let-bindings)  
 7. [Operators](#7-operators)  
 8. [`if` / `then` / `else`](#8-if--then--else)  
@@ -58,7 +100,7 @@ Companion WIT — [`example.wit`](example.wit) exports `inventory` (records, enu
 The file [`example.wit`](example.wit) is documentation-only (not wired into the compiler by default), but world `guide-demo` exports two interfaces so the guide can stay in one place:
 
 - `inventory` — records, enums, variants, flags, and plain `func` exports (most examples below).
-- `shopping` — a `resource cart` (constructor + methods) used in [§1](#1-instance-and-calling-exports) and [§16](#16-wit-resources); its shape is aligned with the shopping-cart style metadata in Rib’s own compiler tests (see [§16](#16-wit-resources) for the path).
+- `shopping` — a `resource cart` (constructor + methods); see [§1](#1-instance-and-calling-exports) and [§16](#16-wit-resources).
 
 | WIT shape | Where | Meaning |
 |-----------|--------|--------|
@@ -79,6 +121,7 @@ What `instance()` is (plain version): Your host (REPL, test harness, etc.) has a
 
 ```rust
 let my-instance = instance();
+
 my-instance.lookup-sku(7)
 ```
 
@@ -90,10 +133,15 @@ More calls against [`example.wit`](example.wit) → `inventory`:
 let my-instance = instance();
 
 let d = my-instance.length({ x: 3, y: -4 });
+
 let blurb = my-instance.format-stage(draft);
-let label = my-instance.lookup-sku(42); // `option<string>`
+
+let label = my-instance.lookup-sku(42); // option<string>
+
 let half = my-instance.ratio(9, 2);
+
 let row = my-instance.make-item("pencil", 5u32);
+
 let caps = my-instance.describe-access({ read, write });
 ```
 
@@ -111,7 +159,9 @@ A Rib **program** is a sequence of expressions separated by **`;`**. The value o
 
 ```rust
 let x = 1;
+
 let y = 2;
+
 x + y
 ```
 
@@ -120,8 +170,10 @@ A **block** is `{` … `}` containing its own `;`-separated Rib program:
 ```rust
 let z = {
   let a = 10;
+
   a + 1
 };
+
 z
 ```
 
@@ -168,7 +220,9 @@ Rib is **statically typed** against the **WIT** you register with the compiler.
 
 ```rust
 let n: s32 = 40;
+
 let m: s32 = n + 2;
+
 m
 ```
 
@@ -176,13 +230,40 @@ Common **scalar** type names: `bool`, `s8`, `u8`, `s16`, `u16`, `s32`, `u32`, `s
 
 **Compound** types: `list<string>`, `tuple<s32, string>`, `option<u64>`, `result` / `result<string, string>`, etc.
 
+<a id="type-inference-sketch"></a>
+
+### Type inference (sketch)
+
+Most types are **fixed by WIT**: `instance()`, export signatures, and the Wave-shaped literals you build. Inference does not stop at a single left-to-right pass: the checker **propagates constraints in both directions** (calls, `let`, literals, and return positions) and **re-runs to a fixed point**—it keeps tightening until nothing more can be learned or it finds a contradiction. That **best-effort** cycle is what lets you **omit explicit `: type` annotations** most of the time: Rib keeps reconciling partial information until the line agrees with your WIT.
+
+In a **REPL** with **tab completion** wired to the loaded component, stubs and signatures already sit on the right WIT types, so short expressions **usually “just work”** without you spelling widths by hand.
+
+When you omit an annotation on **`let`**, **integer literals** (`1`, `42`, …) still need a concrete width (`u8`, `u16`, `u32`, …). Those literals are **pulled** toward whatever **`func`** arguments and surrounding expressions require.
+
+Against [`example.wit`](example.wit), `inventory` includes **`validate-qty: func(qty: u32) -> bool`**. So in:
+
+```rust
+let my-instance = instance();
+
+let x = 1;
+
+my-instance.validate-qty(x)
+```
+
+**`x`** is inferred as **`u32`**, because that is what **`validate-qty`** expects. The same idea applies to other calls: **`instance()`** pins the component API, and argument positions **pull** the types they need from the registered **`func`** signatures (including the right **integer width** among `u8`, `u16`, `u32`, … when a plain literal is passed).
+
+**Longer Rib programs** (many bindings, nested control flow, or heavy overloading-style ambiguity) give the solver **less local** evidence per line; you may need an occasional **`:`** annotation or a slightly more explicit literal. That is rarer at the prompt than in a big script.
+
+The **full** inference algorithm (unification, error messages, edge cases) is **out of scope** for this guide—if Rib reports a type error, read it as “this line cannot be made consistent with your WIT,” then add a **`:`** annotation or adjust literals / calls.
+
 ---
 
 ## 6. `let` bindings
 
 ```rust
 let answer = 42;
-let labeled: u64 = 7u64;
+
+let labeled: u32 = 7u32;
 ```
 
 Bindings from earlier lines **stay in scope** in a REPL session until cleared.
@@ -205,10 +286,10 @@ xs[0] == 1
 ## 8. `if` / `then` / `else`
 
 ```rust
-if score > 10u64 then "win" else "lose"
+if score > 10 then "win" else "lose"
 ```
 
-All three parts are expressions and must type-check together.
+All three parts are expressions and must type-check together. **`score`** should match your comparison (e.g. **`u32`** from WIT); a plain literal **`10`** is fine once types line up.
 
 ---
 
@@ -225,6 +306,7 @@ Below, types come from **[`example.wit`](example.wit)** → **`inventory`**. Rib
 
 ```rust
 let my-instance = instance();
+
 let label = my-instance.lookup-sku(42);
 
 match label {
@@ -241,6 +323,7 @@ match label {
 
 ```rust
 let my-instance = instance();
+
 let q = my-instance.ratio(10, 2);
 
 match q {
@@ -275,6 +358,7 @@ Rib patterns use the **case name**; payloads go in parentheses when the case car
 
 ```rust
 // Suppose `p` has type `payment-info` (e.g. passed in from another call).
+
 match p {
   card(last4) => "card",
   wallet => "wallet",
@@ -290,6 +374,7 @@ Field names match WIT (`x` / `y`, `sku` / `qty`):
 
 ```rust
 let home = { x: 0, y: 0 };
+
 let item = { sku: "notebook", qty: 2u32 };
 
 match home {
@@ -308,7 +393,7 @@ match ids {
 
 ### 9.7 Catch-all and aliases
 
-- **`_`** — any value not covered by earlier arms (required if patterns are not exhaustive).  
+- **`_`** — any value not covered by earlier arms (required when patterns would otherwise be non-exhaustive; see §9.8).  
 - **`name @ pattern`** — bind the **whole** matched value to **`name`** while also matching **`pattern`**.
 
 ```rust
@@ -316,6 +401,16 @@ match home {
   p @ { x: xa, y: ya } => xa + ya
 }
 ```
+
+### 9.8 Compile-time errors (`match`, enums, calls)
+
+Rib reports many mistakes **while compiling** Rib source (REPL line or script)—**before** your embedder invokes Wasm. A few common cases:
+
+**Exhaustive `match` on variants** — In [`example.wit`](example.wit), `variant payment-info` has exactly **three** cases: **`card`**, **`wallet`**, and **`failed`** (§9.4). A `match` on a `payment-info` value must cover **all** of them, unless you add a **`_`** arm. If you only write arms for **two** of the three and omit **`_`**, Rib rejects the program at **compile time** with a non-exhaustive `match` error—you do not wait until runtime to discover the gap.
+
+**Enums** — `order-stage` is only **`draft`**, **`placed`**, and **`shipped`**. A typo in a pattern (e.g. a name that is not a WIT case) or a `match` that omits a case without **`_`** is likewise a **compile-time** error.
+
+**Calls** — Arguments are checked against the **`func`** signature. Example: **`validate-qty`** expects **`u32`**; passing a **string** or the wrong **record** shape to **`length`** is rejected **at compile time**, not as a failed Wasm call later.
 
 ---
 
@@ -374,7 +469,9 @@ let row: line-item = { sku: "eraser", qty: 1u32 };
 
 ```rust
 let my-instance = instance();
+
 let f = { read, execute };
+
 my-instance.describe-access(f)
 ```
 
@@ -386,8 +483,11 @@ my-instance.describe-access(f)
 
 ```rust
 let ok-x = ok(42);
+
 let err-x = err("by-zero");
+
 let some-x = some("found");
+
 let none-x = none;
 ```
 
@@ -401,6 +501,7 @@ Inside `"…"`, **`${` … `}`** embeds a Rib **block** (sequence of expressions
 
 ```rust
 let name = "Rib";
+
 "The language is ${name}"
 ```
 
@@ -408,18 +509,19 @@ let name = "Rib";
 
 ## 16. WIT resources
 
-**[`example.wit`](example.wit)** → interface **`shopping`** defines **`resource cart`**: **`constructor`**, **`line-count`**, **`add-line`**, using **`inventory`.`line-item`**. That is the **small teaching surface** for this repo’s docs.
+[`example.wit`](example.wit) → interface `shopping` defines `resource cart` (`constructor`, `line-count`, `add-line`, using `inventory`.`line-item`). That is the small teaching surface for this repo’s docs.
 
-Rib’s own **shopping-cart style** tests use a larger, programmatic WIT snapshot (interface path **`golem:it/api`**, exports such as **`[constructor]cart`**, **`[method]cart.add-item`**, **`[method]cart.checkout`**, **`[drop]cart`**, …). See **`rib-lang/src/compiler/mod.rs`**, function **`get_metadata`** in the nested **`test_utils`** module (roughly the **`test_invalid_resource_*`** tests and the **`resource_export`** / **`WitExport::Interface`** block that builds the cart API).
-
-A WIT **`resource`** is a **typed object** you obtain from a **constructor** export on whatever **`instance()`** returned—same dot syntax as everything else (e.g. **`let my-instance = instance();`** then **`let shopping-cart = my-instance.cart("checkout-1");`**), then **methods** on **`shopping-cart`** (`add-line`, `line-count`, …, still **kebab-case** from WIT). Under the hood Rib lines this up with WIT’s **`borrow`** rules: the **first** parameter is the resource; Rib fills it in from the left-hand side of the **`.`**.
+For resources, use that `cart` as the pattern: you still work from whatever `instance()` returned. Call the resource constructor as an export on that value (e.g. `my-instance.cart("checkout-1")`), then use the same dot-syntax method calls on the handle as for any other export (`shopping-cart.add-line(…)`, `shopping-cart.line-count()`, …, still kebab-case from WIT). Same mental model as `instance`, so resource calls stay easy.
 
 **Example aligned with `example.wit` / `shopping`:**
 
 ```rust
 let my-instance = instance();
+
 let shopping-cart = my-instance.cart("checkout-1");
+
 shopping-cart.add-line({ sku: "notebook", qty: 2u32 });
+
 shopping-cart.line-count()
 ```
 
@@ -427,7 +529,6 @@ shopping-cart.line-count()
 
 - **Resource values are not arbitrary Wave text.** Printing or serialising them like ordinary JSON/Wave data is **not** supported the same way as records and numbers; treat them as **opaque** at the boundary unless your embedder defines extra behaviour.
 - Some **patterns of nested construction** (e.g. certain inline combinations) may be rejected by the compiler with a specific error—when in doubt, use **`let`** to name intermediate values.
-- The **`golem:it/api`** test metadata is **not** the same file as **`example.wit`**; use it when you need a **richer** cart contract while debugging Rib itself.
 
 ---
 
@@ -448,8 +549,10 @@ Inner **export** forms include plain functions, **`[constructor]`**, **`[method]
 | Sequence | `expr1; expr2; expr3` |
 | Block | `{ … }` |
 | Let | `let x = e` or `let x: T = e` |
+| Inference | fixed-point over WIT; REPL tab completion (§5) |
 | If | `if c then a else b` |
 | Match | `match e { pat => x, _ => y }` |
+| Compile-time | Exhaustive `match`, enum case names, call arity/types vs WIT (§9.8) |
 | Call | `f(a, b)` or `recv.method(a)` |
 | Instance | `let my-instance = instance();` then `my-instance.lookup-sku(7)` (name is yours) |
 | For | `for x in xs { yield y; }` |

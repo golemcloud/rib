@@ -4,6 +4,8 @@
 
 `rib-repl` is a **read–eval–print loop** library for **WebAssembly components**. End users type **Rib** (implemented by [`rib-lang`](../rib-lang/README.md)); this crate supplies the **session**, **line editor**, **completion**, **highlighting**, and **static checking** of each line against the loaded component **before** the embedder’s invocation hook runs.
 
+**Language guide:** [golemcloud.github.io/rib/guide.html](https://golemcloud.github.io/rib/guide.html) — syntax, literals, and patterns for the Rib lines users type here.
+
 Example: Once the component is loaded, the following will result in `3`, if the component exports a stateful `increment_and_get` method.
 
 ```
@@ -76,7 +78,7 @@ Although this is yet to be fully integrated, a work is in [progress](https://git
 
 ## Language reference
 
-All interactive input is Rib source. Start with the [language guide](https://golemcloud.github.io/rib/guide.html); the full EBNF grammar is in [`rib-lang` README](../rib-lang/README.md).
+All interactive input is Rib source. Use the **[language guide](https://golemcloud.github.io/rib/guide.html)** (linked at the top of this README); the EBNF grammar is in [`rib-lang` README](../rib-lang/README.md).
 
 ---
 

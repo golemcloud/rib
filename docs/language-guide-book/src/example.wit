@@ -1,8 +1,6 @@
 package rib:language-guide@0.1.0;
 
 // Example WIT for docs/language-guide.md (documentation only; not built by default).
-// Resource shape mirrors the shopping-cart metadata used in Rib compiler tests:
-//   rib-lang/src/compiler/mod.rs  (test_utils::get_metadata, `[constructor]cart`, …).
 
 interface inventory {
   /// Integer point (record).
