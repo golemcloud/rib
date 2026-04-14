@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="en" class="rust" dir="ltr">
+<html lang="en" class="rust sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -8,43 +8,57 @@
 
 
         <!-- Custom HTML head -->
-        
+
         <meta name="description" content="Rib: a small expression language for WebAssembly components">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
-    </head>
-    <body class="sidebar-visible no-js">
-    <div id="body-container">
-        <!-- Provide site root to javascript -->
-        <script>
-            var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "rust";
-        </script>
 
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-32670914.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-5b89b1a8.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -58,87 +72,69 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
-            var html = document.querySelector('html');
+            const html = document.documentElement;
             html.classList.remove('rust')
             html.classList.add(theme);
-            var body = document.querySelector('body');
-            body.classList.remove('no-js')
-            body.classList.add('js');
+            html.classList.add("js");
         </script>
 
-        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var body = document.querySelector('body');
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
+                sidebar_toggle.checked = false;
             }
-            sidebar_toggle.checked = sidebar === 'visible';
-            body.classList.remove('sidebar-visible');
-            body.classList.add("sidebar-" + sidebar);
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
         </script>
 
-        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="guide.html">Rib language guide</a></li><li class="chapter-item expanded affix "><a href="example-wit.html">Example WIT (example.wit)</a></li></ol>
-            </div>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <!-- Track and set sidebar scroll position -->
-        <script>
-            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
-            sidebarScrollbox.addEventListener('click', function(e) {
-                if (e.target.tagName === 'A') {
-                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
-                }
-            }, { passive: true });
-            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
-            sessionStorage.removeItem('sidebar-scroll');
-            if (sidebarScrollTop) {
-                // preserve sidebar scroll position when navigating via links within sidebar
-                sidebarScrollbox.scrollTop = sidebarScrollTop;
-            } else {
-                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
-                var activeSection = document.querySelector('#sidebar .active');
-                if (activeSection) {
-                    activeSection.scrollIntoView({ block: 'center' });
-                }
-            }
-        </script>
-
-        <div id="page-wrapper" class="page-wrapper">
+        <div id="mdbook-page-wrapper" class="page-wrapper">
 
             <div class="page">
-                                <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                            <i class="fa fa-bars"></i>
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
                         </label>
-                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                            <i class="fa fa-paint-brush"></i>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
                         </button>
-                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
-                            <i class="fa fa-search"></i>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
                         </button>
                     </div>
 
@@ -146,150 +142,212 @@
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
-                            <i id="print-button" class="fa fa-print"></i>
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/golemcloud/rib" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
 
                     </div>
                 </div>
 
-                <div id="search-wrapper" class="hidden">
-                    <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
                     </form>
-                    <div id="searchresults-outer" class="searchresults-outer hidden">
-                        <div id="searchresults-header" class="searchresults-header"></div>
-                        <ul id="searchresults">
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
                         </ul>
                     </div>
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
-                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
                         link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
                     });
                 </script>
 
-                <div id="content" class="content">
+                <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="rib-language-guide"><a class="header" href="#rib-language-guide">Rib language guide</a></h1>
 <p>Rib is a small expression language for WebAssembly components: WIT-shaped types, <a href="https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave">Wasm Wave</a> literals where they apply. Syntax is Rust-like (<code>let</code>, blocks, <code>if</code> / <code>then</code> / <code>else</code>, <code>match</code>, <code>instance()</code> plus dotted export calls)—common in the Wasm toolchain. Grammar stays small: skim the first sections (~5 min), keep the rest for reference.</p>
+<p>You do not need this whole guide first—<a href="#rib-at-the-repl">Rib at the REPL</a> is enough to get oriented at the prompt.</p>
 <p>Repository: <a href="https://github.com/golemcloud/rib">github.com/golemcloud/rib</a> · Grammar (EBNF): <a href="https://github.com/golemcloud/rib/blob/main/rib-lang/README.md">rib-lang/README.md</a></p>
-<h3 id="rib-at-the-repl-you-do-not-need-this-whole-guide-first"><a class="header" href="#rib-at-the-repl-you-do-not-need-this-whole-guide-first">Rib at the REPL (you do not need this whole guide first)</a></h3>
+<h3 id="rib-at-the-repl"><a class="header" href="#rib-at-the-repl">Rib at the REPL</a></h3>
 <p>The REPL is the main place Rib is meant to shine. When the host has already loaded your component, the prompt can auto-complete exports and shape arguments for you—almost everything you type is guided from that contract. The experience we aim for: once you are in a wired-up REPL, you should not keep jumping back to WIT source files for ordinary work; the session reflects the types you shipped, and you stay in flow.</p>
-<p>Day-to-day use stays small: <code>instance()</code>, a <code>let</code> binding (e.g. <code>let my-instance = instance();</code>), then exports with dot syntax—<a href="guide.html#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is enough to be productive. You are still speaking the component model’s types and Wasm Wave literals, not inventing a parallel schema in your head.</p>
+<p><strong>Typical launch</strong> — the exact command is embedder-specific, but the pattern is: point your host’s Rib-enabled CLI at a component, then work at a <code>&gt;&gt;&gt;</code> prompt—for example <code>my-runtime-cli rib path/to/component.wasm</code>.</p>
+<pre><code class="language-console">&gt;&gt;&gt; let a = instance()
+
+&gt;&gt;&gt; let b = a.increment-and-get()
+
+&gt;&gt;&gt; let c = a.increment-and-get()
+
+&gt;&gt;&gt; b + c
+3
+</code></pre>
+<p><strong>Tab completion</strong> covers two different things:</p>
+<ul>
+<li>
+<p><strong>Function names</strong> — after the dot on whatever <code>instance()</code> returned (or on a resource handle), <strong>Tab</strong> completes <strong>kebab-case</strong> names from your WIT. Keep pressing <strong>Tab</strong> <strong>before</strong> you type <strong><code>(</code></strong> to cycle through <strong>every</strong> callable on that value—including <strong>resource constructors</strong>—in one list.</p>
+</li>
+<li>
+<p><strong>Arguments</strong> — <strong>after</strong> you pick a name, type <strong><code>(</code></strong>, then <strong>Tab</strong> to insert <strong>Wave-shaped</strong> placeholders that match the WIT parameter types (record fields, <code>option</code> / <code>result</code> shells, numeric literals where it helps, …). Edit the stub in place instead of copying from WIT by hand.</p>
+</li>
+</ul>
+<pre><code class="language-console">&gt;&gt;&gt; let a = instance()
+
+&gt;&gt;&gt; a.add-to-cart({ product-id: 1, product: "t-shirt" })
+
+()
+</code></pre>
+<p><strong>Resource in the same session</strong> — when your world exposes a <strong><code>cart</code></strong> resource (as in <a href="#example-wit-examplewit"><code>example.wit</code></a> <code>shopping</code>), the constructor is just another dotted name on <code>instance()</code>; the handle then gets its own <strong>function names</strong> after the dot—same rhythm as above.</p>
+<pre><code class="language-console">&gt;&gt;&gt; let w = instance()
+
+&gt;&gt;&gt; let cart = w.cart("checkout-1")
+
+&gt;&gt;&gt; cart.add-line({ sku: "mug", qty: 2u32 })
+
+&gt;&gt;&gt; cart.line-count()
+1
+</code></pre>
+<p>Day-to-day use stays small: <code>instance()</code>, a <code>let</code> binding (e.g. <code>let my-instance = instance();</code>), then exports with dot syntax—<a href="#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is enough to be productive. You are still speaking the component model’s types and Wasm Wave literals, not inventing a parallel schema in your head.</p>
 <h3 id="rib-in-scripts-and-beside-apis-where-the-language-earns-its-keep"><a class="header" href="#rib-in-scripts-and-beside-apis-where-the-language-earns-its-keep">Rib in scripts and beside APIs (where the language earns its keep)</a></h3>
 <p>Rib also shines when you run a program against values that already crossed the boundary: post-process worker or component results, reshape nested <code>record</code> / <code>list</code> / <code>option</code> / <code>result</code> trees with <code>match</code> and expressions, and test structure and transformations instead of only asserting “something came back.” That is how you avoid hand-written ad-hoc checks that drift from your real WIT. Historically, runtimes such as Golem embedded Rib in API-definition YAML so a small script could reshape the HTTP-facing output of a component-backed worker—same pattern anywhere you want a typed, short script next to config rather than untyped glue.</p>
 <p>If your world is WIT, Wasmtime, and components as contracts: Rib is a compact, statically checked expression layer that stays on those types end-to-end—useful whenever you want programmable glue without leaving the WebAssembly component ecosystem.</p>
 <h3 id="about-this-guide-long-on-purpose-light-in-practice"><a class="header" href="#about-this-guide-long-on-purpose-light-in-practice">About this guide (long on purpose, light in practice)</a></h3>
-<p>We document a lot so nothing feels hidden—but Rib is not heavyweight. For REPL work especially, <a href="guide.html#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is usually enough to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a reference you reach for when you move into scripts, <code>match</code> on richer values, resources, comprehensions, or other advanced Rib—not a front-to-back assignment.</p>
+<p>We document a lot so nothing feels hidden—but Rib is not heavyweight. For REPL work especially, <a href="#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is usually enough to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a reference you reach for when you move into scripts, <code>match</code> on richer values, resources, comprehensions, or other advanced Rib—not a front-to-back assignment.</p>
 <p>If you live around Wasmtime and the component stack: Rib is meant to be a thin layer on the types you already ship—not another big platform to adopt wholesale.</p>
-<hr />
+<hr>
 <p>This guide lists language features you can use in scripts and in the REPL. It does not focus on embedder-specific globals (e.g. HTTP-shaped <code>request</code> inputs): those depend on how <code>rib-lang</code> is configured and may change or disappear between releases.</p>
-<p>Companion WIT — <a href="example-wit.html"><code>example.wit</code></a> exports <code>inventory</code> (records, enums, plain funcs) and <code>shopping</code> (a <code>cart</code> resource) from world <code>guide-demo</code>. Start with <a href="guide.html#1-instance-and-calling-exports">§1</a>; <a href="guide.html#0-example-wit-examplewit">§0</a> spells out the WIT if you want it on the page, and <a href="guide.html#9-match-and-patterns">§9 <em><code>match</code></em></a> onward when you need more than export calls.</p>
-<hr />
+<p>Companion WIT — <a href="#example-wit-examplewit"><code>example.wit</code></a> exports <code>inventory</code> (records, enums, plain funcs) and <code>shopping</code> (a <code>cart</code> resource) from world <code>guide-demo</code>. Start with <a href="#1-instance-and-calling-exports">§1</a>; <a href="#0-example-wit-examplewit">§0</a> spells out the WIT if you want it on the page, and <a href="#9-match-and-patterns">§9 <em><code>match</code></em></a> onward when you need more than export calls.</p>
+<hr>
 <h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of contents</a></h2>
 <ol start="0">
-<li><a href="guide.html#0-example-wit-examplewit">Example WIT (<code>example.wit</code>)</a></li>
-<li><a href="guide.html#1-instance-and-calling-exports"><code>instance()</code> and calling exports</a></li>
-<li><a href="guide.html#2-programs-blocks-and-semicolons">Programs, blocks, and semicolons</a></li>
-<li><a href="guide.html#3-comments">Comments</a></li>
-<li><a href="guide.html#4-literals-and-wave-shaped-values">Literals and Wave-shaped values</a></li>
-<li><a href="guide.html#5-types-and-annotations">Types and annotations</a></li>
-<li><a href="guide.html#6-let-bindings"><code>let</code> bindings</a></li>
-<li><a href="guide.html#7-operators">Operators</a></li>
-<li><a href="guide.html#8-if--then--else"><code>if</code> / <code>then</code> / <code>else</code></a></li>
-<li><a href="guide.html#9-match-and-patterns"><code>match</code> and patterns</a></li>
-<li><a href="guide.html#10-more-call-shapes">More call shapes</a></li>
-<li><a href="guide.html#11-list-comprehensions-for--yield">List comprehensions (<code>for</code> … <code>yield</code>)</a></li>
-<li><a href="guide.html#12-list-aggregation-reduce--yield">List aggregation (<code>reduce</code> … <code>yield</code>)</a></li>
-<li><a href="guide.html#13-records-tuples-lists-flags">Records, tuples, lists, flags</a></li>
-<li><a href="guide.html#14-option-and-result"><code>option</code> and <code>result</code></a></li>
-<li><a href="guide.html#15-string-interpolation">String interpolation</a></li>
-<li><a href="guide.html#16-wit-resources">WIT resources</a></li>
-<li><a href="guide.html#17-qualified-wit-export-paths">Qualified WIT export paths</a></li>
+<li><a href="#0-example-wit-examplewit">Example WIT (<code>example.wit</code>)</a></li>
+<li><a href="#1-instance-and-calling-exports"><code>instance()</code> and calling exports</a></li>
+<li><a href="#2-programs-blocks-and-semicolons">Programs, blocks, and semicolons</a></li>
+<li><a href="#3-comments">Comments</a></li>
+<li><a href="#4-literals-and-wave-shaped-values">Literals and Wave-shaped values</a></li>
+<li><a href="#5-types-and-annotations">Types and annotations</a> (<a href="#type-inference-sketch-1">inference sketch</a>)</li>
+<li><a href="#6-let-bindings"><code>let</code> bindings</a></li>
+<li><a href="#7-operators">Operators</a></li>
+<li><a href="#8-if--then--else"><code>if</code> / <code>then</code> / <code>else</code></a></li>
+<li><a href="#9-match-and-patterns"><code>match</code> and patterns</a></li>
+<li><a href="#10-more-call-shapes">More call shapes</a></li>
+<li><a href="#11-list-comprehensions-for--yield">List comprehensions (<code>for</code> … <code>yield</code>)</a></li>
+<li><a href="#12-list-aggregation-reduce--yield">List aggregation (<code>reduce</code> … <code>yield</code>)</a></li>
+<li><a href="#13-records-tuples-lists-flags">Records, tuples, lists, flags</a></li>
+<li><a href="#14-option-and-result"><code>option</code> and <code>result</code></a></li>
+<li><a href="#15-string-interpolation">String interpolation</a></li>
+<li><a href="#16-wit-resources">WIT resources</a></li>
+<li><a href="#17-qualified-wit-export-paths">Qualified WIT export paths</a></li>
 </ol>
-<hr />
+<hr>
 <h2 id="0-example-wit-examplewit"><a class="header" href="#0-example-wit-examplewit">0. Example WIT (<code>example.wit</code>)</a></h2>
-<p>The file <a href="example-wit.html"><code>example.wit</code></a> is documentation-only (not wired into the compiler by default), but world <code>guide-demo</code> exports two interfaces so the guide can stay in one place:</p>
+<p>The file <a href="#example-wit-examplewit"><code>example.wit</code></a> is documentation-only (not wired into the compiler by default), but world <code>guide-demo</code> exports two interfaces so the guide can stay in one place:</p>
 <ul>
 <li><code>inventory</code> — records, enums, variants, flags, and plain <code>func</code> exports (most examples below).</li>
-<li><code>shopping</code> — a <code>resource cart</code> (constructor + methods) used in <a href="guide.html#1-instance-and-calling-exports">§1</a> and <a href="guide.html#16-wit-resources">§16</a>; its shape is aligned with the shopping-cart style metadata in Rib’s own compiler tests (see <a href="guide.html#16-wit-resources">§16</a> for the path).</li>
+<li><code>shopping</code> — a <code>resource cart</code> (constructor + methods); see <a href="#1-instance-and-calling-exports">§1</a> and <a href="#16-wit-resources">§16</a>.</li>
 </ul>
-<div class="table-wrapper"><table><thead><tr><th>WIT shape</th><th>Where</th><th>Meaning</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>WIT shape</th><th>Where</th><th>Meaning</th></tr>
+</thead>
+<tbody>
 <tr><td><code>record</code></td><td><code>inventory</code></td><td><code>point</code>, <code>line-item</code>, …</td></tr>
 <tr><td><code>enum</code></td><td><code>inventory</code></td><td><code>order-stage</code>: <code>draft</code> | <code>placed</code> | <code>shipped</code></td></tr>
 <tr><td><code>variant</code></td><td><code>inventory</code></td><td><code>payment-info</code>, …</td></tr>
 <tr><td><code>flags</code></td><td><code>inventory</code></td><td><code>file-access</code>: <code>read</code>, <code>write</code>, <code>execute</code></td></tr>
 <tr><td><code>func</code></td><td><code>inventory</code></td><td><code>length</code>, <code>validate-qty</code>, <code>lookup-sku</code>, <code>ratio</code>, …</td></tr>
 <tr><td><code>resource</code></td><td><code>shopping</code> / <code>cart</code></td><td>State per cart; <code>constructor</code>, <code>line-count</code>, <code>add-line</code> (uses <code>inventory</code>.<code>line-item</code>)</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
-<p>How you call exports from Rib is in <a href="guide.html#1-instance-and-calling-exports">§1</a>: <code>let my-instance = instance();</code> then <code>my-instance.lookup-sku(...)</code>, etc. WIT export names use kebab-case after the dot.</p>
-<hr />
+<p>How you call exports from Rib is in <a href="#1-instance-and-calling-exports">§1</a>: <code>let my-instance = instance();</code> then <code>my-instance.lookup-sku(...)</code>, etc. WIT export names use kebab-case after the dot.</p>
+<hr>
 <h2 id="1-instance-and-calling-exports"><a class="header" href="#1-instance-and-calling-exports">1. <code>instance()</code> and calling exports</a></h2>
 <p>What <code>instance()</code> is (plain version): Your host (REPL, test harness, etc.) has already loaded the Wasm component your WIT describes. <code>instance()</code> is the one call that says: “hand me the live object I should send export calls to.” Give that object a <code>let</code> name that reads nicely to you—this guide uses <code>my-instance</code> because it sits right next to <code>instance()</code> and stays easy to spot in snippets. Then call exports with dot syntax, same rhythm as methods on a value in Rust.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
+
 my-instance.lookup-sku(7)
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>That’s the whole pattern: one binding from <code>instance()</code>, then <code>that-name.export-name(…)</code>. Export names come from WIT and are usually kebab-case (<code>lookup-sku</code>, <code>format-stage</code>, …). Hyphens in <code>let</code> names are fine too (<code>store-main</code>, <code>lane-a</code>, …) if you prefer that style.</p>
-<p>More calls against <a href="example-wit.html"><code>example.wit</code></a> → <code>inventory</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<p>More calls against <a href="#example-wit-examplewit"><code>example.wit</code></a> → <code>inventory</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
 
 let d = my-instance.length({ x: 3, y: -4 });
+
 let blurb = my-instance.format-stage(draft);
-let label = my-instance.lookup-sku(42); // `option&lt;string&gt;`
+
+let label = my-instance.lookup-sku(42); // option&lt;string&gt;
+
 let half = my-instance.ratio(9, 2);
+
 let row = my-instance.make-item("pencil", 5u32);
+
 let caps = my-instance.describe-access({ read, write });
-<span class="boring">}</span></code></pre></pre>
-<p><em>For <code>lookup-sku</code>, you often follow with <code>match</code> on <code>option</code>—see <a href="guide.html#sec-9-1">§9.1</a>.</em></p>
-<p>Resources (e.g. <code>shopping</code>’s <code>cart</code> in the same world) use the same pattern: <code>let shopping-cart = my-instance.cart("checkout-1");</code> then <code>shopping-cart.add-line(…)</code>. Details in <a href="guide.html#16-wit-resources">§16 <em>WIT resources</em></a>.</p>
-<p>Exact lowering still depends on your embedder; <code>example.wit</code> is the reference. A richer <code>cart</code> API in compiler tests is linked from <a href="guide.html#16-wit-resources">§16</a>.</p>
-<hr />
+<span class="boring">}</span></code></pre>
+<p><em>For <code>lookup-sku</code>, you often follow with <code>match</code> on <code>option</code>—see <a href="#sec-9-1">§9.1</a>.</em></p>
+<p>Resources (e.g. <code>shopping</code>’s <code>cart</code> in the same world) use the same pattern: <code>let shopping-cart = my-instance.cart("checkout-1");</code> then <code>shopping-cart.add-line(…)</code>. Details in <a href="#16-wit-resources">§16 <em>WIT resources</em></a>.</p>
+<p>Exact lowering still depends on your embedder; <code>example.wit</code> is the reference. A richer <code>cart</code> API in compiler tests is linked from <a href="#16-wit-resources">§16</a>.</p>
+<hr>
 <h2 id="2-programs-blocks-and-semicolons"><a class="header" href="#2-programs-blocks-and-semicolons">2. Programs, blocks, and semicolons</a></h2>
 <p>A Rib <strong>program</strong> is a sequence of expressions separated by <strong><code>;</code></strong>. The value of the whole program is the <strong>last</strong> expression (REPLs usually print that).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let x = 1;
+
 let y = 2;
+
 x + y
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>A <strong>block</strong> is <code>{</code> … <code>}</code> containing its own <code>;</code>-separated Rib program:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let z = {
   let a = 10;
+
   a + 1
 };
+
 z
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<hr>
 <h2 id="3-comments"><a class="header" href="#3-comments">3. Comments</a></h2>
 <ul>
 <li><strong>Line:</strong> <code>//</code> and <code>///</code></li>
 <li><strong>Block:</strong> <code>/* … */</code> and doc-style <code>/** … */</code></li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// one line
 
 /* block
    comment */
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<hr>
 <h2 id="4-literals-and-wave-shaped-values"><a class="header" href="#4-literals-and-wave-shaped-values">4. Literals and Wave-shaped values</a></h2>
-<p>Scalars and structured values use <strong>Wasm Wave</strong> text rules. The right column ties each shape to <strong><a href="example-wit.html"><code>example.wit</code></a></strong> (<code>inventory</code>).</p>
-<div class="table-wrapper"><table><thead><tr><th>Kind</th><th>Examples</th><th>From <code>inventory</code> (when relevant)</th></tr></thead><tbody>
+<p>Scalars and structured values use <strong>Wasm Wave</strong> text rules. The right column ties each shape to <strong><a href="#example-wit-examplewit"><code>example.wit</code></a></strong> (<code>inventory</code>).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Kind</th><th>Examples</th><th>From <code>inventory</code> (when relevant)</th></tr>
+</thead>
+<tbody>
 <tr><td>Boolean</td><td><code>true</code>, <code>false</code></td><td>Conditions, e.g. with <strong><code>validate-qty</code></strong> (<code>u32</code> → <code>bool</code>)</td></tr>
 <tr><td>Integer</td><td><code>0</code>, <code>-42</code>, <code>42u32</code></td><td><code>qty</code> is <code>u32</code>; point fields are <code>s32</code></td></tr>
 <tr><td>String</td><td><code>"hello"</code></td><td><code>sku</code> values</td></tr>
@@ -300,226 +358,269 @@ z
 <tr><td>Flags</td><td><code>{ read, write }</code></td><td>A <strong><code>file-access</code></strong> value (subset of <code>read</code>, <code>write</code>, <code>execute</code>)</td></tr>
 <tr><td><code>option</code></td><td><code>none</code>, <code>some("ink")</code></td><td>Same shape as <strong><code>lookup-sku</code></strong> result</td></tr>
 <tr><td><code>result</code></td><td><code>ok(7)</code>, <code>err("div0")</code></td><td>Same shape as <strong><code>ratio</code></strong> result</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
-<hr />
+<hr>
 <h2 id="5-types-and-annotations"><a class="header" href="#5-types-and-annotations">5. Types and annotations</a></h2>
 <p>Rib is <strong>statically typed</strong> against the <strong>WIT</strong> you register with the compiler.</p>
 <p><strong>Type ascription</strong> on an expression: <strong><code>expr : type</code></strong>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let n: s32 = 40;
+
 let m: s32 = n + 2;
+
 m
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Common <strong>scalar</strong> type names: <code>bool</code>, <code>s8</code>, <code>u8</code>, <code>s16</code>, <code>u16</code>, <code>s32</code>, <code>u32</code>, <code>s64</code>, <code>u64</code>, <code>f32</code>, <code>f64</code>, <code>char</code>, <code>string</code>.</p>
 <p><strong>Compound</strong> types: <code>list&lt;string&gt;</code>, <code>tuple&lt;s32, string&gt;</code>, <code>option&lt;u64&gt;</code>, <code>result</code> / <code>result&lt;string, string&gt;</code>, etc.</p>
-<hr />
+<p><a id="type-inference-sketch"></a></p>
+<h3 id="type-inference-sketch-1"><a class="header" href="#type-inference-sketch-1">Type inference (sketch)</a></h3>
+<p>Most types are <strong>fixed by WIT</strong>: <code>instance()</code>, export signatures, and the Wave-shaped literals you build. Inference does not stop at a single left-to-right pass: the checker <strong>propagates constraints in both directions</strong> (calls, <code>let</code>, literals, and return positions) and <strong>re-runs to a fixed point</strong>—it keeps tightening until nothing more can be learned or it finds a contradiction. That <strong>best-effort</strong> cycle is what lets you <strong>omit explicit <code>: type</code> annotations</strong> most of the time: Rib keeps reconciling partial information until the line agrees with your WIT.</p>
+<p>In a <strong>REPL</strong> with <strong>tab completion</strong> wired to the loaded component, stubs and signatures already sit on the right WIT types, so short expressions <strong>usually “just work”</strong> without you spelling widths by hand.</p>
+<p>When you omit an annotation on <strong><code>let</code></strong>, <strong>integer literals</strong> (<code>1</code>, <code>42</code>, …) still need a concrete width (<code>u8</code>, <code>u16</code>, <code>u32</code>, …). Those literals are <strong>pulled</strong> toward whatever <strong><code>func</code></strong> arguments and surrounding expressions require.</p>
+<p>Against <a href="#example-wit-examplewit"><code>example.wit</code></a>, <code>inventory</code> includes <strong><code>validate-qty: func(qty: u32) -&gt; bool</code></strong>. So in:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let my-instance = instance();
+
+let x = 1;
+
+my-instance.validate-qty(x)
+<span class="boring">}</span></code></pre>
+<p><strong><code>x</code></strong> is inferred as <strong><code>u32</code></strong>, because that is what <strong><code>validate-qty</code></strong> expects. The same idea applies to other calls: <strong><code>instance()</code></strong> pins the component API, and argument positions <strong>pull</strong> the types they need from the registered <strong><code>func</code></strong> signatures (including the right <strong>integer width</strong> among <code>u8</code>, <code>u16</code>, <code>u32</code>, … when a plain literal is passed).</p>
+<p><strong>Longer Rib programs</strong> (many bindings, nested control flow, or heavy overloading-style ambiguity) give the solver <strong>less local</strong> evidence per line; you may need an occasional <strong><code>:</code></strong> annotation or a slightly more explicit literal. That is rarer at the prompt than in a big script.</p>
+<p>The <strong>full</strong> inference algorithm (unification, error messages, edge cases) is <strong>out of scope</strong> for this guide—if Rib reports a type error, read it as “this line cannot be made consistent with your WIT,” then add a <strong><code>:</code></strong> annotation or adjust literals / calls.</p>
+<hr>
 <h2 id="6-let-bindings"><a class="header" href="#6-let-bindings">6. <code>let</code> bindings</a></h2>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let answer = 42;
-let labeled: u64 = 7u64;
-<span class="boring">}</span></code></pre></pre>
+
+let labeled: u32 = 7u32;
+<span class="boring">}</span></code></pre>
 <p>Bindings from earlier lines <strong>stay in scope</strong> in a REPL session until cleared.</p>
-<hr />
+<hr>
 <h2 id="7-operators"><a class="header" href="#7-operators">7. Operators</a></h2>
 <p>Binary operators (with usual precedence grouping in Rib): <strong><code>+</code> <code>-</code> <code>*</code> <code>/</code></strong>, comparisons <strong><code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></strong>, and <strong><code>&amp;&amp;</code> <code>||</code></strong>. Unary <strong><code>!</code></strong>.</p>
 <p><strong>Chaining:</strong> Rib also has suffix forms for indexing, field-like segments, ranges, and further binary ops on the right—see the full grammar in <code>rib-lang/README.md</code> for <code>rib_suffix</code> / <code>segment_suffix</code> / <code>range_suffix</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let xs = [1, 2, 3];
 xs[0] == 1
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<hr>
 <h2 id="8-if--then--else"><a class="header" href="#8-if--then--else">8. <code>if</code> / <code>then</code> / <code>else</code></a></h2>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>if score &gt; 10u64 then "win" else "lose"
-<span class="boring">}</span></code></pre></pre>
-<p>All three parts are expressions and must type-check together.</p>
-<hr />
+</span>if score &gt; 10 then "win" else "lose"
+<span class="boring">}</span></code></pre>
+<p>All three parts are expressions and must type-check together. <strong><code>score</code></strong> should match your comparison (e.g. <strong><code>u32</code></strong> from WIT); a plain literal <strong><code>10</code></strong> is fine once types line up.</p>
+<hr>
 <h2 id="9-match-and-patterns"><a class="header" href="#9-match-and-patterns">9. <code>match</code> and patterns</a></h2>
-<p><code>match</code> chooses an arm by <strong>pattern</strong> on a value. Arms are <strong><code>pattern =&gt; expr</code></strong>, separated by commas, inside <code>{ }</code>.<br />
-Below, types come from <strong><a href="example-wit.html"><code>example.wit</code></a></strong> → <strong><code>inventory</code></strong>. Rib uses <strong>Wave-shaped</strong> literals and <strong>WIT-derived</strong> constructor / case names (often <strong>kebab-case</strong> where the WIT used hyphens).</p>
+<p><code>match</code> chooses an arm by <strong>pattern</strong> on a value. Arms are <strong><code>pattern =&gt; expr</code></strong>, separated by commas, inside <code>{ }</code>.<br>Below, types come from <strong><a href="#example-wit-examplewit"><code>example.wit</code></a></strong> → <strong><code>inventory</code></strong>. Rib uses <strong>Wave-shaped</strong> literals and <strong>WIT-derived</strong> constructor / case names (often <strong>kebab-case</strong> where the WIT used hyphens).</p>
 <p><a id="sec-9-1"></a></p>
 <h3 id="91-option--eg-return-type-of-lookup-sku"><a class="header" href="#91-option--eg-return-type-of-lookup-sku">9.1 <code>option</code> — e.g. return type of <code>lookup-sku</code></a></h3>
-<p><code>lookup-sku</code> returns <code>option&lt;string&gt;</code>. <em>(<code>my-instance</code> here is just an example name—use whatever reads best for you; see <a href="guide.html#1-instance-and-calling-exports">§1</a>.)</em></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<p><code>lookup-sku</code> returns <code>option&lt;string&gt;</code>. <em>(<code>my-instance</code> here is just an example name—use whatever reads best for you; see <a href="#1-instance-and-calling-exports">§1</a>.)</em></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
+
 let label = my-instance.lookup-sku(42);
 
 match label {
   some(name) =&gt; name,
   none =&gt; "unknown"
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><a id="sec-9-2"></a></p>
 <h3 id="92-result--eg-return-type-of-ratio"><a class="header" href="#92-result--eg-return-type-of-ratio">9.2 <code>result</code> — e.g. return type of <code>ratio</code></a></h3>
 <p><code>ratio</code> returns <code>result&lt;s32, string&gt;</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
+
 let q = my-instance.ratio(10, 2);
 
 match q {
   ok(n) =&gt; n,
   err(msg) =&gt; 0
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="93-enum--order-stage-draft--placed--shipped"><a class="header" href="#93-enum--order-stage-draft--placed--shipped">9.3 <code>enum</code> — <code>order-stage</code> (<code>draft</code> | <code>placed</code> | <code>shipped</code>)</a></h3>
 <p>Enum patterns are the <strong>case names</strong> from WIT. Suppose <strong><code>s</code></strong> has type <strong><code>order-stage</code></strong> (however you obtained it—another function’s return value, etc.):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>match s {
   draft =&gt; "still editing",
   placed =&gt; "waiting to ship",
   shipped =&gt; "on the truck"
 }
-<span class="boring">}</span></code></pre></pre>
-<p>To turn a stage into a single string with a function instead of <code>match</code>, call <code>format-stage</code> (see <a href="guide.html#1-instance-and-calling-exports">§1</a>).</p>
+<span class="boring">}</span></code></pre>
+<p>To turn a stage into a single string with a function instead of <code>match</code>, call <code>format-stage</code> (see <a href="#1-instance-and-calling-exports">§1</a>).</p>
 <h3 id="94-variant--payment-info"><a class="header" href="#94-variant--payment-info">9.4 <code>variant</code> — <code>payment-info</code></a></h3>
 <p>From <strong><code>example.wit</code></strong>:</p>
 <pre><code class="language-text">variant payment-info { card(string), wallet, failed(string) }
 </code></pre>
 <p>Rib patterns use the <strong>case name</strong>; payloads go in parentheses when the case carries data:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Suppose `p` has type `payment-info` (e.g. passed in from another call).
+
 match p {
   card(last4) =&gt; "card",
   wallet =&gt; "wallet",
   failed(reason) =&gt; reason
 }
-<span class="boring">}</span></code></pre></pre>
-<p>To produce a single string from a <code>payment-info</code> value via an export, use <code>summarize-payment</code> on the same <code>instance()</code> binding you used elsewhere (<a href="guide.html#1-instance-and-calling-exports">§1</a>).</p>
+<span class="boring">}</span></code></pre>
+<p>To produce a single string from a <code>payment-info</code> value via an export, use <code>summarize-payment</code> on the same <code>instance()</code> binding you used elsewhere (<a href="#1-instance-and-calling-exports">§1</a>).</p>
 <h3 id="95-record--point-line-item"><a class="header" href="#95-record--point-line-item">9.5 <code>record</code> — <code>point</code>, <code>line-item</code></a></h3>
 <p>Field names match WIT (<code>x</code> / <code>y</code>, <code>sku</code> / <code>qty</code>):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let home = { x: 0, y: 0 };
+
 let item = { sku: "notebook", qty: 2u32 };
 
 match home {
   { x: x, y: y } =&gt; x + y
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="96-list-patterns"><a class="header" href="#96-list-patterns">9.6 <code>list</code> patterns</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>match ids {
   [only] =&gt; only,
   _ =&gt; 0
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="97-catch-all-and-aliases"><a class="header" href="#97-catch-all-and-aliases">9.7 Catch-all and aliases</a></h3>
 <ul>
-<li><strong><code>_</code></strong> — any value not covered by earlier arms (required if patterns are not exhaustive).</li>
+<li><strong><code>_</code></strong> — any value not covered by earlier arms (required when patterns would otherwise be non-exhaustive; see §9.8).</li>
 <li><strong><code>name @ pattern</code></strong> — bind the <strong>whole</strong> matched value to <strong><code>name</code></strong> while also matching <strong><code>pattern</code></strong>.</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>match home {
   p @ { x: xa, y: ya } =&gt; xa + ya
 }
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<h3 id="98-compile-time-errors-match-enums-calls"><a class="header" href="#98-compile-time-errors-match-enums-calls">9.8 Compile-time errors (<code>match</code>, enums, calls)</a></h3>
+<p>Rib reports many mistakes <strong>while compiling</strong> Rib source (REPL line or script)—<strong>before</strong> your embedder invokes Wasm. A few common cases:</p>
+<p><strong>Exhaustive <code>match</code> on variants</strong> — In <a href="#example-wit-examplewit"><code>example.wit</code></a>, <code>variant payment-info</code> has exactly <strong>three</strong> cases: <strong><code>card</code></strong>, <strong><code>wallet</code></strong>, and <strong><code>failed</code></strong> (§9.4). A <code>match</code> on a <code>payment-info</code> value must cover <strong>all</strong> of them, unless you add a <strong><code>_</code></strong> arm. If you only write arms for <strong>two</strong> of the three and omit <strong><code>_</code></strong>, Rib rejects the program at <strong>compile time</strong> with a non-exhaustive <code>match</code> error—you do not wait until runtime to discover the gap.</p>
+<p><strong>Enums</strong> — <code>order-stage</code> is only <strong><code>draft</code></strong>, <strong><code>placed</code></strong>, and <strong><code>shipped</code></strong>. A typo in a pattern (e.g. a name that is not a WIT case) or a <code>match</code> that omits a case without <strong><code>_</code></strong> is likewise a <strong>compile-time</strong> error.</p>
+<p><strong>Calls</strong> — Arguments are checked against the <strong><code>func</code></strong> signature. Example: <strong><code>validate-qty</code></strong> expects <strong><code>u32</code></strong>; passing a <strong>string</strong> or the wrong <strong>record</strong> shape to <strong><code>length</code></strong> is rejected <strong>at compile time</strong>, not as a failed Wasm call later.</p>
+<hr>
 <h2 id="10-more-call-shapes"><a class="header" href="#10-more-call-shapes">10. More call shapes</a></h2>
-<p><a href="guide.html#1-instance-and-calling-exports">§1</a> already covers <code>let my-instance = instance();</code> and dot-syntax export calls (same idea as method calls) such as <code>my-instance.lookup-sku(42)</code> and <code>my-instance.format-stage(draft)</code> against <a href="example-wit.html"><code>example.wit</code></a>.</p>
+<p><a href="#1-instance-and-calling-exports">§1</a> already covers <code>let my-instance = instance();</code> and dot-syntax export calls (same idea as method calls) such as <code>my-instance.lookup-sku(42)</code> and <code>my-instance.format-stage(draft)</code> against <a href="#example-wit-examplewit"><code>example.wit</code></a>.</p>
 <p>Other shapes you may see:</p>
 <ul>
 <li>Plain function call: <code>name(arg1, arg2)</code> for functions registered with the compiler that are not spelled as <code>receiver.</code>… exports.</li>
-<li>Qualified WIT paths (package / interface / version / export) when a short name is ambiguous: <a href="guide.html#17-qualified-wit-export-paths">§17</a>.</li>
-<li>Resources and <code>borrow</code>: construction + methods as in <a href="guide.html#16-wit-resources">§16</a>.</li>
+<li>Qualified WIT paths (package / interface / version / export) when a short name is ambiguous: <a href="#17-qualified-wit-export-paths">§17</a>.</li>
+<li>Resources and <code>borrow</code>: construction + methods as in <a href="#16-wit-resources">§16</a>.</li>
 </ul>
-<p>Exact export spelling still follows <a href="guide.html#0-example-wit-examplewit">§0</a> and your embedder’s lowering from WIT.</p>
-<hr />
+<p>Exact export spelling still follows <a href="#0-example-wit-examplewit">§0</a> and your embedder’s lowering from WIT.</p>
+<hr>
 <h2 id="11-list-comprehensions-for--yield"><a class="header" href="#11-list-comprehensions-for--yield">11. List comprehensions (<code>for</code> … <code>yield</code>)</a></h2>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>for word in ["hello", "world"] {
   yield word;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Optional <strong>statements</strong> may appear <strong>before</strong> <code>yield</code> in the <code>{ }</code> block (same idea as a small inner block).</p>
-<hr />
+<hr>
 <h2 id="12-list-aggregation-reduce--yield"><a class="header" href="#12-list-aggregation-reduce--yield">12. List aggregation (<code>reduce</code> … <code>yield</code>)</a></h2>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>reduce acc, x in [1, 2, 3] from 0 {
   yield acc + x;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Here <strong><code>acc</code></strong> is the accumulator, <strong><code>x</code></strong> is each element from the list after <strong><code>in</code></strong>, and <strong><code>from</code></strong> supplies the initial accumulator value.</p>
-<hr />
+<hr>
 <h2 id="13-records-tuples-lists-flags"><a class="header" href="#13-records-tuples-lists-flags">13. Records, tuples, lists, flags</a></h2>
 <p><strong>Record</strong> — field names and types must match WIT. From <strong><code>inventory</code></strong>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let origin: point = { x: 0, y: 0 };
 let row: line-item = { sku: "eraser", qty: 1u32 };
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Tuple:</strong> <code>(a, b, c)</code> — general syntax; your WIT may or may not expose tuples.</p>
 <p><strong>List:</strong> <code>[e1, e2, e3]</code>.</p>
 <p><strong>Flags</strong> — independent booleans from WIT; subset of the declared names. <strong><code>file-access</code></strong> allows <strong><code>read</code></strong>, <strong><code>write</code></strong>, <strong><code>execute</code></strong>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
+
 let f = { read, execute };
+
 my-instance.describe-access(f)
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<hr>
 <h2 id="14-option-and-result"><a class="header" href="#14-option-and-result">14. <code>option</code> and <code>result</code></a></h2>
 <p><strong>Construction</strong> (Wave-shaped; same shapes as <strong><code>lookup-sku</code></strong> / <strong><code>ratio</code></strong> results):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let ok-x = ok(42);
+
 let err-x = err("by-zero");
+
 let some-x = some("found");
+
 let none-x = none;
-<span class="boring">}</span></code></pre></pre>
-<p>Destruction — see <a href="guide.html#sec-9-1">§9.1</a> (<code>option</code>) and <a href="guide.html#sec-9-2">§9.2</a> (<code>result</code>) using the real <code>inventory</code> return types.</p>
-<hr />
+<span class="boring">}</span></code></pre>
+<p>Destruction — see <a href="#sec-9-1">§9.1</a> (<code>option</code>) and <a href="#sec-9-2">§9.2</a> (<code>result</code>) using the real <code>inventory</code> return types.</p>
+<hr>
 <h2 id="15-string-interpolation"><a class="header" href="#15-string-interpolation">15. String interpolation</a></h2>
 <p>Inside <code>"…"</code>, <strong><code>${</code> … <code>}</code></strong> embeds a Rib <strong>block</strong> (sequence of expressions; the block’s value is inserted).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let name = "Rib";
+
 "The language is ${name}"
-<span class="boring">}</span></code></pre></pre>
-<hr />
+<span class="boring">}</span></code></pre>
+<hr>
 <h2 id="16-wit-resources"><a class="header" href="#16-wit-resources">16. WIT resources</a></h2>
-<p><strong><a href="example-wit.html"><code>example.wit</code></a></strong> → interface <strong><code>shopping</code></strong> defines <strong><code>resource cart</code></strong>: <strong><code>constructor</code></strong>, <strong><code>line-count</code></strong>, <strong><code>add-line</code></strong>, using <strong><code>inventory</code>.<code>line-item</code></strong>. That is the <strong>small teaching surface</strong> for this repo’s docs.</p>
-<p>Rib’s own <strong>shopping-cart style</strong> tests use a larger, programmatic WIT snapshot (interface path <strong><code>golem:it/api</code></strong>, exports such as <strong><code>[constructor]cart</code></strong>, <strong><code>[method]cart.add-item</code></strong>, <strong><code>[method]cart.checkout</code></strong>, <strong><code>[drop]cart</code></strong>, …). See <strong><code>rib-lang/src/compiler/mod.rs</code></strong>, function <strong><code>get_metadata</code></strong> in the nested <strong><code>test_utils</code></strong> module (roughly the <strong><code>test_invalid_resource_*</code></strong> tests and the <strong><code>resource_export</code></strong> / <strong><code>WitExport::Interface</code></strong> block that builds the cart API).</p>
-<p>A WIT <strong><code>resource</code></strong> is a <strong>typed object</strong> you obtain from a <strong>constructor</strong> export on whatever <strong><code>instance()</code></strong> returned—same dot syntax as everything else (e.g. <strong><code>let my-instance = instance();</code></strong> then <strong><code>let shopping-cart = my-instance.cart("checkout-1");</code></strong>), then <strong>methods</strong> on <strong><code>shopping-cart</code></strong> (<code>add-line</code>, <code>line-count</code>, …, still <strong>kebab-case</strong> from WIT). Under the hood Rib lines this up with WIT’s <strong><code>borrow</code></strong> rules: the <strong>first</strong> parameter is the resource; Rib fills it in from the left-hand side of the <strong><code>.</code></strong>.</p>
+<p><a href="#example-wit-examplewit"><code>example.wit</code></a> → interface <code>shopping</code> defines <code>resource cart</code> (<code>constructor</code>, <code>line-count</code>, <code>add-line</code>, using <code>inventory</code>.<code>line-item</code>). That is the small teaching surface for this repo’s docs.</p>
+<p>For resources, use that <code>cart</code> as the pattern: you still work from whatever <code>instance()</code> returned. Call the resource constructor as an export on that value (e.g. <code>my-instance.cart("checkout-1")</code>), then use the same dot-syntax method calls on the handle as for any other export (<code>shopping-cart.add-line(…)</code>, <code>shopping-cart.line-count()</code>, …, still kebab-case from WIT). Same mental model as <code>instance</code>, so resource calls stay easy.</p>
 <p><strong>Example aligned with <code>example.wit</code> / <code>shopping</code>:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
+
 let shopping-cart = my-instance.cart("checkout-1");
+
 shopping-cart.add-line({ sku: "notebook", qty: 2u32 });
+
 shopping-cart.line-count()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Important</strong></p>
 <ul>
 <li><strong>Resource values are not arbitrary Wave text.</strong> Printing or serialising them like ordinary JSON/Wave data is <strong>not</strong> supported the same way as records and numbers; treat them as <strong>opaque</strong> at the boundary unless your embedder defines extra behaviour.</li>
 <li>Some <strong>patterns of nested construction</strong> (e.g. certain inline combinations) may be rejected by the compiler with a specific error—when in doubt, use <strong><code>let</code></strong> to name intermediate values.</li>
-<li>The <strong><code>golem:it/api</code></strong> test metadata is <strong>not</strong> the same file as <strong><code>example.wit</code></strong>; use it when you need a <strong>richer</strong> cart contract while debugging Rib itself.</li>
 </ul>
-<hr />
+<hr>
 <h2 id="17-qualified-wit-export-paths"><a class="header" href="#17-qualified-wit-export-paths">17. Qualified WIT export paths</a></h2>
 <p>When you need to disambiguate <strong>package / interface / version</strong> and <strong>function</strong>, Rib supports <strong>interface paths</strong> in the grammar, roughly:</p>
 <p><code>package-namespace:package-name / interface-name @ version . { export }</code></p>
 <p>Inner <strong>export</strong> forms include plain functions, <strong><code>[constructor]</code></strong>, <strong><code>[method]</code></strong>, <strong><code>[static]</code></strong>, <strong><code>[drop]</code></strong>, etc., as generated from your WIT. Prefer <strong><code>let my-instance = instance();</code></strong> then <strong><code>my-instance.some-export()</code></strong> (kebab-case export names) in REPLs unless you must spell the full path.</p>
-<hr />
+<hr>
 <h2 id="quick-reference-card"><a class="header" href="#quick-reference-card">Quick reference card</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>Topic</th><th>Syntax / reminder</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Topic</th><th>Syntax / reminder</th></tr>
+</thead>
+<tbody>
 <tr><td>Sequence</td><td><code>expr1; expr2; expr3</code></td></tr>
 <tr><td>Block</td><td><code>{ … }</code></td></tr>
 <tr><td>Let</td><td><code>let x = e</code> or <code>let x: T = e</code></td></tr>
+<tr><td>Inference</td><td>fixed-point over WIT; REPL tab completion (§5)</td></tr>
 <tr><td>If</td><td><code>if c then a else b</code></td></tr>
 <tr><td>Match</td><td><code>match e { pat =&gt; x, _ =&gt; y }</code></td></tr>
+<tr><td>Compile-time</td><td>Exhaustive <code>match</code>, enum case names, call arity/types vs WIT (§9.8)</td></tr>
 <tr><td>Call</td><td><code>f(a, b)</code> or <code>recv.method(a)</code></td></tr>
 <tr><td>Instance</td><td><code>let my-instance = instance();</code> then <code>my-instance.lookup-sku(7)</code> (name is yours)</td></tr>
 <tr><td>For</td><td><code>for x in xs { yield y; }</code></td></tr>
@@ -528,16 +629,16 @@ shopping-cart.line-count()
 <tr><td>Result</td><td><code>ok(x)</code>, <code>err(x)</code></td></tr>
 <tr><td>Interpolate</td><td><code>"Hello ${ name }"</code></td></tr>
 <tr><td>Resource</td><td>constructor + methods on the value; not generic Wave “print me”</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
-<p>Names in this guide default to <strong><a href="example-wit.html"><code>example.wit</code></a></strong>. For any other component, substitute the <strong>WIT</strong> you actually loaded — that is what <strong><code>rib-lang</code></strong> type-checks against.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="example-wit-examplewit"><a class="header" href="#example-wit-examplewit">Example WIT (<code>example.wit</code>)</a></h1>
+<p>Names in this guide default to <strong><a href="#example-wit-examplewit"><code>example.wit</code></a></strong>. For any other component, substitute the <strong>WIT</strong> you actually loaded — that is what <strong><code>rib-lang</code></strong> type-checks against.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="example-wit-examplewit"><a class="header" href="#example-wit-examplewit">Example WIT (<code>example.wit</code>)</a></h1>
 <p>Same file as <a href="https://github.com/golemcloud/rib/blob/main/docs/example.wit">docs/example.wit</a> in the repository. The block is WIT; the book applies TypeScript-style highlighting as a rough approximation.</p>
 <pre><code class="language-typescript">package rib:language-guide@0.1.0;
 
 // Example WIT for docs/language-guide.md (documentation only; not built by default).
-// Resource shape mirrors the shopping-cart metadata used in Rib compiler tests:
-//   rib-lang/src/compiler/mod.rs  (test_utils::get_metadata, `[constructor]cart`, …).
 
 interface inventory {
   /// Integer point (record).
@@ -638,6 +739,11 @@ world guide-demo {
 
         </div>
 
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
 
 
@@ -646,13 +752,13 @@ world guide-demo {
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
 
@@ -661,6 +767,7 @@ world guide-demo {
             window.setTimeout(window.print, 100);
         });
         </script>
+
 
     </div>
     </body>
