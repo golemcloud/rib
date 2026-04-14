@@ -1,13 +1,14 @@
 # Rib
 
-[Rib](rib-lang/README.md) is a small **expression language** with a [REPL](rib-repl/README.md) for working with **WebAssembly components** using types aligned with **WIT** . It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
-**Rib** lets you write interaction with deployed WASM components using  **short Rib expression**. 
+[Rib](rib-lang/README.md) is a small **expression language** with a [REPL](rib-repl/README.md) for working with **WebAssembly components** using types aligned with **WIT**. It supports **interactive export probing**, **lightweight validation scripts**, and **embedding** a line-oriented shell in hosts such as **Wasmtime**.
 
-It is statically typed that if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual WASM call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
+**Rib** lets you interact with deployed Wasm components using **short Rib expressions**.
 
-The runtimes can depend on `rib-repl` to quickly add a REPL to their CLI without worry about `rib-lang` at all, with full auto complete features including function argument stubs generated from WIT signatures in WASM-WAVE syntax. This will allow users to experiment with runtime with least number of mistakes (syntax, type mismatch etc)
+Rib is **statically typed**: if Rib text does not match the WIT types (wrong fields, arity, etc.), you get a **Rib compile/type error** *before* your embedding runs the actual Wasm call. Many mistakes show up there rather than only as a **failed or trapping invocation** after the fact.
 
-For the most part, the usage pattern of `rib` is through REPL, unless ruintimes choose to use `rib-lang` directly in their codebase, for example in tests or as a scripting language for users. 
+Runtimes can depend on **`rib-repl`** to add a REPL to their CLI without touching **`rib-lang`** directly, with tab completion and argument stubs generated from WIT signatures in **Wasm Wave** syntax—fewer syntax and type mistakes while experimenting.
+
+Most usage is through the **REPL**; **runtimes** can also embed **`rib-lang`** in tests or offer Rib as a small scripting surface for users.
 
 ```rust
 // define a variable `counter` and assign it to the instance of the component that's loaded by the runtime
@@ -22,7 +23,15 @@ let b = counter.increment-and-get();
 a + b
 ```
 
-**Language guide (features & examples):** [docs/language-guide.md](docs/language-guide.md) · **Grammar:** [rib-lang/README.md](rib-lang/README.md) · **REPL:** [rib-repl/README.md](rib-repl/README.md)
+## Documentation
+
+| | |
+|:---|:---|
+| [Rib language guide](https://golemcloud.github.io/rib/guide.html) | Features, REPL workflow, `instance()` and exports, `match`, resources; [§1](https://golemcloud.github.io/rib/guide.html#1-instance-and-calling-exports) is enough for many REPL sessions, the rest is reference. |
+| [Documentation index](docs/README.md) | Links to the hosted guide, `example.wit`, and grammar. |
+| [Grammar (EBNF)](rib-lang/README.md) | Formal syntax for implementers and tooling. |
+| [REPL](rib-repl/README.md) | Session behaviour, commands, and embedding notes. |
+
 ---
 
 ## Component model, WIT, and execution context
@@ -44,7 +53,7 @@ a + b
 
 **`rib-lang` without the REPL** — Supply analysed exports and types, register them, run the parse/check/compile/interpret pipeline, and implement the interpreter’s invocation hook. **`rib-repl`** is the reference embedding for an interactive session on top of the same stack.
 
-**Wasm Wave** — Uses [`wasm-wave`](https://github.com/bytecodealliance/wasm-wave) for parsing and printing many component values in the shared textual format. Resource **handles** are not generally serialisable as arbitrary Wave text; APIs reflect that limitation.
+**Wasm Wave** — Uses [`wasm-wave`](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave) for parsing and printing many component values in the shared textual format. Resource **handles** are not generally serialisable as arbitrary Wave text; APIs reflect that limitation.
 
 ---
 
@@ -52,13 +61,21 @@ a + b
 
 Rib is expression-oriented: literals, records, lists, `let`, conditionals, `match`, calls (including WIT-style qualified export paths), `option` / `result`, comprehensions, and related forms. The **syntax is close to Rust**; **value text** follows **Wasm Wave**, so Rust and Wasm-component authors have little extra surface to learn. The **`rib-repl`** front end adds **tab completion**, including **call completions** that can insert **Wave-shaped placeholder arguments** typed from each export’s **WIT** signature. Rib is intended for **orchestration and exploration**, not as a replacement for full application languages.
 
-Formal grammar: [rib-lang/README.md](rib-lang/README.md). REPL behaviour: [rib-repl/README.md](rib-repl/README.md).
+See **[Documentation](#documentation)** above for the language guide, grammar, and REPL docs.
 
 ---
 
 ## History
 
 Rib was first developed for **[Golem Cloud](https://www.golem.cloud/)** against WIT-described components. **`rib-lang`** and **`rib-repl`** are published independently so any Component Model host or tool chain can reuse the same implementation.
+
+### Why the name “Rib”?
+
+No, not the bone—and not an acronym someone reverse-engineered at 2 a.m.
+
+In **pottery**, a **rib** is the modest little paddle (wood, metal, rubber—pick your vibe) that **extends your hand** on the wheel: you smooth the wobbles, firm up the walls, and stop pretending five thumbs are a finishing strategy. Clay spins; the rib keeps you honest.
+
+**Rib** the language stole that job description. Components and **WIT** are the spinning part; Rib is the **small tool at the boundary** that helps you **shape** exports, nudge values into place, and file off the rough bits. Same energy: craft, not chaos.
 
 ---
 
