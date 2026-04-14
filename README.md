@@ -28,7 +28,6 @@ a + b
 | | |
 |:---|:---|
 | [Rib language guide](https://golemcloud.github.io/rib/guide.html) | Features, REPL workflow, `instance()` and exports, `match`, resources; [§1](https://golemcloud.github.io/rib/guide.html#1-instance-and-calling-exports) is enough for many REPL sessions, the rest is reference. |
-| [Documentation index](docs/README.md) | Links to the language guide, `example.wit`, and grammar. |
 | [Grammar (EBNF)](rib-lang/README.md) | Formal syntax for implementers and tooling. |
 | [REPL](rib-repl/README.md) | Session behaviour, commands, and embedding notes. |
 
