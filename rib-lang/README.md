@@ -62,6 +62,7 @@ An embedding already holds a **`wasmtime::component::Instance`** (or equivalent)
 
 ## Further reading
 
+- **[Rib language guide](../docs/language-guide.md)** — usage, examples, resources, `for` / `reduce`  
 - [WebAssembly Component Model — introduction](https://component-model.bytecodealliance.org/)  
 - [WIT](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)  
 - [Wasm Wave](https://github.com/bytecodealliance/wasm-wave)  

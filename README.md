@@ -22,7 +22,7 @@ let b = counter.increment-and-get();
 a + b
 ```
 
-Find more details: [language](rib-lang/README.md) and [REPL](rib-repl/README.md)
+**Language guide (features & examples):** [docs/language-guide.md](docs/language-guide.md) · **Grammar:** [rib-lang/README.md](rib-lang/README.md) · **REPL:** [rib-repl/README.md](rib-repl/README.md)
 ---
 
 ## Component model, WIT, and execution context
