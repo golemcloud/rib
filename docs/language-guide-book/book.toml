@@ -9,5 +9,9 @@ build-dir = "book"
 
 [output.html]
 default-theme = "rust"
+# Project Pages URL is https://golemcloud.github.io/rib/ — required for sidebar TOC links, search, and 404.
+site-url = "/rib/"
 git-repository-url = "https://github.com/golemcloud/rib"
 edit-url-template = "https://github.com/golemcloud/rib/edit/main/docs/language-guide.md"
+# In-page headings in the left sidebar (mdBook ≥ 0.5; default true — set explicitly for clarity).
+sidebar-header-nav = true

@@ -2,6 +2,8 @@
 
 `rib-lang` implements **Rib**: a compact expression language aligned with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) and **WIT**-shaped types, with value text compatible with **[Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)** where applicable. The crate provides the full pipeline—**parse**, **type inference**, **checking against embedder-supplied export metadata**, **compile**, and **interpret**—so component hosts can offer typed scripting without maintaining a parallel type system.
 
+**Language guide:** [golemcloud.github.io/rib/guide.html](https://golemcloud.github.io/rib/guide.html) — `instance()`, export calls, `match`, resources, comprehensions, and the teaching [`example.wit`](https://github.com/golemcloud/rib/blob/main/docs/example.wit).
+
 **Familiarity** — Rib’s **syntax is deliberately Rust-like** (`let`, `match`, blocks, calls, records, string syntax). Authors comfortable with Rust typically write well-formed Rib quickly. **Runtime literals** (records, lists, scalars, `option`, `result`, etc.) follow **Wasm Wave** text rules, so experience with the Wasm **component / WIT / Wave** stack carries over directly.
 
 ---

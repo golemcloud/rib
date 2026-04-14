@@ -5,7 +5,7 @@ The canonical source is **[`../language-guide.md`](../language-guide.md)**. This
 ## Local build
 
 ```bash
-cargo install mdbook --locked   # once
+cargo install mdbook --version 0.5.2   # once; 0.5+ adds in-page headings in the sidebar (matches CI)
 cd docs/language-guide-book
 chmod +x build.sh
 ./build.sh
