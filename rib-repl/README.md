@@ -10,8 +10,8 @@ Example: Once the component is loaded, the following will result in `3`, if the 
 
 ```
 >>> let a = instance();
->>> let b = a.increment_and_get();
->>> let c = a.increment_and_get();
+>>> let b = a.increment-and-get();
+>>> let c = a.increment-and-get();
 >>> b + c
 ```
 

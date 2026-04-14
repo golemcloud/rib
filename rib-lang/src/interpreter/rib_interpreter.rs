@@ -3372,7 +3372,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
+            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. Rib does not currently support disambiguating worker method names across interfaces. interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3494,7 +3494,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
+            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. Rib does not currently support disambiguating worker method names across interfaces. interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3542,7 +3542,7 @@ mod tests {
 
         assert_eq!(
             compiled,
-            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages; use a fully qualified WIT call site to disambiguate: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
+            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages. Rib does not currently support disambiguating worker method names in this case. Conflicting exports: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
         );
     }
 

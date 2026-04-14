@@ -292,7 +292,7 @@ fn search_function_in_single_package(
         interfaces.sort();
 
         Err(format!(
-            "multiple interfaces contain function '{function_name}'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{{fn}}). interfaces: {}",
+            "multiple interfaces contain function '{function_name}'. Rib does not currently support disambiguating worker method names across interfaces. interfaces: {}",
             interfaces.join(", ")
         ))
     }
@@ -303,7 +303,7 @@ fn search_function_in_multiple_packages(
     package_map: HashMap<Option<PackageName>, HashSet<Option<InterfaceName>>>,
 ) -> Result<Function, String> {
     let mut error_msg = format!(
-        "function '{function_name}' exists in multiple packages; use a fully qualified WIT call site to disambiguate: "
+        "function '{function_name}' exists in multiple packages. Rib does not currently support disambiguating worker method names in this case. Conflicting exports: "
     );
 
     let mut package_interface_list = package_map
