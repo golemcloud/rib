@@ -2,8 +2,7 @@
 
 | Guide | Description |
 |-------|-------------|
-| [**Rib language guide**](language-guide.md) | Features, syntax, and usage patterns; reads alongside **`example.wit`**. |
-| [**Example WIT**](example.wit) | World **`guide-demo`**: **`inventory`** (records, enums, …) and **`shopping`** (`resource cart`); see guide **§0** / **§16**. |
-| [**Language guide → static site**](language-guide-book/README.md) | Build the same markdown as an **mdBook** site (local HTML or **GitHub Pages** via **`gh-pages`**). |
+| [Rib language guide](https://golemcloud.github.io/rib/guide.html) | Syntax, patterns, and REPL-oriented usage; links to a highlighted [Example WIT](https://golemcloud.github.io/rib/example-wit.html) page in the same book. |
+| [`example.wit`](example.wit) | World `guide-demo`: `inventory` (records, enums, …) and `shopping` (`resource cart`); source in-repo, [readable in the book](https://golemcloud.github.io/rib/example-wit.html) with highlighting. |
 
 Formal grammar: [rib-lang/README.md](../rib-lang/README.md).

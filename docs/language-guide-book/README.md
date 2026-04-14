@@ -1,6 +1,6 @@
 # Language guide as a static site (mdBook)
 
-The canonical source is **[`../language-guide.md`](../language-guide.md)**. This folder builds it with **[mdBook](https://github.com/rust-lang/mdBook)** so you can host it on **GitHub Pages** or any static file host.
+The canonical source is **[`../language-guide.md`](../language-guide.md)**. This folder builds it with **[mdBook](https://github.com/rust-lang/mdBook)** so you can host it on **GitHub Pages** or any static file host. **`./build.sh`** generates **`src/example-wit.md`** from **[`../example.wit`](../example.wit)** (second sidebar chapter, highlighted in the browser) and rewrites **`example.wit`** links in the guide to that page in the built HTML.
 
 ## Local build
 

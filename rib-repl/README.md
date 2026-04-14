@@ -76,7 +76,7 @@ Although this is yet to be fully integrated, a work is in [progress](https://git
 
 ## Language reference
 
-All interactive input is **Rib** source. Start with the **[language guide](../docs/language-guide.md)**; the full EBNF grammar is in **[`rib-lang` README](../rib-lang/README.md)**.
+All interactive input is Rib source. Start with the [language guide](https://golemcloud.github.io/rib/guide.html); the full EBNF grammar is in [`rib-lang` README](../rib-lang/README.md).
 
 ---
 
