@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-32670914.js";
+            window.path_to_searchindex_js = "searchindex-1d3f980a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-5b89b1a8.js"></script>
@@ -220,14 +220,12 @@
 1
 </code></pre>
 <p>Day-to-day use stays small: <code>instance()</code>, a <code>let</code> binding (e.g. <code>let my-instance = instance();</code>), then exports with dot syntax—<a href="#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is enough to be productive. You are still speaking the component model’s types and Wasm Wave literals, not inventing a parallel schema in your head.</p>
-<h3 id="rib-in-scripts-and-beside-apis-where-the-language-earns-its-keep"><a class="header" href="#rib-in-scripts-and-beside-apis-where-the-language-earns-its-keep">Rib in scripts and beside APIs (where the language earns its keep)</a></h3>
+<h3 id="advanced-and-direct-use-of-rib-not-through-repl"><a class="header" href="#advanced-and-direct-use-of-rib-not-through-repl">Advanced and Direct use of Rib (not through REPL)</a></h3>
 <p>Rib also shines when you run a program against values that already crossed the boundary: post-process worker or component results, reshape nested <code>record</code> / <code>list</code> / <code>option</code> / <code>result</code> trees with <code>match</code> and expressions, and test structure and transformations instead of only asserting “something came back.” That is how you avoid hand-written ad-hoc checks that drift from your real WIT. Historically, runtimes such as Golem embedded Rib in API-definition YAML so a small script could reshape the HTTP-facing output of a component-backed worker—same pattern anywhere you want a typed, short script next to config rather than untyped glue.</p>
 <p>If your world is WIT, Wasmtime, and components as contracts: Rib is a compact, statically checked expression layer that stays on those types end-to-end—useful whenever you want programmable glue without leaving the WebAssembly component ecosystem.</p>
 <h3 id="about-this-guide-long-on-purpose-light-in-practice"><a class="header" href="#about-this-guide-long-on-purpose-light-in-practice">About this guide (long on purpose, light in practice)</a></h3>
 <p>We document a lot so nothing feels hidden—but Rib is not heavyweight. For REPL work especially, <a href="#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is usually enough to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a reference you reach for when you move into scripts, <code>match</code> on richer values, resources, comprehensions, or other advanced Rib—not a front-to-back assignment.</p>
-<p>If you live around Wasmtime and the component stack: Rib is meant to be a thin layer on the types you already ship—not another big platform to adopt wholesale.</p>
 <hr>
-<p>This guide lists language features you can use in scripts and in the REPL. It does not focus on embedder-specific globals (e.g. HTTP-shaped <code>request</code> inputs): those depend on how <code>rib-lang</code> is configured and may change or disappear between releases.</p>
 <p>Companion WIT — <a href="#example-wit-examplewit"><code>example.wit</code></a> exports <code>inventory</code> (records, enums, plain funcs) and <code>shopping</code> (a <code>cart</code> resource) from world <code>guide-demo</code>. Start with <a href="#1-instance-and-calling-exports">§1</a>; <a href="#0-example-wit-examplewit">§0</a> spells out the WIT if you want it on the page, and <a href="#9-match-and-patterns">§9 <em><code>match</code></em></a> onward when you need more than export calls.</p>
 <hr>
 <h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of contents</a></h2>
@@ -242,21 +240,19 @@
 <li><a href="#7-operators">Operators</a></li>
 <li><a href="#8-if--then--else"><code>if</code> / <code>then</code> / <code>else</code></a></li>
 <li><a href="#9-match-and-patterns"><code>match</code> and patterns</a></li>
-<li><a href="#10-more-call-shapes">More call shapes</a></li>
-<li><a href="#11-list-comprehensions-for--yield">List comprehensions (<code>for</code> … <code>yield</code>)</a></li>
-<li><a href="#12-list-aggregation-reduce--yield">List aggregation (<code>reduce</code> … <code>yield</code>)</a></li>
-<li><a href="#13-records-tuples-lists-flags">Records, tuples, lists, flags</a></li>
-<li><a href="#14-option-and-result"><code>option</code> and <code>result</code></a></li>
-<li><a href="#15-string-interpolation">String interpolation</a></li>
-<li><a href="#16-wit-resources">WIT resources</a></li>
-<li><a href="#17-qualified-wit-export-paths">Qualified WIT export paths</a></li>
+<li><a href="#10-list-comprehensions-for--yield">List comprehensions (<code>for</code> … <code>yield</code>)</a></li>
+<li><a href="#11-list-aggregation-reduce--yield">List aggregation (<code>reduce</code> … <code>yield</code>)</a></li>
+<li><a href="#12-records-tuples-lists-flags">Records, tuples, lists, flags</a></li>
+<li><a href="#13-option-and-result"><code>option</code> and <code>result</code></a></li>
+<li><a href="#14-string-interpolation">String interpolation</a></li>
+<li><a href="#15-invoking-resource-methods">Invoking resource methods</a></li>
 </ol>
 <hr>
 <h2 id="0-example-wit-examplewit"><a class="header" href="#0-example-wit-examplewit">0. Example WIT (<code>example.wit</code>)</a></h2>
 <p>The file <a href="#example-wit-examplewit"><code>example.wit</code></a> is documentation-only (not wired into the compiler by default), but world <code>guide-demo</code> exports two interfaces so the guide can stay in one place:</p>
 <ul>
 <li><code>inventory</code> — records, enums, variants, flags, and plain <code>func</code> exports (most examples below).</li>
-<li><code>shopping</code> — a <code>resource cart</code> (constructor + methods); see <a href="#1-instance-and-calling-exports">§1</a> and <a href="#16-wit-resources">§16</a>.</li>
+<li><code>shopping</code> — a <code>resource cart</code> (constructor + methods); see <a href="#1-instance-and-calling-exports">§1</a> and <a href="#15-invoking-resource-methods">§15</a>.</li>
 </ul>
 <div class="table-wrapper">
 <table>
@@ -302,8 +298,8 @@ let row = my-instance.make-item("pencil", 5u32);
 let caps = my-instance.describe-access({ read, write });
 <span class="boring">}</span></code></pre>
 <p><em>For <code>lookup-sku</code>, you often follow with <code>match</code> on <code>option</code>—see <a href="#sec-9-1">§9.1</a>.</em></p>
-<p>Resources (e.g. <code>shopping</code>’s <code>cart</code> in the same world) use the same pattern: <code>let shopping-cart = my-instance.cart("checkout-1");</code> then <code>shopping-cart.add-line(…)</code>. Details in <a href="#16-wit-resources">§16 <em>WIT resources</em></a>.</p>
-<p>Exact lowering still depends on your embedder; <code>example.wit</code> is the reference. A richer <code>cart</code> API in compiler tests is linked from <a href="#16-wit-resources">§16</a>.</p>
+<p>Resources (e.g. <code>shopping</code>’s <code>cart</code> in the same world) use the same pattern: <code>let shopping-cart = my-instance.cart("checkout-1");</code> then <code>shopping-cart.add-line(…)</code>. Details in <a href="#15-invoking-resource-methods">§15 <em>Invoking resource methods</em></a>.</p>
+<p>Exact lowering still depends on your embedder; <code>example.wit</code> is the reference. A richer <code>cart</code> API in compiler tests is linked from <a href="#15-invoking-resource-methods">§15</a>.</p>
 <hr>
 <h2 id="2-programs-blocks-and-semicolons"><a class="header" href="#2-programs-blocks-and-semicolons">2. Programs, blocks, and semicolons</a></h2>
 <p>A Rib <strong>program</strong> is a sequence of expressions separated by <strong><code>;</code></strong>. The value of the whole program is the <strong>last</strong> expression (REPLs usually print that).</p>
@@ -364,6 +360,7 @@ z
 <hr>
 <h2 id="5-types-and-annotations"><a class="header" href="#5-types-and-annotations">5. Types and annotations</a></h2>
 <p>Rib is <strong>statically typed</strong> against the <strong>WIT</strong> you register with the compiler.</p>
+<p>Most of the time you never need to specifically annotate the type. When you do need to, Rib allows <strong>explicit</strong> types—<strong><code>let x: T = …</code></strong> and <strong>type ascription</strong> <strong><code>expr : type</code></strong> (below).</p>
 <p><strong>Type ascription</strong> on an expression: <strong><code>expr : type</code></strong>.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -512,17 +509,7 @@ match home {
 <p><strong>Enums</strong> — <code>order-stage</code> is only <strong><code>draft</code></strong>, <strong><code>placed</code></strong>, and <strong><code>shipped</code></strong>. A typo in a pattern (e.g. a name that is not a WIT case) or a <code>match</code> that omits a case without <strong><code>_</code></strong> is likewise a <strong>compile-time</strong> error.</p>
 <p><strong>Calls</strong> — Arguments are checked against the <strong><code>func</code></strong> signature. Example: <strong><code>validate-qty</code></strong> expects <strong><code>u32</code></strong>; passing a <strong>string</strong> or the wrong <strong>record</strong> shape to <strong><code>length</code></strong> is rejected <strong>at compile time</strong>, not as a failed Wasm call later.</p>
 <hr>
-<h2 id="10-more-call-shapes"><a class="header" href="#10-more-call-shapes">10. More call shapes</a></h2>
-<p><a href="#1-instance-and-calling-exports">§1</a> already covers <code>let my-instance = instance();</code> and dot-syntax export calls (same idea as method calls) such as <code>my-instance.lookup-sku(42)</code> and <code>my-instance.format-stage(draft)</code> against <a href="#example-wit-examplewit"><code>example.wit</code></a>.</p>
-<p>Other shapes you may see:</p>
-<ul>
-<li>Plain function call: <code>name(arg1, arg2)</code> for functions registered with the compiler that are not spelled as <code>receiver.</code>… exports.</li>
-<li>Qualified WIT paths (package / interface / version / export) when a short name is ambiguous: <a href="#17-qualified-wit-export-paths">§17</a>.</li>
-<li>Resources and <code>borrow</code>: construction + methods as in <a href="#16-wit-resources">§16</a>.</li>
-</ul>
-<p>Exact export spelling still follows <a href="#0-example-wit-examplewit">§0</a> and your embedder’s lowering from WIT.</p>
-<hr>
-<h2 id="11-list-comprehensions-for--yield"><a class="header" href="#11-list-comprehensions-for--yield">11. List comprehensions (<code>for</code> … <code>yield</code>)</a></h2>
+<h2 id="10-list-comprehensions-for--yield"><a class="header" href="#10-list-comprehensions-for--yield">10. List comprehensions (<code>for</code> … <code>yield</code>)</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>for word in ["hello", "world"] {
@@ -531,7 +518,7 @@ match home {
 <span class="boring">}</span></code></pre>
 <p>Optional <strong>statements</strong> may appear <strong>before</strong> <code>yield</code> in the <code>{ }</code> block (same idea as a small inner block).</p>
 <hr>
-<h2 id="12-list-aggregation-reduce--yield"><a class="header" href="#12-list-aggregation-reduce--yield">12. List aggregation (<code>reduce</code> … <code>yield</code>)</a></h2>
+<h2 id="11-list-aggregation-reduce--yield"><a class="header" href="#11-list-aggregation-reduce--yield">11. List aggregation (<code>reduce</code> … <code>yield</code>)</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>reduce acc, x in [1, 2, 3] from 0 {
@@ -540,7 +527,7 @@ match home {
 <span class="boring">}</span></code></pre>
 <p>Here <strong><code>acc</code></strong> is the accumulator, <strong><code>x</code></strong> is each element from the list after <strong><code>in</code></strong>, and <strong><code>from</code></strong> supplies the initial accumulator value.</p>
 <hr>
-<h2 id="13-records-tuples-lists-flags"><a class="header" href="#13-records-tuples-lists-flags">13. Records, tuples, lists, flags</a></h2>
+<h2 id="12-records-tuples-lists-flags"><a class="header" href="#12-records-tuples-lists-flags">12. Records, tuples, lists, flags</a></h2>
 <p><strong>Record</strong> — field names and types must match WIT. From <strong><code>inventory</code></strong>:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -559,7 +546,7 @@ let f = { read, execute };
 my-instance.describe-access(f)
 <span class="boring">}</span></code></pre>
 <hr>
-<h2 id="14-option-and-result"><a class="header" href="#14-option-and-result">14. <code>option</code> and <code>result</code></a></h2>
+<h2 id="13-option-and-result"><a class="header" href="#13-option-and-result">13. <code>option</code> and <code>result</code></a></h2>
 <p><strong>Construction</strong> (Wave-shaped; same shapes as <strong><code>lookup-sku</code></strong> / <strong><code>ratio</code></strong> results):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -573,7 +560,7 @@ let none-x = none;
 <span class="boring">}</span></code></pre>
 <p>Destruction — see <a href="#sec-9-1">§9.1</a> (<code>option</code>) and <a href="#sec-9-2">§9.2</a> (<code>result</code>) using the real <code>inventory</code> return types.</p>
 <hr>
-<h2 id="15-string-interpolation"><a class="header" href="#15-string-interpolation">15. String interpolation</a></h2>
+<h2 id="14-string-interpolation"><a class="header" href="#14-string-interpolation">14. String interpolation</a></h2>
 <p>Inside <code>"…"</code>, <strong><code>${</code> … <code>}</code></strong> embeds a Rib <strong>block</strong> (sequence of expressions; the block’s value is inserted).</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -582,10 +569,8 @@ let none-x = none;
 "The language is ${name}"
 <span class="boring">}</span></code></pre>
 <hr>
-<h2 id="16-wit-resources"><a class="header" href="#16-wit-resources">16. WIT resources</a></h2>
-<p><a href="#example-wit-examplewit"><code>example.wit</code></a> → interface <code>shopping</code> defines <code>resource cart</code> (<code>constructor</code>, <code>line-count</code>, <code>add-line</code>, using <code>inventory</code>.<code>line-item</code>). That is the small teaching surface for this repo’s docs.</p>
-<p>For resources, use that <code>cart</code> as the pattern: you still work from whatever <code>instance()</code> returned. Call the resource constructor as an export on that value (e.g. <code>my-instance.cart("checkout-1")</code>), then use the same dot-syntax method calls on the handle as for any other export (<code>shopping-cart.add-line(…)</code>, <code>shopping-cart.line-count()</code>, …, still kebab-case from WIT). Same mental model as <code>instance</code>, so resource calls stay easy.</p>
-<p><strong>Example aligned with <code>example.wit</code> / <code>shopping</code>:</strong></p>
+<h2 id="15-invoking-resource-methods"><a class="header" href="#15-invoking-resource-methods">15. Invoking resource methods</a></h2>
+<p><a href="#example-wit-examplewit"><code>example.wit</code></a> defines <strong><code>cart</code></strong> as a <strong>resource</strong> (under <code>shopping</code>); <strong><code>add-line</code></strong> and <strong><code>line-count</code></strong> are <strong>methods</strong> on the handle. The way this works in Rib is very intuitive—see below. Same mental model as <strong><code>instance()</code></strong>, so resource calls stay easy.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let my-instance = instance();
@@ -601,11 +586,6 @@ shopping-cart.line-count()
 <li><strong>Resource values are not arbitrary Wave text.</strong> Printing or serialising them like ordinary JSON/Wave data is <strong>not</strong> supported the same way as records and numbers; treat them as <strong>opaque</strong> at the boundary unless your embedder defines extra behaviour.</li>
 <li>Some <strong>patterns of nested construction</strong> (e.g. certain inline combinations) may be rejected by the compiler with a specific error—when in doubt, use <strong><code>let</code></strong> to name intermediate values.</li>
 </ul>
-<hr>
-<h2 id="17-qualified-wit-export-paths"><a class="header" href="#17-qualified-wit-export-paths">17. Qualified WIT export paths</a></h2>
-<p>When you need to disambiguate <strong>package / interface / version</strong> and <strong>function</strong>, Rib supports <strong>interface paths</strong> in the grammar, roughly:</p>
-<p><code>package-namespace:package-name / interface-name @ version . { export }</code></p>
-<p>Inner <strong>export</strong> forms include plain functions, <strong><code>[constructor]</code></strong>, <strong><code>[method]</code></strong>, <strong><code>[static]</code></strong>, <strong><code>[drop]</code></strong>, etc., as generated from your WIT. Prefer <strong><code>let my-instance = instance();</code></strong> then <strong><code>my-instance.some-export()</code></strong> (kebab-case export names) in REPLs unless you must spell the full path.</p>
 <hr>
 <h2 id="quick-reference-card"><a class="header" href="#quick-reference-card">Quick reference card</a></h2>
 <div class="table-wrapper">
