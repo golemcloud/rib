@@ -47,8 +47,8 @@ a + b
 
 | crates.io | Responsibility |
 |-----------|----------------|
-| **`rib-lang`** | Parse Rib, infer and check types, compile, interpret; **`wit_type`**; **Wasm Wave** integration for typed value text where applicable. |
-| **`rib-repl`** | REPL session (line editor, state, commands); delegates compilation to **`rib-lang`**; requires an embedder-supplied **`ComponentFunctionInvoke`** implementation for real calls. |
+| **`rib-lang`** | Parser, type inference, compile, and interpreter of Rib |
+| **`rib-repl`** | A library that runtimes can depend to quickly integrate a REPL in their CLI  |
 
 **`rib-lang` without the REPL** — Supply analysed exports and types, register them, run the parse/check/compile/interpret pipeline, and implement the interpreter’s invocation hook. **`rib-repl`** is the reference embedding for an interactive session on top of the same stack.
 
