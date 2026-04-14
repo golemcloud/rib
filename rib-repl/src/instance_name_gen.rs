@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 // When it comes to REPL, unlike the regular Rib execution,
 // it recompiles from the start anytime to figure out the types
-// however it shouldn't result in a variable having a different instance of worker,
-// meaning different worker name. Rib internally generates a worker name at compile time
-// for instances without worker-name, i.e, `instance()` compared to `instance("my-worker")`.
+// however it shouldn't result in a variable having a different logical instance,
+// meaning a different generated instance name. Rib internally generates an instance name at compile time
+// for `instance()` compared to `instance("my-worker")`.
 pub struct ReplInstanceNameGen {
     pub instance_count: u64,
     pub worker_name_cache: HashMap<u64, String>,
@@ -35,7 +35,7 @@ impl ReplInstanceNameGen {
             return name.clone();
         }
         let uuid = uuid::Uuid::new_v4();
-        let name = format!("worker-{}-{}", self.instance_count, uuid);
+        let name = format!("instance-{}-{}", self.instance_count, uuid);
         self.worker_name_cache
             .insert(self.instance_count, name.clone());
         name

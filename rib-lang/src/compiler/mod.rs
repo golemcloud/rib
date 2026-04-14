@@ -182,7 +182,7 @@ pub struct DefaultWorkerNameGenerator;
 impl GenerateWorkerName for DefaultWorkerNameGenerator {
     fn generate_worker_name(&self) -> String {
         let uuid = uuid::Uuid::new_v4();
-        format!("worker-{uuid}")
+        format!("instance-{uuid}")
     }
 }
 

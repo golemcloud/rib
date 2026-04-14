@@ -733,7 +733,7 @@ mod internal {
                     Some(worker_id) => {
                         let value_and_type = worker_id.get_val().ok_or_else(|| {
                             internal_corrupted_state!(
-                        "expected a worker name to be present in the environment, but it was not found"
+                        "expected an instance name to be present in the environment, but it was not found"
                     )
                         })?;
 
@@ -1212,7 +1212,7 @@ mod internal {
                     .map(|x| {
                         x.get_val().ok_or_else(|| {
                             internal_corrupted_state!(
-                                "failed to get a worker variable id for function {}",
+                                "failed to get an instance variable id for function {}",
                                 function_name
                             )
                         })
@@ -1220,7 +1220,7 @@ mod internal {
                     .transpose()?
                     .ok_or_else(|| {
                         internal_corrupted_state!(
-                            "failed to find a worker with id {}",
+                            "failed to find an instance with id {}",
                             variable_id.name()
                         )
                     })?;
@@ -1230,7 +1230,7 @@ mod internal {
                         .get_literal()
                         .map(|v| v.as_string())
                         .ok_or_else(|| {
-                            internal_corrupted_state!("failed to get a worker name for variable")
+                            internal_corrupted_state!("failed to get an instance name for variable")
                         })?;
 
                 let result = interpreter_env
@@ -3328,7 +3328,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "inline invocation of functions on a worker instance is currently not supported"
+            "inline invocation of functions on an instance expression is currently not supported"
         );
     }
 
@@ -3349,7 +3349,7 @@ mod tests {
 
         let compiled = compiler.compile(expr).unwrap_err().to_string();
 
-        assert_eq!(compiled, "error in the following rib found at line 2, column 28\n`instance`\ncause: `instance` is a reserved keyword\nhelp: use `instance()` instead of `instance` to create an ephemeral worker instance.\nhelp: for a durable worker, use `instance(\"foo\")` where `\"foo\"` is the worker name\n".to_string());
+        assert_eq!(compiled, "error in the following rib found at line 2, column 28\n`instance`\ncause: `instance` is a reserved keyword\nhelp: use `instance()` instead of `instance` to create an ephemeral instance.\nhelp: for a named instance, use `instance(\"foo\")` where `\"foo\"` is the instance name\n".to_string());
     }
 
     #[test]
@@ -3372,7 +3372,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
+            "error in the following rib found at line 3, column 30\n`x.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. Rib does not currently support disambiguating instance method names across interfaces. interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3494,7 +3494,7 @@ mod tests {
 
         assert_eq!(
             compilation_error,
-            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'; disambiguate with a fully qualified WIT call (e.g. ns:pkg/interface.{fn}). interfaces: api1, api2\n".to_string()
+            "error in the following rib found at line 3, column 30\n`worker.bar(\"bar\")`\ncause: invalid function call `bar`\nmultiple interfaces contain function 'bar'. Rib does not currently support disambiguating instance method names across interfaces. interfaces: api1, api2\n".to_string()
         );
     }
 
@@ -3542,7 +3542,7 @@ mod tests {
 
         assert_eq!(
             compiled,
-            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages; use a fully qualified WIT call site to disambiguate: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
+            "error in the following rib found at line 3, column 30\n`worker.qux(\"bar\")`\ncause: invalid function call `qux`\nfunction 'qux' exists in multiple packages. Rib does not currently support disambiguating instance method names in this case. Conflicting exports: amazon:shopping-cart (interfaces: api1), wasi:clocks (interfaces: monotonic-clock)\n".to_string()
         );
     }
 
@@ -4758,8 +4758,8 @@ mod tests {
             }
         }
 
-        // The interpreter that always returns a record value consisting of function name, worker name etc
-        // for every function calls in Rib, so tests can assert the invoke target (worker name, function, args).
+        // The interpreter that always returns a record value consisting of function name, instance name, etc.
+        // for every function calls in Rib, so tests can assert the invoke target (instance name, function, args).
         pub(crate) fn interpreter_with_resource_function_invoke_impl(
             rib_input: Option<RibInput>,
         ) -> Interpreter {
@@ -5165,7 +5165,7 @@ mod tests {
             }
 
             // A pass through function simply pass through the information embedded in a function call
-            // such as function name, the worker name and the arguments used to invoke the call
+            // such as function name, the instance name and the arguments used to invoke the call
             // allowing us to cross verify if the invoke is correct
             pub(crate) fn test_deps_for_pass_through_function() -> RibTestDeps {
                 let exports = vec![WitExport::Function(WitFunction {

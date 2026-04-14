@@ -271,7 +271,7 @@ fn try_invalid_function_calls_for_node(
                 FunctionCallError::InvalidFunctionCall {
                     function_name: function_name.function.name_pretty().to_string(),
                     source_span: node.source_span.clone(),
-                    message: "function call is not associated with a wasm component. make sure component functions are called after creating an instance using `instance(<optional-worker-name>)`".to_string(),
+                    message: "function call is not associated with a wasm component. make sure component functions are called after creating an instance using `instance(<optional-name>)`".to_string(),
                 }
                 .into(),
             );
@@ -324,8 +324,8 @@ fn call_type_node_additional_detail(ct: &CallTypeNode) -> String {
         CallTypeNode::InstanceCreation(ic) => match ic {
             InstanceCreationNode::WitWorker { worker_name, .. } => {
                 let wn = worker_name
-                    .map(|_| "(worker expr)")
-                    .map_or(String::new(), |s| format!(", with worker `{s}`"));
+                    .map(|_| "(instance name expr)")
+                    .map_or(String::new(), |s| format!(", with instance name `{s}`"));
                 format!("cannot determine the type of instance creation `{wn}`")
             }
             InstanceCreationNode::WitResource {

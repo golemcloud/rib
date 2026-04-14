@@ -24,7 +24,7 @@ pub trait ComponentFunctionInvoke {
 
 // Note: Currently, the Rib interpreter supports only one component, so the
 // `RibFunctionInvoke` trait in the `golem-rib` module does not include `component_id` in
-// the `invoke` arguments. It only requires the optional worker name, function name, and arguments.
+// the `invoke` arguments. It only requires the optional instance name, function name, and arguments.
 // Once multi-component support is added, the trait will be updated to include `component_id`,
 // and we can use it directly instead of `WorkerFunctionInvoke` in the `golem-rib-repl` module.
 pub(crate) struct ReplRibFunctionInvoke {
