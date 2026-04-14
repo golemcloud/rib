@@ -1,6 +1,6 @@
 # `rib-lang` 
 
-`rib-lang` implements **Rib**: a compact expression language aligned with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) and **WIT**-shaped types, with value text compatible with **[Wasm Wave](https://github.com/bytecodealliance/wasm-wave)** where applicable. The crate provides the full pipeline—**parse**, **type inference**, **checking against embedder-supplied export metadata**, **compile**, and **interpret**—so component hosts can offer typed scripting without maintaining a parallel type system.
+`rib-lang` implements **Rib**: a compact expression language aligned with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) and **WIT**-shaped types, with value text compatible with **[Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)** where applicable. The crate provides the full pipeline—**parse**, **type inference**, **checking against embedder-supplied export metadata**, **compile**, and **interpret**—so component hosts can offer typed scripting without maintaining a parallel type system.
 
 **Familiarity** — Rib’s **syntax is deliberately Rust-like** (`let`, `match`, blocks, calls, records, string syntax). Authors comfortable with Rust typically write well-formed Rib quickly. **Runtime literals** (records, lists, scalars, `option`, `result`, etc.) follow **Wasm Wave** text rules, so experience with the Wasm **component / WIT / Wave** stack carries over directly.
 
@@ -67,7 +67,7 @@ Most people meet Rib in a **REPL**; **`rib-lang`** is also for **embedding** in 
 - **[Rib language guide](../docs/language-guide.md)** — usage, examples, resources, `for` / `reduce`  
 - [WebAssembly Component Model — introduction](https://component-model.bytecodealliance.org/)  
 - [WIT](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)  
-- [Wasm Wave](https://github.com/bytecodealliance/wasm-wave)  
+- [Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)  
 - Repository overview: [README.md](../README.md)  
 - REPL built on this crate: [rib-repl/README.md](../rib-repl/README.md)  
 

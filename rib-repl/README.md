@@ -19,7 +19,7 @@ Example: Once the component is loaded, the following will result in `3`, if the 
 
 **Rust-shaped surface** — Rib’s syntax is similar to Rust's to some extent, to make it easy for Rust developers to pick up. Those who are into webassembly and WIT will find familiar constructs like records, variants, lists, `option`, and `result` in the same style as Wasm Wave. The syntax is not a full Rust subset; it is designed for interactive exploration of component exports rather than general-purpose programming.
 
-**Wasm Wave literals** — Concrete values in Rib use the same **textual conventions as [Wasm Wave](https://github.com/bytecodealliance/wasm-wave)** (via `rib-lang` and `wasm-wave`). Anyone already using Wave or WIT in the Wasm toolchain should recognise record, list, `option`, `result`, and scalar syntax without learning a Rib-specific literal format.
+**Wasm Wave literals** — Concrete values in Rib use the same **textual conventions as [Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)** (via `rib-lang` and `wasm-wave`). Anyone already using Wave or WIT in the Wasm toolchain should recognise record, list, `option`, `result`, and scalar syntax without learning a Rib-specific literal format.
 
 **Tab completion and argument stubs** — The REPL is built around **`rustyline`** completion (`rib_edit.rs`). Besides export and identifier completion, when the user completes a **call** (for example after typing `(` on a resolved function or method), the editor can offer a **full argument list** filled with **type-correct placeholder values**: `value_generator::generate_value` walks each parameter’s **`WitType`** and builds a **`ValueAndType`**, then formats it with the same Wave-style printing used elsewhere. Those stubs are meant to be edited, not final logic—but they **satisfy the WIT signature** so exploration starts from a well-typed skeleton.
 
@@ -41,7 +41,7 @@ After load, component authors and runtime integrators routinely need to:
 
 - Exercise exports with **realistic** `record`, `variant`, `list`, and `result` values without a new Rust `main` per experiment.
 - Retain **one instance** while calling constructors, methods, or other stateful exports in sequence.
-- Reuse **[Wasm Wave](https://github.com/bytecodealliance/wasm-wave)**-compatible value text where possible instead of bespoke string formats.
+- Reuse **[Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)**-compatible value text where possible instead of bespoke string formats.
 
 `rib-repl` packages those requirements behind **`RibRepl::bootstrap`** / **`RibReplConfig`**: link the crate, implement **`ComponentFunctionInvoke`**, supply dependency loading, and obtain a `rustyline`-driven loop on top of the same **`rib`** pipeline tests may invoke directly.
 

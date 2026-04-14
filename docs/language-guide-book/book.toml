@@ -1,0 +1,13 @@
+[book]
+title = "Rib language guide"
+description = "Rib: a small expression language for WebAssembly components"
+authors = ["Rib contributors"]
+language = "en"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "rust"
+git-repository-url = "https://github.com/golemcloud/rib"
+edit-url-template = "https://github.com/golemcloud/rib/edit/main/docs/language-guide.md"

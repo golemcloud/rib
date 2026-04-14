@@ -28,7 +28,7 @@ a + b
 | | |
 |:---|:---|
 | **[Rib language guide](docs/language-guide.md)** | Features, REPL-first workflow, **`instance()`** and export calls, **`match`**, resources, and more—written so **§0–§2** are enough for many sessions; the rest is **reference**. |
-| **[Documentation index](docs/README.md)** | Links to the language guide and teaching **[`example.wit`](docs/example.wit)**. |
+| **[Documentation index](docs/README.md)** | Links to the language guide, **`example.wit`**, and **[building the guide as a site](docs/language-guide-book/README.md)**. |
 | **[Grammar (EBNF)](rib-lang/README.md)** | Formal syntax for implementers and tooling. |
 | **[REPL](rib-repl/README.md)** | Session behaviour, commands, and embedding notes. |
 
@@ -53,7 +53,7 @@ a + b
 
 **`rib-lang` without the REPL** — Supply analysed exports and types, register them, run the parse/check/compile/interpret pipeline, and implement the interpreter’s invocation hook. **`rib-repl`** is the reference embedding for an interactive session on top of the same stack.
 
-**Wasm Wave** — Uses [`wasm-wave`](https://github.com/bytecodealliance/wasm-wave) for parsing and printing many component values in the shared textual format. Resource **handles** are not generally serialisable as arbitrary Wave text; APIs reflect that limitation.
+**Wasm Wave** — Uses [`wasm-wave`](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave) for parsing and printing many component values in the shared textual format. Resource **handles** are not generally serialisable as arbitrary Wave text; APIs reflect that limitation.
 
 ---
 

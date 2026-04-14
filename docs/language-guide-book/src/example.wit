@@ -1,0 +1,85 @@
+package rib:language-guide@0.1.0;
+
+// Example WIT for docs/language-guide.md (documentation only; not built by default).
+// Resource shape mirrors the shopping-cart metadata used in Rib compiler tests:
+//   rib-lang/src/compiler/mod.rs  (test_utils::get_metadata, `[constructor]cart`, …).
+
+interface inventory {
+  /// Integer point (record).
+  record point {
+    x: s32,
+    y: s32,
+  }
+
+  /// Stock line (record with string + integer).
+  record line-item {
+    sku: string,
+    qty: u32,
+  }
+
+  /// Order lifecycle (enum — mutually exclusive named cases).
+  enum order-stage {
+    draft,
+    placed,
+    shipped,
+  }
+
+  /// Payment outcome (variant — tagged union with different payloads).
+  variant payment-info {
+    card(string),
+    wallet,
+    failed(string),
+  }
+
+  /// Permission bits (flags — independent booleans).
+  flags file-access {
+    read,
+    write,
+    execute,
+  }
+
+  /// Manhattan distance from origin: |x| + |y|
+  length: func(p: point) -> s32;
+
+  /// True if quantity is under 1000 (example predicate).
+  validate-qty: func(qty: u32) -> bool;
+
+  /// Optional product label for an id.
+  lookup-sku: func(id: s32) -> option<string>;
+
+  /// Integer division, or an error message.
+  ratio: func(a: s32, b: s32) -> result<s32, string>;
+
+  /// Render enum as a short label.
+  format-stage: func(stage: order-stage) -> string;
+
+  /// Describe a payment variant as text.
+  summarize-payment: func(p: payment-info) -> string;
+
+  /// Construct a line item from parts.
+  make-item: func(sku: string, qty: u32) -> line-item;
+
+  /// Toy summary of which flags are set (embedding may return any string).
+  describe-access: func(f: file-access) -> string;
+}
+
+/// Shopping-cart style **resource** (per-cart state, constructor, methods).
+/// Rib: e.g. `let my-instance = instance();` then `let store-main = my-instance.cart("store-main");` → `store-main.add-line` / `line-count` (kebab exports).
+interface shopping {
+  use inventory.{line-item};
+
+  resource cart {
+    /// Host may treat this string as a logical cart key (e.g. store or session id).
+    constructor(id: string);
+
+    /// Illustrative counter — embedder returns how many lines were added for this cart.
+    line-count: func() -> u32;
+
+    add-line: func(item: line-item);
+  }
+}
+
+world guide-demo {
+  export inventory;
+  export shopping;
+}

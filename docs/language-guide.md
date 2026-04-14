@@ -1,16 +1,14 @@
 # Rib language guide
 
-Rib is a small **expression language** for **WebAssembly components**: types follow **WIT**, and many **literals** use **[Wasm Wave](https://github.com/bytecodealliance/wasm-wave)** text. The **WebAssembly** ecosystem sits mostly next to **Rust**, and we want people who already live there to feel **at home quickly**. Rib’s syntax **feels familiar**—**`let`**, blocks, **`if` / `then` / `else`**, **`match`**, and **dot syntax** for calling things on the value you got from **`instance()`**—the same mental model as **method calls on an instance** in Rust, Java, C#, Kotlin, and friends—so your existing habits carry over. The **grammar itself is intentionally minimal**; treat the opening sections of this guide as a **~5 minute** orientation, not a second language to memorise.
+Rib is a small **expression language** for **WebAssembly components**: types follow **WIT**, and many **literals** use **[Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)** text. The **WebAssembly** ecosystem sits mostly next to **Rust**, and we want people who already live there to feel **at home quickly**. Rib’s syntax **feels familiar**—**`let`**, blocks, **`if` / `then` / `else`**, **`match`**, and **dot syntax** for calling things on the value you got from **`instance()`**—the same mental model as **method calls on an instance** in Rust, Java, C#, Kotlin, and friends—so your existing habits carry over. The **grammar itself is intentionally minimal**; treat the opening sections of this guide as a **~5 minute** orientation, not a second language to memorise.
 
 **Repository:** [github.com/golemcloud/rib](https://github.com/golemcloud/rib) · **Grammar (EBNF):** [rib-lang/README.md](../rib-lang/README.md)
 
-**Why “Rib”?** — Think **potter’s rib**: the tiny paddle that saves your pot from thumbprints. Here, Rib is the paddle for **components**—same idea, less clay in your keyboard. **[Full story →](../README.md#why-the-name-rib)**
-
 ### Rib at the REPL (you do not need this whole guide first)
 
-**The REPL is the main place Rib is meant to shine.** When the host has already **loaded your component’s WIT**, the prompt can **auto-complete** exports and **shape** arguments for you—almost everything you type is guided from that contract. The experience we aim for: **once you are in a wired-up REPL, you should not keep jumping back to WIT source files** for ordinary work; the session reflects the types you shipped, and you stay in flow.
+**The REPL is the main place Rib is meant to shine.** When the host has already **loaded your component**, the prompt can **auto-complete** exports and **shape** arguments for you—almost everything you type is guided from that contract. The experience we aim for: **once you are in a wired-up REPL, you should not keep jumping back to WIT source files** for ordinary work; the session reflects the types you shipped, and you stay in flow.
 
-Day-to-day use stays small: **`instance()`**, a **`let`** binding (e.g. **`let my-instance = instance();`**), then **exports** with dot syntax—**§1** is enough to be productive. You are still speaking the **component model’s** types and **Wasm Wave** literals, not inventing a parallel schema in your head.
+Day-to-day use stays small: **`instance()`**, a **`let`** binding (e.g. **`let my-instance = instance();`**), then **exports** with dot syntax—[**§1** *`instance()` and calling exports*](#1-instance-and-calling-exports) is enough to be productive. You are still speaking the **component model’s** types and **Wasm Wave** literals, not inventing a parallel schema in your head.
 
 ### Rib in scripts and beside APIs (where the language earns its keep)
 
@@ -20,7 +18,7 @@ If your world is **WIT**, **Wasmtime**, and **components as contracts**: Rib is 
 
 ### About this guide (long on purpose, light in practice)
 
-We document a lot so nothing feels hidden—but **Rib is not heavyweight**. For **REPL** work especially, **§0** (the teaching WIT at a glance), **§1** (`instance()` and calling exports), and **§2** (programs, blocks, and `;`) are usually **all you need** to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a **reference** you reach for when you move into **scripts**, **`match`** on richer values, **resources**, comprehensions, or other **advanced** Rib—not a front-to-back assignment.
+We document a lot so nothing feels hidden—but **Rib is not heavyweight**. For **REPL** work especially, [**§0** *Example WIT*](#0-example-wit-examplewit), [**§1** *`instance()` and calling exports*](#1-instance-and-calling-exports), and [**§2** *Programs, blocks, and `;`*](#2-programs-blocks-and-semicolons) are usually **all you need** to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a **reference** you reach for when you move into **scripts**, **`match`** on richer values, **resources**, comprehensions, or other **advanced** Rib—not a front-to-back assignment.
 
 If you live around **Wasmtime** and the component stack: Rib is meant to be a **thin layer** on the types you already ship—**not** another big platform to adopt wholesale.
 
@@ -28,7 +26,7 @@ If you live around **Wasmtime** and the component stack: Rib is meant to be a **
 
 This guide lists **language features** you can use in scripts and in the **REPL**. It does **not** focus on **embedder-specific globals** (e.g. HTTP-shaped `request` inputs): those depend on how `rib-lang` is configured and may change or disappear between releases.
 
-**Companion WIT** — **[`example.wit`](example.wit)** exports **`inventory`** (records, enums, plain funcs) and **`shopping`** (a **`cart`** **resource**) from world **`guide-demo`**. For a **fast path**, read **§0** then **§1** (and skim **§2** if you chain expressions); **§9** (`match`) and beyond are there when you need them.
+**Companion WIT** — **[`example.wit`](example.wit)** exports **`inventory`** (records, enums, plain funcs) and **`shopping`** (a **`cart`** **resource**) from world **`guide-demo`**. For a **fast path**, read [**§0**](#0-example-wit-examplewit) then [**§1**](#1-instance-and-calling-exports) (and skim [**§2**](#2-programs-blocks-and-semicolons) if you chain expressions); [**§9** *`match`*](#9-match-and-patterns) and beyond are there when you need them.
 
 ---
 
@@ -60,7 +58,7 @@ This guide lists **language features** you can use in scripts and in the **REPL*
 The file **[`example.wit`](example.wit)** is **documentation-only** (not wired into the compiler by default), but world **`guide-demo`** exports two interfaces so the guide can stay in one place:
 
 - **`inventory`** — records, enums, variants, flags, and plain **`func`** exports (most examples below).
-- **`shopping`** — a **`resource cart`** (constructor + methods) used in **§1** and **§16**; its shape is aligned with the **shopping-cart style** metadata in Rib’s own compiler tests (see **§16** for the path).
+- **`shopping`** — a **`resource cart`** (constructor + methods) used in [**§1**](#1-instance-and-calling-exports) and [**§16**](#16-wit-resources); its shape is aligned with the **shopping-cart style** metadata in Rib’s own compiler tests (see [**§16**](#16-wit-resources) for the path).
 
 | WIT shape | Where | Meaning |
 |-----------|--------|--------|
@@ -71,7 +69,7 @@ The file **[`example.wit`](example.wit)** is **documentation-only** (not wired i
 | `func` | `inventory` | `length`, `validate-qty`, `lookup-sku`, `ratio`, … |
 | `resource` | `shopping` / `cart` | State per cart; **`constructor`**, **`line-count`**, **`add-line`** (uses **`inventory`.`line-item`**) |
 
-How you **call** exports from Rib is in **§1**: **`let my-instance = instance();`** then **`my-instance.lookup-sku(...)`**, etc. WIT export names use **kebab-case** after the dot.
+How you **call** exports from Rib is in [**§1**](#1-instance-and-calling-exports): **`let my-instance = instance();`** then **`my-instance.lookup-sku(...)`**, etc. WIT export names use **kebab-case** after the dot.
 
 ---
 
@@ -93,15 +91,17 @@ let my-instance = instance();
 
 let d = my-instance.length({ x: 3, y: -4 });
 let blurb = my-instance.format-stage(draft);
-let label = my-instance.lookup-sku(42); // `option<string>` — often `match` (§9.1)
+let label = my-instance.lookup-sku(42); // `option<string>`
 let half = my-instance.ratio(9, 2);
 let row = my-instance.make-item("pencil", 5u32);
 let caps = my-instance.describe-access({ read, write });
 ```
 
-**Resources** (e.g. **`shopping`**’s **`cart`** in the same world) use the same pattern: **`let shopping-cart = my-instance.cart("checkout-1");`** then **`shopping-cart.add-line(…)`**. Details in **§16**.
+*For `lookup-sku`, you often follow with **`match`** on `option`—see [**§9.1**](#sec-9-1).*
 
-Exact lowering still depends on your embedder; **`example.wit`** is the reference. A richer **cart** API in compiler tests is linked from **§16**.
+**Resources** (e.g. **`shopping`**’s **`cart`** in the same world) use the same pattern: **`let shopping-cart = my-instance.cart("checkout-1");`** then **`shopping-cart.add-line(…)`**. Details in [**§16** *WIT resources*](#16-wit-resources).
+
+Exact lowering still depends on your embedder; **`example.wit`** is the reference. A richer **cart** API in compiler tests is linked from [**§16**](#16-wit-resources).
 
 ---
 
@@ -217,9 +217,11 @@ All three parts are expressions and must type-check together.
 `match` chooses an arm by **pattern** on a value. Arms are **`pattern => expr`**, separated by commas, inside `{ }`.  
 Below, types come from **[`example.wit`](example.wit)** → **`inventory`**. Rib uses **Wave-shaped** literals and **WIT-derived** constructor / case names (often **kebab-case** where the WIT used hyphens).
 
+<a id="sec-9-1"></a>
+
 ### 9.1 `option` — e.g. return type of `lookup-sku`
 
-`lookup-sku` returns `option<string>`. *(**`my-instance`** here is just an example name—use whatever reads best for you; see **§1**.)*
+`lookup-sku` returns `option<string>`. *(**`my-instance`** here is just an example name—use whatever reads best for you; see [**§1**](#1-instance-and-calling-exports).)*
 
 ```rust
 let my-instance = instance();
@@ -230,6 +232,8 @@ match label {
   none => "unknown"
 }
 ```
+
+<a id="sec-9-2"></a>
 
 ### 9.2 `result` — e.g. return type of `ratio`
 
@@ -257,7 +261,7 @@ match s {
 }
 ```
 
-To turn a stage into a single string with a **function** instead of `match`, call **`format-stage`** (see **§1**).
+To turn a stage into a single string with a **function** instead of `match`, call **`format-stage`** (see [**§1**](#1-instance-and-calling-exports)).
 
 ### 9.4 `variant` — `payment-info`
 
@@ -278,7 +282,7 @@ match p {
 }
 ```
 
-To produce a **single string** from a `payment-info` value via an export, use **`summarize-payment`** on the same **`instance()`** binding you used elsewhere (**§1**).
+To produce a **single string** from a `payment-info` value via an export, use **`summarize-payment`** on the same **`instance()`** binding you used elsewhere ([**§1**](#1-instance-and-calling-exports)).
 
 ### 9.5 `record` — `point`, `line-item`
 
@@ -317,15 +321,15 @@ match home {
 
 ## 10. More call shapes
 
-**§1** already covers **`let my-instance = instance();`** and **dot-syntax export calls** (same idea as method calls) such as **`my-instance.lookup-sku(42)`** and **`my-instance.format-stage(draft)`** against **[`example.wit`](example.wit)**.
+[**§1**](#1-instance-and-calling-exports) already covers **`let my-instance = instance();`** and **dot-syntax export calls** (same idea as method calls) such as **`my-instance.lookup-sku(42)`** and **`my-instance.format-stage(draft)`** against **[`example.wit`](example.wit)**.
 
 Other shapes you may see:
 
 - **Plain function call:** **`name(arg1, arg2)`** for functions registered with the compiler that are not spelled as **`receiver.`**… exports.
-- **Qualified WIT paths** (package / interface / version / export) when a short name is ambiguous: **§17**.
-- **Resources** and **`borrow`**: construction + methods as in **§16**.
+- **Qualified WIT paths** (package / interface / version / export) when a short name is ambiguous: [**§17**](#17-qualified-wit-export-paths).
+- **Resources** and **`borrow`**: construction + methods as in [**§16**](#16-wit-resources).
 
-Exact export **spelling** still follows **§0** and your embedder’s lowering from WIT.
+Exact export **spelling** still follows [**§0**](#0-example-wit-examplewit) and your embedder’s lowering from WIT.
 
 ---
 
@@ -387,7 +391,7 @@ let some-x = some("found");
 let none-x = none;
 ```
 
-**Destruction** — see **§9.1** (`option`) and **§9.2** (`result`) using the real **`inventory`** return types.
+**Destruction** — see [**§9.1**](#sec-9-1) (`option`) and [**§9.2**](#sec-9-2) (`result`) using the real **`inventory`** return types.
 
 ---
 
