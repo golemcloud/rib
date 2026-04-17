@@ -8,8 +8,7 @@ use crate::type_inference as ti;
 use crate::wit_type::WitType;
 use crate::{
     from_string, text, type_checker, type_inference, ComponentDependency, ComponentDependencyKey,
-    CustomInstanceSpec, DynamicParsedFunctionName, GlobalVariableTypeSpec, InferredType,
-    InstanceIdentifier, VariableId,
+    CustomInstanceSpec, DynamicParsedFunctionName, InferredType, InstanceIdentifier, VariableId,
 };
 use crate::{IntoValueAndType, ValueAndType};
 use bigdecimal::{BigDecimal, ToPrimitive};
@@ -1099,7 +1098,6 @@ impl Expr {
     pub fn infer_types(
         &mut self,
         component_dependency: &ComponentDependency,
-        global_variable_type_spec: &Vec<GlobalVariableTypeSpec>,
         custom_instance_spec: &[CustomInstanceSpec],
     ) -> Result<(), RibTypeErrorInternal> {
         let component = Arc::new(component_dependency.clone());
@@ -1119,7 +1117,6 @@ impl Expr {
                 &mut arena,
                 &mut types,
                 component.clone(),
-                global_variable_type_spec.as_slice(),
                 custom_instance_spec,
             )?;
 
@@ -1168,7 +1165,7 @@ impl Expr {
                     ti::push_types_down(root, arena, types)?;
                     ti::infer_all_identifiers(root, arena, types);
                     ti::pull_types_up(root, arena, types, component.as_ref())?;
-                    ti::infer_global_inputs(root, arena, types);
+                    ti::infer_global_inputs(root, arena, types)?;
                     ti::infer_function_call_types(
                         root,
                         arena,

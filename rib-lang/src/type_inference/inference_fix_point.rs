@@ -39,17 +39,23 @@ mod tests {
     fn test_fix_point() {
         let expr = r#"
         let x: u64 = 1;
+        let y: u64 = 2;
         if x == x then x else y
         "#;
 
         let mut expr = Expr::from_text(expr).unwrap();
 
-        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &[])
             .unwrap();
         let expected = Expr::expr_block(vec![
             Expr::let_binding_with_variable_id(
                 VariableId::local("x", 0),
                 Expr::number_inferred(BigDecimal::from(1), None, InferredType::u64()),
+                Some(TypeName::U64),
+            ),
+            Expr::let_binding_with_variable_id(
+                VariableId::local("y", 0),
+                Expr::number_inferred(BigDecimal::from(2), None, InferredType::u64()),
                 Some(TypeName::U64),
             ),
             Expr::cond(
@@ -58,7 +64,7 @@ mod tests {
                     Expr::identifier_local("x", 0, None).with_inferred_type(InferredType::u64()),
                 ),
                 Expr::identifier_local("x", 0, None).with_inferred_type(InferredType::u64()),
-                Expr::identifier_global("y", None).with_inferred_type(InferredType::u64()),
+                Expr::identifier_local("y", 0, None).with_inferred_type(InferredType::u64()),
             )
             .with_inferred_type(InferredType::u64()),
         ])

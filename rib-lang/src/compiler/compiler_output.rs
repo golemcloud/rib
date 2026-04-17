@@ -1,9 +1,9 @@
-use crate::compiler::worker_functions_in_rib::WorkerFunctionsInRib;
+use crate::compiler::worker_functions_in_rib::SideEffectFunctions;
 use crate::{RibByteCode, RibInputTypeInfo, RibOutputTypeInfo};
 
 #[derive(Debug, Clone)]
 pub struct CompilerOutput {
-    pub worker_invoke_calls: Option<WorkerFunctionsInRib>,
+    pub worker_invoke_calls: Option<SideEffectFunctions>,
     pub byte_code: RibByteCode,
     pub rib_input_type_info: RibInputTypeInfo,
     // Optional to keep backward compatible as compiler output information

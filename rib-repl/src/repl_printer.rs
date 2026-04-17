@@ -375,23 +375,6 @@ fn print_rib_compilation_error(error: &RibCompilationError) {
             println!("{} {}", "[rib static analysis error]".red(), msg.red());
         }
 
-        RibCompilationError::UnsupportedGlobalInput {
-            invalid_global_inputs: found,
-            valid_global_inputs: expected,
-        } => {
-            println!(
-                "{} {} {}",
-                "[unsupported input]".red(),
-                "found:".yellow(),
-                found.join(", ").white()
-            );
-            println!(
-                "{} {} {}",
-                "[supported inputs]".green(),
-                "expected:".yellow(),
-                expected.join(", ").white()
-            );
-        }
         RibCompilationError::RibTypeError(compilation_error) => {
             let cause = &compilation_error.cause;
             let position = &compilation_error.source_span;

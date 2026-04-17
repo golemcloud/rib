@@ -324,8 +324,17 @@ mod internal {
             }
 
             Expr::SelectField { expr, field, .. } => {
-                stack.push(ExprState::from_expr(expr.deref()));
-                instructions.push(RibIR::SelectField(field.clone()));
+                if let Expr::Identifier { variable_id, .. } = expr.as_ref() {
+                    if variable_id.is_global() && variable_id.name() == "env" {
+                        instructions.push(RibIR::LoadEnvVar(field.clone()));
+                    } else {
+                        stack.push(ExprState::from_expr(expr.deref()));
+                        instructions.push(RibIR::SelectField(field.clone()));
+                    }
+                } else {
+                    stack.push(ExprState::from_expr(expr.deref()));
+                    instructions.push(RibIR::SelectField(field.clone()));
+                }
             }
 
             Expr::SelectIndex { expr, index, .. } => match index.inferred_type().internal_type() {
@@ -1417,7 +1426,7 @@ mod compiler_tests {
         #[test]
         fn test_unknown_function() {
             let expr = r#"
-               foo(request);
+               foo(env.x);
                "success"
             "#;
 
@@ -1426,7 +1435,7 @@ mod compiler_tests {
 
             let compiler_error = compiler.compile(expr).unwrap_err().to_string();
 
-            assert_eq!(compiler_error, "error in the following rib found at line 2, column 16\n`foo(request)`\ncause: invalid function call `foo`\nunknown function\n");
+            assert_eq!(compiler_error, "error in the following rib found at line 2, column 16\n`foo(env.x)`\ncause: invalid function call `foo`\nunknown function\n");
         }
 
         #[test]
@@ -1441,7 +1450,7 @@ mod compiler_tests {
 
             let expr = Expr::from_text(expr).unwrap();
 
-            let compiler_config = RibCompilerConfig::new(metadata, vec![], vec![]);
+            let compiler_config = RibCompilerConfig::new(metadata, vec![]);
 
             let compiler = RibCompiler::new(compiler_config);
 
@@ -1463,7 +1472,7 @@ mod compiler_tests {
 
             let expr = Expr::from_text(expr).unwrap();
 
-            let compiler_config = RibCompilerConfig::new(metadata, vec![], vec![]);
+            let compiler_config = RibCompilerConfig::new(metadata, vec![]);
 
             let compiler = RibCompiler::new(compiler_config);
 
@@ -1486,7 +1495,7 @@ mod compiler_tests {
 
             let expr = Expr::from_text(expr).unwrap();
 
-            let compiler_config = RibCompilerConfig::new(metadata, vec![], vec![]);
+            let compiler_config = RibCompilerConfig::new(metadata, vec![]);
 
             let compiler = RibCompiler::new(compiler_config);
 
@@ -1498,353 +1507,10 @@ mod compiler_tests {
         }
     }
 
-    #[cfg(test)]
-    mod global_input_tests {
-        use test_r::test;
-
-        use crate::compiler::byte_code::compiler_tests::internal;
-        use crate::wit_type::{
-            case, field, list, option, r#enum, record, result, str, tuple, u32, u64, unit_case,
-            variant,
-        };
-        use crate::{Expr, RibCompiler, RibCompilerConfig};
-
-        #[test]
-        async fn test_str_global_input() {
-            let request_value_type = str();
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            let expr = r#"
-               let x = request;
-               let worker = instance();
-               worker.my-worker-function(x);
-               match x {
-                "foo"  => "success",
-                 _ => "fallback"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_number_global_input() {
-            let request_value_type = u32();
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            let expr = r#"
-               let x = request;
-               let worker = instance();
-               worker.my-worker-function(x);
-               match x {
-                1  => "success",
-                0 => "failure"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_variant_type_info() {
-            let request_value_type = variant(vec![
-                case("register-user", u64()),
-                case("process-user", str()),
-                unit_case("validate"),
-            ]);
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the  input to Rib.
-            // my-worker-function is a function that takes a Variant as input,
-            // implies the type of request is a Variant.
-            // This means the rib interpreter env has to have a request variable in it,
-            // with a value that should be of the type Variant
-            let expr = r#"
-               let worker = instance();
-               worker.my-worker-function(request);
-               match request {
-                 process-user(user) => user,
-                 _ => "default"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_result_type_info() {
-            let request_value_type = result(u64(), str());
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the  input to Rib.
-            // my-worker-function is a function that takes a Result as input,
-            // implies the type of request is a Result.
-            // This means the rib interpreter env has to have a request variable in it,
-            // with a value that should be of the type Result
-            let expr = r#"
-               let worker = instance();
-               worker.my-worker-function(request);
-               match request {
-                 ok(x) => "${x}",
-                 err(msg) => msg
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_option_type_info() {
-            let request_value_type = option(str());
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the input to Rib.
-            // my-worker-function is a function that takes a Option as input,
-            // implies the type of request is a Result.
-            // This means the rib interpreter env has to have a request variable in it,
-            // with a value that should be of the type Option
-            let expr = r#"
-               let worker = instance();
-               worker.my-worker-function(request);
-               match request {
-                 some(x) => x,
-                 none => "error"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_enum_type_info() {
-            let request_value_type = r#enum(&["prod", "dev", "test"]);
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the input to Rib.
-            // my-worker-function is a function that takes a Option as input,
-            // implies the type of request is a Result.
-            // This means the rib interpreter env has to have a request variable in it,
-            // with a value that should be of the type Option
-            let expr = r#"
-               let worker = instance();
-               worker.my-worker-function(request);
-               match request {
-                 prod  => "p",
-                 dev => "d",
-                 test => "t"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_record_global_input() {
-            let request_value_type =
-                record(vec![field("path", record(vec![field("user", str())]))]);
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the  input to Rib.
-            // my-worker-function is a function that takes a Record of path -> user -> str as input
-            // implies the type of request is a Record.
-            // This means the rib interpreter env has to have a request variable in it,
-            // with a value that should be of the type Record
-            let expr = r#"
-               let x = request;
-               let worker = instance();
-               worker.my-worker-function(x);
-
-               let name = x.path.user;
-
-               match x {
-                 { path : { user : some_name } } => some_name,
-                 _ => name
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_tuple_global_input() {
-            let request_value_type = tuple(vec![str(), u32(), record(vec![field("user", str())])]);
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the  input to Rib.
-            // my-worker-function is a function that takes a Tuple,
-            // implies the type of request is a Tuple.
-            let expr = r#"
-               let x = request;
-               let worker = instance();
-               worker.my-worker-function(x);
-               match x {
-                (_, _, record) =>  record.user,
-                 _ => "fallback"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-
-        #[test]
-        async fn test_list_global_input() {
-            let request_value_type = list(str());
-
-            let output_analysed_type = str();
-
-            let analysed_exports = internal::get_component_metadata(
-                "my-worker-function",
-                vec![request_value_type.clone()],
-                output_analysed_type,
-            );
-
-            // x = request, implies we are expecting a global variable
-            // called request as the  input to Rib.
-            // my-worker-function is a function that takes a List,
-            // implies the type of request should be a List
-            let expr = r#"
-               let x = request;
-               let worker = instance();
-               worker.my-worker-function(x);
-               match x {
-               [a, b, c]  => a,
-                 _ => "fallback"
-               }
-            "#;
-
-            let expr = Expr::from_text(expr).unwrap();
-            let compiler =
-                RibCompiler::new(RibCompilerConfig::new(analysed_exports, vec![], vec![]));
-            let compiled = compiler.compile(expr).unwrap();
-            let expected_type_info =
-                internal::rib_input_type_info(vec![("request", request_value_type)]);
-
-            assert_eq!(compiled.rib_input_type_info, expected_type_info);
-        }
-    }
-
     mod internal {
         use crate::wit_type::*;
         use crate::wit_type::{case, str, u64, unit_case, variant};
-        use crate::{ComponentDependency, ComponentDependencyKey, RibInputTypeInfo};
-        use std::collections::HashMap;
+        use crate::{ComponentDependency, ComponentDependencyKey};
         use uuid::Uuid;
 
         pub(crate) fn metadata_with_variants() -> ComponentDependency {
@@ -1910,14 +1576,6 @@ mod compiler_tests {
                 result: Some(WitFunctionResult { typ: output }),
             })];
             ComponentDependency::from_wit_metadata(component_info, &exports).unwrap()
-        }
-
-        pub(crate) fn rib_input_type_info(types: Vec<(&str, WitType)>) -> RibInputTypeInfo {
-            let mut type_info = HashMap::new();
-            for (name, typ) in types {
-                type_info.insert(name.to_string(), typ);
-            }
-            RibInputTypeInfo { types: type_info }
         }
     }
 }

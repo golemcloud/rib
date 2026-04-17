@@ -4,7 +4,7 @@
 use crate::expr_arena::{ExprArena, ExprId, TypeTable};
 use crate::rib_type_error::RibTypeErrorInternal;
 use crate::type_inference as ti;
-use crate::{ComponentDependency, CustomInstanceSpec, GlobalVariableTypeSpec};
+use crate::{ComponentDependency, CustomInstanceSpec};
 use std::sync::Arc;
 
 pub fn run_initial_binding_and_instance_phases(
@@ -12,15 +12,8 @@ pub fn run_initial_binding_and_instance_phases(
     arena: &mut ExprArena,
     types: &mut TypeTable,
     component: Arc<ComponentDependency>,
-    global_variable_type_spec: &[GlobalVariableTypeSpec],
     custom_instance_spec: &[CustomInstanceSpec],
 ) -> Result<(), RibTypeErrorInternal> {
-    ti::global_variable_type_binding::bind_global_variable_types_lowered(
-        root,
-        arena,
-        types,
-        global_variable_type_spec,
-    );
     ti::type_annotation_binding::bind_type_annotations(root, arena, types);
     ti::variable_binding::bind_variables_of_list_comprehension(root, arena, types);
     ti::variable_binding::bind_variables_of_list_reduce(root, arena, types);

@@ -120,7 +120,6 @@ impl RibRepl {
             config.worker_function_invoke,
             RibCompiler::new(RibCompilerConfig::new(
                 bundle.component.clone(),
-                vec![],
                 bundle.custom_instance_spec.clone(),
             )),
             history_file_path.clone(),

@@ -1,4 +1,5 @@
 pub use env::*;
+pub use env_resolve::*;
 pub use eval::*;
 pub use interpreter_input::*;
 pub use interpreter_result::*;
@@ -9,6 +10,7 @@ pub use rib_runtime_error::*;
 pub use stack::*;
 
 mod env;
+mod env_resolve;
 mod eval;
 mod instruction_cursor;
 mod interpreter_input;

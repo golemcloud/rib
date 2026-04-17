@@ -56,6 +56,24 @@ The **`rib-repl`** crate in this repository consumes the same pipeline for inter
 
 ---
 
+## Environment input model
+
+Rib reads host-provided input only via `env.<name>`.
+
+- **Single segment only**: `env.a` is valid; `env.a.b` is rejected.
+- **Exact key mapping**: `<name>` is used as-is for lookup in `RibInput` and process environment variables.
+- **String-only**: values from `env.<name>` are always typed as `string`.
+
+Examples:
+
+- env key `TOKEN_ID` -> `env.TOKEN_ID`
+- env key `TOKEN-ID` -> `env.TOKEN-ID`
+- env key `token` -> `env.token`
+
+No key normalization or alternate spellings are applied.
+
+---
+
 ## Advanced usage (beyond the REPL)
 
 Most people meet Rib in a **REPL**; **`rib-lang`** is also for **embedding** in your own Rust binary. There, Rib helps when components grow **many exports**, when you **revise WIT or ship new component versions often**, or when you want **short, typed programs** plugged into the **output** of component calls—post-process, reshape, validate—without hand-writing and re-hand-writing the same glue in Rust (or JSON shims) for every export and every shape change. You wire **analysed exports** into the registry once; Rib text is **checked against that surface** on each compile, so updating the component tends to surface mistakes in the script **before** a bad call reaches Wasm.

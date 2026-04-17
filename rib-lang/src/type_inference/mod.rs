@@ -1,10 +1,10 @@
 pub use call_arguments_inference::*;
 pub use custom_instance_spec::*;
 pub use enum_inference::*;
+pub use env_namespace::*;
 pub use errors::*;
 pub use expr_visitor::*;
 pub use global_input_inference::*;
-pub use global_variable_type_binding::*;
 pub use identifier_inference::*;
 pub use identify_instance_creation::*;
 pub use inference_fix_point::*;
@@ -27,10 +27,10 @@ pub use worker_function_invocation::*;
 mod call_arguments_inference;
 mod custom_instance_spec;
 mod enum_inference;
+mod env_namespace;
 mod errors;
 mod expr_visitor;
 mod global_input_inference;
-mod global_variable_type_binding;
 mod identifier_inference;
 mod identify_instance_creation;
 mod inference_fix_point;
@@ -53,8 +53,6 @@ mod worker_function_invocation;
 #[cfg(test)]
 mod tests {
     use crate::call_type::CallType;
-    use crate::type_checker::Path;
-    use crate::type_inference::global_variable_type_binding::GlobalVariableTypeSpec;
     use crate::type_inference::tests::test_utils::{
         call, concat, cond, equal_to, expr_block, get_test_rib_compiler_with, greater_than,
         greater_than_or_equal_to, identifier, less_than, less_than_or_equal_to, let_binding,
@@ -65,7 +63,7 @@ mod tests {
     use crate::{
         ArmPattern, ComponentDependency, DynamicParsedFunctionName, DynamicParsedFunctionReference,
         Expr, InferredType, InstanceCreationType, InstanceIdentifier, InstanceType, MatchArm,
-        Number, ParsedFunctionSite, RibCompiler, RibCompilerConfig, TypeName, VariableId,
+        Number, ParsedFunctionSite, RibCompiler, TypeName, VariableId,
     };
     use bigdecimal::BigDecimal;
     use std::sync::Arc;
@@ -75,73 +73,63 @@ mod tests {
 
     #[test]
     fn test_inference_global_variable_1() {
-        let rib_expr = r#"
+        let unknown_global = r#"
              let res = foo;
              res
             "#;
 
-        let mut expr = Expr::from_text(rib_expr).unwrap();
-        let type_spec =
-            GlobalVariableTypeSpec::new("foo", Path::from_elems(vec![]), InferredType::string());
+        let mut expr = Expr::from_text(unknown_global).unwrap();
+        assert!(expr
+            .infer_types(&ComponentDependency::default(), &[])
+            .is_err());
 
-        let with_type_spec =
-            expr.infer_types(&ComponentDependency::default(), &vec![type_spec], &[]);
+        let env_global = r#"
+             let res = env.foo;
+             res
+            "#;
 
-        assert!(with_type_spec.is_ok());
-
-        let mut new_expr = Expr::from_text(rib_expr).unwrap();
-
-        let without_type_spec = new_expr.infer_types(&ComponentDependency::default(), &vec![], &[]);
-
-        assert!(without_type_spec.is_err())
+        let mut expr = Expr::from_text(env_global).unwrap();
+        assert!(expr
+            .infer_types(&ComponentDependency::default(), &[])
+            .is_ok());
     }
 
     #[test]
     fn test_inference_global_variable_2() {
         let rib_expr = r#"
-             let res = request.path.user-id;
-             let hello: u64 = request.path.number;
+             let res = env.USER_ID;
+             let hello: string = env.NUMBER;
              hello
             "#;
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
-        let type_spec = GlobalVariableTypeSpec::new(
-            "request",
-            Path::from_elems(vec!["path"]),
-            InferredType::string(),
-        );
 
         assert!(expr
-            .infer_types(&ComponentDependency::default(), &vec![type_spec], &[])
+            .infer_types(&ComponentDependency::default(), &[])
             .is_ok());
     }
 
     #[test]
     fn test_inference_global_variable_3() {
         let rib_expr = r#"
-             let res1 = request.path.user-id;
-             let res2 = request.headers.name;
-             let res3 = request.headers.age;
+             let res1 = env.USER_ID;
+             let res2 = env.NAME;
+             let res3 = env.AGE;
              "${res1}-${res2}-${res3}"
             "#;
 
         let mut expr = Expr::from_text(rib_expr).unwrap();
-        let type_spec = vec![
-            GlobalVariableTypeSpec::new(
-                "request",
-                Path::from_elems(vec!["path"]),
-                InferredType::string(),
-            ),
-            GlobalVariableTypeSpec::new(
-                "request",
-                Path::from_elems(vec!["headers"]),
-                InferredType::string(),
-            ),
-        ];
 
         assert!(expr
-            .infer_types(&ComponentDependency::default(), &type_spec, &[])
+            .infer_types(&ComponentDependency::default(), &[])
             .is_ok());
+    }
+
+    #[test]
+    fn test_inference_env_nested_path_rejected() {
+        // Only `env.<name>` — one segment; `env.a.b` is not supported.
+        let expr = Expr::from_text(r#"let x = env.a.b; x"#).unwrap();
+        assert!(RibCompiler::default().compile(expr).is_err());
     }
 
     #[test]
@@ -160,7 +148,7 @@ mod tests {
         let mut expr = Expr::from_text(rib_expr).unwrap();
 
         assert!(expr
-            .infer_types(&ComponentDependency::default(), &vec![], &[])
+            .infer_types(&ComponentDependency::default(), &[])
             .is_ok());
     }
 
@@ -222,7 +210,8 @@ mod tests {
 
     #[test]
     fn test_inference_inline_type_annotation_1() {
-        let rib_expr = Expr::from_text(r#"foo.bar.baz[0] + 1u32"#).unwrap();
+        let rib_expr =
+            Expr::from_text(r#"let foo = {bar: {baz: [1u32]}}; foo.bar.baz[0] + 1u32"#).unwrap();
 
         let compiler = RibCompiler::default();
 
@@ -230,7 +219,9 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let rib_expr = Expr::from_text(r#"foo.bar.baz[0]: u32 + 1u32"#).unwrap();
+        let rib_expr =
+            Expr::from_text(r#"let foo = {bar: {baz: [1u32]}}; foo.bar.baz[0]: u32 + 1u32"#)
+                .unwrap();
         let result = compiler.compile(rib_expr);
 
         assert!(result.is_ok());
@@ -238,28 +229,17 @@ mod tests {
 
     #[test]
     fn test_inference_inline_type_annotation_2() {
-        let type_spec = GlobalVariableTypeSpec::new(
-            "foo",
-            Path::from_elems(vec!["bar"]),
-            InferredType::string(),
-        );
+        let rib_compiler = RibCompiler::default();
 
-        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
-            ComponentDependency::default(),
-            vec![type_spec],
-            vec![],
-        ));
-
-        // by default foo.bar.* will be inferred to be a string (given the above type spec) and
-        // foo.bar.baz + 1u32 should fail compilation since we are adding string with a u32.
-        let invalid_rib_expr = Expr::from_text(r#"foo.bar.baz + 1u32"#).unwrap();
+        // `env.baz` is a string; adding u32 should fail.
+        let invalid_rib_expr = Expr::from_text(r#"env.baz + 1u32"#).unwrap();
 
         let result = rib_compiler.compile(invalid_rib_expr);
 
         assert!(result.is_err());
 
-        // We inline the type of foo.bar.baz with u32 (over-riding what's given in the type spec)
-        let valid_rib_expr = Expr::from_text(r#"foo.bar.baz: u32 + 1u32"#).unwrap();
+        // Inline annotation can override a string literal for numeric use.
+        let valid_rib_expr = Expr::from_text(r#""1": u32 + 1u32"#).unwrap();
         let result = rib_compiler.compile(valid_rib_expr);
 
         assert!(result.is_ok());
@@ -267,25 +247,15 @@ mod tests {
 
     #[test]
     fn test_inference_inline_type_annotation_3() {
-        let type_spec =
-            GlobalVariableTypeSpec::new("foo", Path::from_elems(vec![]), InferredType::string());
+        let rib_compiler = RibCompiler::default();
 
-        // by default foo will be inferred to be a string (given the above type spec) and
-        // foo + 1u32 should fail compilation since we are adding string with a u32.
-        let invalid_rib_expr = Expr::from_text(r#"foo + 1u32"#).unwrap();
-
-        let rib_compiler = RibCompiler::new(RibCompilerConfig::new(
-            ComponentDependency::default(),
-            vec![type_spec],
-            vec![],
-        ));
+        let invalid_rib_expr = Expr::from_text(r#"env.foo + 1u32"#).unwrap();
 
         let result = rib_compiler.compile(invalid_rib_expr);
 
         assert!(result.is_err());
 
-        // We inline the type of foo identifier with u32 (over-riding what's given in the type spec)
-        let valid_rib_expr = Expr::from_text(r#"foo: u32 + 1u32"#).unwrap();
+        let valid_rib_expr = Expr::from_text(r#""2": u32 + 1u32"#).unwrap();
 
         let result = rib_compiler.compile(valid_rib_expr);
 
@@ -747,7 +717,7 @@ mod tests {
         );
 
         let expr = r#"
-              let user: string = request.body.user-id;
+              let user: string = env.USER_ID;
               let query1 = foo;
               let query2 = bar;
               let query3 = foo-bar;
@@ -813,7 +783,7 @@ mod tests {
 
         let expr = r#"
               let worker = instance();
-              let user = request.body.user-id;
+              let user = 1u64;
               let query1 = foo(user);
               let query2 = bar-baz("jon");
               let query3 = foo-bar;
@@ -1268,7 +1238,7 @@ mod tests {
 
         let mut expr = Expr::from_text(expr_str).unwrap();
 
-        expr.infer_types(&ComponentDependency::default(), &vec![], &[])
+        expr.infer_types(&ComponentDependency::default(), &[])
             .unwrap();
 
         let expected = expr_block(
@@ -2172,7 +2142,7 @@ mod tests {
             get_test_rib_compiler_with("foo", vec![request_type.clone()], return_type);
 
         let expr_str = r#"
-              let x = { body : { id: "bId", name: "bName", titles: request.body.titles, address: request.body.address } };
+              let x = { body : { id: "bId", name: "bName", titles: ["a", "b"], address: { street: "st", city: "ct" } } };
               let worker = instance("foo");
               let result = worker.foo(x);
               match result {  some(value) => "personal-id", none =>  x.body.titles[1] }
@@ -2715,7 +2685,6 @@ mod tests {
                 )
                 .unwrap(),
                 vec![],
-                vec![],
             ))
         }
 
@@ -2755,7 +2724,6 @@ mod tests {
                 ComponentDependency::from_wit_metadata(component_dependency_key.clone(), &exports)
                     .unwrap(),
                 vec![],
-                vec![],
             ))
         }
 
@@ -2768,26 +2736,15 @@ mod tests {
                         VariableId::local("user", 0),
                         Some(TypeName::Str),
                         select_field(
-                            select_field(
-                                identifier(
-                                    VariableId::global("request".to_string()),
-                                    None,
-                                    InferredType::record(vec![(
-                                        "body".to_string(),
-                                        InferredType::record(vec![(
-                                            "user-id".to_string(),
-                                            InferredType::string(),
-                                        )]),
-                                    )]),
-                                ),
-                                "body".to_string(),
+                            identifier(
+                                VariableId::global("env".to_string()),
                                 None,
                                 InferredType::record(vec![(
-                                    "user-id".to_string(),
+                                    "USER_ID".to_string(),
                                     InferredType::string(),
                                 )]),
                             ),
-                            "user-id".to_string(),
+                            "USER_ID".to_string(),
                             None,
                             InferredType::string(),
                         ),
@@ -3186,123 +3143,19 @@ mod tests {
                                         ("name".to_string(), Expr::literal("bName")),
                                         (
                                             "titles".to_string(),
-                                            select_field(
-                                                select_field(
-                                                    identifier(
-                                                        VariableId::global("request".to_string()),
-                                                        None,
-                                                        InferredType::record(vec![(
-                                                            "body".to_string(),
-                                                            InferredType::record(vec![
-                                                                (
-                                                                    "address".to_string(),
-                                                                    InferredType::record(vec![
-                                                                        (
-                                                                            "street".to_string(),
-                                                                            InferredType::string(),
-                                                                        ),
-                                                                        (
-                                                                            "city".to_string(),
-                                                                            InferredType::string(),
-                                                                        ),
-                                                                    ]),
-                                                                ),
-                                                                (
-                                                                    "titles".to_string(),
-                                                                    InferredType::list(
-                                                                        InferredType::string(),
-                                                                    ),
-                                                                ),
-                                                            ]),
-                                                        )]),
-                                                    ),
-                                                    "body".to_string(),
-                                                    None,
-                                                    InferredType::record(vec![
-                                                        (
-                                                            "address".to_string(),
-                                                            InferredType::record(vec![
-                                                                (
-                                                                    "street".to_string(),
-                                                                    InferredType::string(),
-                                                                ),
-                                                                (
-                                                                    "city".to_string(),
-                                                                    InferredType::string(),
-                                                                ),
-                                                            ]),
-                                                        ),
-                                                        (
-                                                            "titles".to_string(),
-                                                            InferredType::list(
-                                                                InferredType::string(),
-                                                            ),
-                                                        ),
-                                                    ]),
-                                                ),
-                                                "titles".to_string(),
+                                            sequence(
+                                                vec![Expr::literal("a"), Expr::literal("b")],
                                                 None,
                                                 InferredType::list(InferredType::string()),
                                             ),
                                         ),
                                         (
                                             "address".to_string(),
-                                            select_field(
-                                                select_field(
-                                                    identifier(
-                                                        VariableId::global("request".to_string()),
-                                                        None,
-                                                        InferredType::record(vec![(
-                                                            "body".to_string(),
-                                                            InferredType::record(vec![
-                                                                (
-                                                                    "address".to_string(),
-                                                                    InferredType::record(vec![
-                                                                        (
-                                                                            "street".to_string(),
-                                                                            InferredType::string(),
-                                                                        ),
-                                                                        (
-                                                                            "city".to_string(),
-                                                                            InferredType::string(),
-                                                                        ),
-                                                                    ]),
-                                                                ),
-                                                                (
-                                                                    "titles".to_string(),
-                                                                    InferredType::list(
-                                                                        InferredType::string(),
-                                                                    ),
-                                                                ),
-                                                            ]),
-                                                        )]),
-                                                    ),
-                                                    "body".to_string(),
-                                                    None,
-                                                    InferredType::record(vec![
-                                                        (
-                                                            "address".to_string(),
-                                                            InferredType::record(vec![
-                                                                (
-                                                                    "street".to_string(),
-                                                                    InferredType::string(),
-                                                                ),
-                                                                (
-                                                                    "city".to_string(),
-                                                                    InferredType::string(),
-                                                                ),
-                                                            ]),
-                                                        ),
-                                                        (
-                                                            "titles".to_string(),
-                                                            InferredType::list(
-                                                                InferredType::string(),
-                                                            ),
-                                                        ),
-                                                    ]),
-                                                ),
-                                                "address".to_string(),
-                                                None,
+                                            record(
+                                                vec![
+                                                    ("street".to_string(), Expr::literal("st")),
+                                                    ("city".to_string(), Expr::literal("ct")),
+                                                ],
                                                 InferredType::record(vec![
                                                     ("street".to_string(), InferredType::string()),
                                                     ("city".to_string(), InferredType::string()),

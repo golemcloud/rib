@@ -14,9 +14,9 @@ use rib::{
 async fn rib_compiler_interpreter_end_to_end_worker_metadata_matrix() {
     let expr = r#"
               let worker = instance();
-              let str1: string = request.body.name;
-              let str2: string = request.headers.name;
-              let str3: string = request.path.name;
+              let str1: string = env.API_TOKEN;
+              let str2: string = env.CLIENT_NAME;
+              let str3: string = env.DEPLOY_REGION;
 
               let unused = worker.function-unit-response(str1);
 
@@ -473,7 +473,6 @@ async fn rib_compiler_interpreter_end_to_end_worker_metadata_matrix() {
 
     let compiler = RibCompiler::new(RibCompilerConfig::new(
         component_metadata::component_metadata(),
-        vec![],
         vec![],
     ));
 
@@ -1709,7 +1708,7 @@ mod mock_data {
 }
 
 mod mock_interpreter {
-    use crate::{mock_data, test_utils, Interpreter};
+    use crate::{mock_data, Interpreter};
     use crate::{
         EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, RibComponentFunctionInvoke,
         RibFunctionInvokeResult, RibInput,
@@ -1717,7 +1716,6 @@ mod mock_interpreter {
     use async_trait::async_trait;
 
     use rib::wit_type::WitType;
-    use rib::wit_type::{field, record, str};
     use rib::ValueAndType;
     use rib::{ComponentDependencyKey, DefaultWorkerNameGenerator, InstructionId};
     use std::collections::HashMap;
@@ -1876,19 +1874,19 @@ mod mock_interpreter {
                 .map(|(name, result)| (FunctionName(name.to_string()), result))
                 .collect();
 
-        let record_input_type = record(vec![
-            field("headers", record(vec![field("name", str())])),
-            field("body", record(vec![field("name", str())])),
-            field("path", record(vec![field("name", str())])),
-        ]);
-
-        let record_input_value = test_utils::get_value_and_type(
-            &record_input_type,
-            r#" { headers : { name : "foo" }, body : { name : "bar" }, path : { name : "baz" } }"#,
-        );
-
         let mut interpreter_env_input: HashMap<String, ValueAndType> = HashMap::new();
-        interpreter_env_input.insert("request".to_string(), record_input_value);
+        interpreter_env_input.insert(
+            "API_TOKEN".to_string(),
+            ValueAndType::new(rib::Value::String("bar".to_string()), rib::wit_type::str()),
+        );
+        interpreter_env_input.insert(
+            "CLIENT_NAME".to_string(),
+            ValueAndType::new(rib::Value::String("foo".to_string()), rib::wit_type::str()),
+        );
+        interpreter_env_input.insert(
+            "DEPLOY_REGION".to_string(),
+            ValueAndType::new(rib::Value::String("baz".to_string()), rib::wit_type::str()),
+        );
 
         dynamic_test_interpreter(functions_and_result, interpreter_env_input)
     }

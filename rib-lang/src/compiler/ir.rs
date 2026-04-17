@@ -9,6 +9,8 @@ pub enum RibIR {
     PushLit(ValueAndType),
     AssignVar(VariableId),
     LoadVar(VariableId),
+    /// One segment after `env.` only (`env.a`); nested `env.a.b` is rejected at type-check. Field maps to env keys (e.g. `TOKEN_ID`).
+    LoadEnvVar(String),
     CreateAndPushRecord(WitType),
     UpdateRecord(String),
     PushList(WitType, usize),

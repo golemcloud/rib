@@ -147,6 +147,27 @@ Exact lowering still depends on your embedder; `example.wit` is the reference. A
 
 ---
 
+## 1.1 Environment variables (`env.<name>`)
+
+Rib supports host input only via **environment variables** with the `env` namespace.
+
+- Use exactly one segment: `env.<name>` (for example `env.TOKEN_ID`).
+- Nested paths are rejected: `env.a.b` is invalid.
+- The value is always inferred as `string`.
+- Name matching is **exact and 1:1** with the environment key.
+  - If the key is `TOKEN_ID`, use `env.TOKEN_ID`.
+  - If the key is `TOKEN-ID`, use `env.TOKEN-ID`.
+  - If the key is `token`, use `env.token`.
+- There is no normalization or aliasing (`TOKEN_ID` is not auto-mapped from `token-id`, etc.).
+
+```rust
+let token: string = env.TOKEN_ID;
+let region: string = env.DEPLOY_REGION;
+"token=${token}, region=${region}"
+```
+
+---
+
 ## 2. Programs, blocks, and semicolons
 
 A Rib **program** is a sequence of expressions separated by **`;`**. The value of the whole program is the **last** expression (REPLs usually print that).

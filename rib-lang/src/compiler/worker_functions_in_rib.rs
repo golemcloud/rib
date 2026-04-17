@@ -9,15 +9,15 @@ use crate::{ComponentDependency, FunctionName, InferredExpr, RibCompilationError
 // These function calls are indeed worker invoke calls and nothing else.
 // If Rib has inbuilt function support, those will not be included here either.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkerFunctionsInRib {
-    pub function_calls: Vec<WorkerFunctionType>,
+pub struct SideEffectFunctions {
+    pub function_calls: Vec<SideEffectFunctionSignature>,
 }
 
-impl WorkerFunctionsInRib {
+impl SideEffectFunctions {
     pub fn from_inferred_expr(
         inferred_expr: &InferredExpr,
         component_dependency: &ComponentDependency,
-    ) -> Result<Option<WorkerFunctionsInRib>, RibCompilationError> {
+    ) -> Result<Option<SideEffectFunctions>, RibCompilationError> {
         let worker_invoke_registry_keys = inferred_expr.worker_invoke_registry_keys();
 
         let mut function_calls = vec![];
@@ -27,7 +27,7 @@ impl WorkerFunctionsInRib {
                 .get_function_type(&key)
                 .map_err(|e| RibCompilationError::RibStaticAnalysisError(e.to_string()))?;
 
-            let function_call_in_rib = WorkerFunctionType {
+            let function_call_in_rib = SideEffectFunctionSignature {
                 function_name: key,
                 parameter_types: function_type
                     .parameter_types
@@ -46,14 +46,14 @@ impl WorkerFunctionsInRib {
         if function_calls.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(WorkerFunctionsInRib { function_calls }))
+            Ok(Some(SideEffectFunctions { function_calls }))
         }
     }
 }
 
 // The type of a function call with worker (ephmeral or durable) in Rib script
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkerFunctionType {
+pub struct SideEffectFunctionSignature {
     pub function_name: FunctionName,
     pub parameter_types: Vec<WitType>,
     pub return_type: Option<WitType>,

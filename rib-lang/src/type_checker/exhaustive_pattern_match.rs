@@ -625,6 +625,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_option_pattern_match_wild_card1() {
         let expr = r#"
+        let a = "bar";
         let x = some("foo");
         match x {
             some(_) => a,
@@ -640,6 +641,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_option_pattern_match_wild_card2() {
         let expr = r#"
+        let a = "bar";
         let x = some("foo");
         match x {
             none => "none",
@@ -689,6 +691,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_option_pattern_match_wild_card5() {
         let expr = r#"
+        let a = "bar";
         let x = some("foo");
         match x {
             some(_) => a,
@@ -705,6 +708,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_option_pattern_match_wild_card_invalid1() {
         let expr = r#"
+        let a = "z";
         let x = some("foo");
         match x {
             _ => "none",
@@ -718,7 +722,7 @@ mod pattern_match_exhaustive_tests {
         let error_msg = compiler.compile(expr).unwrap_err().to_string();
 
         let expected = r#"
-        error in the following rib found at line 3, column 9
+        error in the following rib found at line 4, column 9
         `match x {  _ => "none", some(_) => a } `
         cause: dead code detected, pattern `some(_)` is unreachable due to the existence of the pattern `_` prior to it
         help: to ensure a complete match, add missing patterns or use wildcard (`_`)
@@ -758,7 +762,7 @@ mod pattern_match_exhaustive_tests {
         let x = some("foo");
         match x {
             something => "none",
-            some(_) => a
+            some(_) => "x"
         }
         "#;
 
@@ -769,7 +773,7 @@ mod pattern_match_exhaustive_tests {
 
         let expected = r#"
         error in the following rib found at line 3, column 9
-        `match x {  something => "none", some(_) => a } `
+        `match x {  something => "none", some(_) => "x" } `
         cause: dead code detected, pattern `some(_)` is unreachable due to the existence of the pattern `something` prior to it
         help: to ensure a complete match, add missing patterns or use wildcard (`_`)
         "#;
@@ -926,6 +930,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_result_pattern_match_wild_card2() {
         let expr = r#"
+        let a = "bar";
         let x: result<string, string> = ok("foo");
         match x {
             err(msg) => msg,
@@ -975,6 +980,7 @@ mod pattern_match_exhaustive_tests {
     #[test]
     fn test_result_pattern_match_wild_card5() {
         let expr = r#"
+        let a = "bar";
         let x = ok("foo");
         match x {
             ok(_) => a,
@@ -994,7 +1000,7 @@ mod pattern_match_exhaustive_tests {
         let x = ok("foo");
         match x {
             _ => "none",
-            ok(_) => a
+            ok(_) => "x"
         }
         "#;
 
@@ -1005,7 +1011,7 @@ mod pattern_match_exhaustive_tests {
 
         let expected = r#"
         error in the following rib found at line 3, column 9
-        `match x {  _ => "none", ok(_) => a } `
+        `match x {  _ => "none", ok(_) => "x" } `
         cause: dead code detected, pattern `ok(_)` is unreachable due to the existence of the pattern `_` prior to it
         help: to ensure a complete match, add missing patterns or use wildcard (`_`)
         "#;

@@ -39,10 +39,7 @@ mod unresolved_types_tests {
         let error = r#"
         error in the following rib found at line 1, column 1
         `hello`
-        cause: cannot determine the type
-        help: try specifying the expected type explicitly
-        help: if the issue persists, please review the script for potential type inconsistencies
-        help: make sure `hello` is a valid identifier
+        cause: unknown global `hello`. Rib only supports `env.<name>` for inputs (strings from environment variables).
         "#;
 
         assert_eq!(error_msg, strip_spaces(error));
@@ -57,11 +54,7 @@ mod unresolved_types_tests {
         let expected = r#"
         error in the following rib found at line 1, column 29
         `hello`
-        cause: cannot determine the type
-        unresolved type at path: `foo.b[1]`
-        help: try specifying the expected type explicitly
-        help: if the issue persists, please review the script for potential type inconsistencies
-        help: make sure `hello` is a valid identifier
+        cause: unknown global `hello`. Rib only supports `env.<name>` for inputs (strings from environment variables).
         "#;
 
         assert_eq!(error_msg, strip_spaces(expected));
@@ -76,10 +69,7 @@ mod unresolved_types_tests {
         let expected = r#"
         error in the following rib found at line 1, column 4
         `hello`
-        cause: cannot determine the type
-        help: try specifying the expected type explicitly
-        help: if the issue persists, please review the script for potential type inconsistencies
-        help: make sure `hello` is a valid identifier
+        cause: unknown global `hello`. Rib only supports `env.<name>` for inputs (strings from environment variables).
         "#;
 
         assert_eq!(error_msg, strip_spaces(expected));
@@ -95,10 +85,7 @@ mod unresolved_types_tests {
         let expected = r#"
         error in the following rib found at line 1, column 5
         `hello`
-        cause: cannot determine the type
-        help: try specifying the expected type explicitly
-        help: if the issue persists, please review the script for potential type inconsistencies
-        help: make sure `hello` is a valid identifier
+        cause: unknown global `hello`. Rib only supports `env.<name>` for inputs (strings from environment variables).
         "#;
 
         assert_eq!(error_msg, strip_spaces(expected));

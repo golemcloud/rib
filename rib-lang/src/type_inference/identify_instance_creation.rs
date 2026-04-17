@@ -39,10 +39,13 @@ fn search_for_invalid_instance_declarations_arena(
         let span = node.source_span.clone();
         match &node.kind.clone() {
             ExprKind::Let { variable_id, .. } => {
-                if variable_id.name() == "instance" {
+                if variable_id.name() == "instance" || variable_id.name() == "env" {
                     return Err(CustomError::new(
                         span,
-                        "`instance` is a reserved keyword and cannot be used as a variable.",
+                        format!(
+                            "`{}` is a reserved keyword and cannot be used as a variable.",
+                            variable_id.name()
+                        ),
                     )
                     .into());
                 }
