@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a85a8089.js";
+            window.path_to_searchindex_js = "searchindex-0e17447a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-5b89b1a8.js"></script>
@@ -226,7 +226,7 @@
 <h3 id="about-this-guide-long-on-purpose-light-in-practice"><a class="header" href="#about-this-guide-long-on-purpose-light-in-practice">About this guide (long on purpose, light in practice)</a></h3>
 <p>We document a lot so nothing feels hidden—but Rib is not heavyweight. For REPL work especially, <a href="#1-instance-and-calling-exports">§1 <em><code>instance()</code> and calling exports</em></a> is usually enough to feel fluent at the prompt, especially with completion wired to your component. Treat the rest of this file as a reference you reach for when you move into scripts, <code>match</code> on richer values, resources, comprehensions, or other advanced Rib—not a front-to-back assignment.</p>
 <hr>
-<p>Companion WIT — <a href="#example-wit-examplewit"><code>example.wit</code></a> exports <code>inventory</code> (records, enums, plain funcs) and <code>shopping</code> (a <code>cart</code> resource) from world <code>guide-demo</code>. Start with <a href="#1-instance-and-calling-exports">§1</a>; <a href="#0-example-wit-examplewit">§0</a> spells out the WIT if you want it on the page, and <a href="#9-match-and-patterns">§9 <em><code>match</code></em></a> onward when you need more than export calls.</p>
+<p>Companion WIT — <a href="#example-wit-examplewit"><code>example.wit</code></a> exports <code>inventory</code> (records, enums, plain funcs) and <code>shopping</code> (a <code>cart</code> resource) from world <code>guide-demo</code>. Start with <a href="#1-instance-and-calling-exports">§1</a>; <a href="#0-example-wit-examplewit">§0</a> spells out the WIT if you want it on the page, and <a href="#9-match-and-patterns">§9 <em><code>match</code></em></a> onward when you need more than export calls. <a href="#16-common-compilation-errors-examples">§16</a> lists typical <strong>compile-time</strong> mistakes (arity, types, <code>match</code> coverage) with small broken snippets.</p>
 <hr>
 <h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of contents</a></h2>
 <ol start="0">
@@ -246,6 +246,7 @@
 <li><a href="#13-option-and-result"><code>option</code> and <code>result</code></a></li>
 <li><a href="#14-string-interpolation">String interpolation</a></li>
 <li><a href="#15-invoking-resource-methods">Invoking resource methods</a></li>
+<li><a href="#16-common-compilation-errors-examples">Common compilation errors (examples)</a></li>
 </ol>
 <hr>
 <h2 id="0-example-wit-examplewit"><a class="header" href="#0-example-wit-examplewit">0. Example WIT (<code>example.wit</code>)</a></h2>
@@ -522,11 +523,13 @@ match home {
   p @ { x: xa, y: ya } =&gt; xa + ya
 }
 <span class="boring">}</span></code></pre>
+<p><a id="sec-9-8"></a></p>
 <h3 id="98-compile-time-errors-match-enums-calls"><a class="header" href="#98-compile-time-errors-match-enums-calls">9.8 Compile-time errors (<code>match</code>, enums, calls)</a></h3>
 <p>Rib reports many mistakes <strong>while compiling</strong> Rib source (REPL line or script)—<strong>before</strong> your embedder invokes Wasm. A few common cases:</p>
 <p><strong>Exhaustive <code>match</code> on variants</strong> — In <a href="#example-wit-examplewit"><code>example.wit</code></a>, <code>variant payment-info</code> has exactly <strong>three</strong> cases: <strong><code>card</code></strong>, <strong><code>wallet</code></strong>, and <strong><code>failed</code></strong> (§9.4). A <code>match</code> on a <code>payment-info</code> value must cover <strong>all</strong> of them, unless you add a <strong><code>_</code></strong> arm. If you only write arms for <strong>two</strong> of the three and omit <strong><code>_</code></strong>, Rib rejects the program at <strong>compile time</strong> with a non-exhaustive <code>match</code> error—you do not wait until runtime to discover the gap.</p>
 <p><strong>Enums</strong> — <code>order-stage</code> is only <strong><code>draft</code></strong>, <strong><code>placed</code></strong>, and <strong><code>shipped</code></strong>. A typo in a pattern (e.g. a name that is not a WIT case) or a <code>match</code> that omits a case without <strong><code>_</code></strong> is likewise a <strong>compile-time</strong> error.</p>
 <p><strong>Calls</strong> — Arguments are checked against the <strong><code>func</code></strong> signature. Example: <strong><code>validate-qty</code></strong> expects <strong><code>u32</code></strong>; passing a <strong>string</strong> or the wrong <strong>record</strong> shape to <strong><code>length</code></strong> is rejected <strong>at compile time</strong>, not as a failed Wasm call later.</p>
+<p>Short <strong>copy-paste examples</strong> of invalid programs (and what goes wrong) are in <a href="#16-common-compilation-errors-examples">§16</a>.</p>
 <hr>
 <h2 id="10-list-comprehensions-for--yield"><a class="header" href="#10-list-comprehensions-for--yield">10. List comprehensions (<code>for</code> … <code>yield</code>)</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -606,6 +609,43 @@ shopping-cart.line-count()
 <li>Some <strong>patterns of nested construction</strong> (e.g. certain inline combinations) may be rejected by the compiler with a specific error—when in doubt, use <strong><code>let</code></strong> to name intermediate values.</li>
 </ul>
 <hr>
+<h2 id="16-common-compilation-errors-examples"><a class="header" href="#16-common-compilation-errors-examples">16. Common compilation errors (examples)</a></h2>
+<p>Assume <a href="#example-wit-examplewit"><code>example.wit</code></a> is loaded and <strong><code>let my-instance = instance();</code></strong> already exists. The snippets below are <strong>invalid</strong> Rib: the compiler rejects them <strong>before</strong> any Wasm runs. Exact wording of diagnostics can change between versions; the point is <strong>why</strong> each program fails.</p>
+<h3 id="wrong-number-of-parameters"><a class="header" href="#wrong-number-of-parameters">Wrong number of parameters</a></h3>
+<p>From WIT, <strong><code>validate-qty</code></strong> takes <strong>one</strong> <code>u32</code>, and <strong><code>length</code></strong> takes <strong>one</strong> <code>point</code> record:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Invalid — missing argument
+my-instance.validate-qty()
+
+// Invalid — too many arguments
+my-instance.length({ x: 1, y: 2 }, { x: 0, y: 0 })
+<span class="boring">}</span></code></pre>
+<p>Rib reports an <strong>arity</strong> / argument-count mismatch against the export’s signature.</p>
+<h3 id="type-mismatch"><a class="header" href="#type-mismatch">Type mismatch</a></h3>
+<p><strong><code>validate-qty</code></strong> expects a <strong><code>u32</code></strong>, not a string; <strong><code>length</code></strong> expects a <strong><code>point</code></strong>, not a bare number:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Invalid — string where u32 is required
+my-instance.validate-qty("100")
+
+// Invalid — s32 where a point record is required
+my-instance.length(42)
+<span class="boring">}</span></code></pre>
+<p>The compiler compares your expression types to the WIT parameter types and stops with a <strong>type</strong> error.</p>
+<h3 id="non-exhaustive-pattern-match-match"><a class="header" href="#non-exhaustive-pattern-match-match">Non-exhaustive pattern match (<code>match</code>)</a></h3>
+<p><code>variant payment-info</code> has <strong>three</strong> cases (<code>card</code>, <code>wallet</code>, <code>failed</code>). This <code>match</code> is <strong>incomplete</strong>—there is no arm for <strong><code>failed</code></strong>, and no <strong><code>_</code></strong> fallback:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Invalid — not all variant cases covered (`p` has type `payment-info`)
+match p {
+  card(_) =&gt; "c",
+  wallet =&gt; "w"
+}
+<span class="boring">}</span></code></pre>
+<p>Either add <strong><code>failed(_) =&gt; …</code></strong> or a catch-all <strong><code>_ =&gt; …</code></strong>. The same idea applies to <strong><code>enum order-stage</code></strong>: every <strong><code>draft</code> / <code>placed</code> / <code>shipped</code></strong> arm must be present, or you use <strong><code>_</code></strong>.</p>
+<p>Enum and variant <strong>exhaustiveness</strong> is checked at compile time (see also <a href="#sec-9-8">§9.8</a>).</p>
+<hr>
 <h2 id="quick-reference-card"><a class="header" href="#quick-reference-card">Quick reference card</a></h2>
 <div class="table-wrapper">
 <table>
@@ -619,7 +659,7 @@ shopping-cart.line-count()
 <tr><td>Inference</td><td>fixed-point over WIT; REPL tab completion (§5)</td></tr>
 <tr><td>If</td><td><code>if c then a else b</code></td></tr>
 <tr><td>Match</td><td><code>match e { pat =&gt; x, _ =&gt; y }</code></td></tr>
-<tr><td>Compile-time</td><td>Exhaustive <code>match</code>, enum case names, call arity/types vs WIT (§9.8)</td></tr>
+<tr><td>Compile-time</td><td>Exhaustive <code>match</code>, enum case names, call arity/types vs WIT (§9.8, §16)</td></tr>
 <tr><td>Call</td><td><code>f(a, b)</code> or <code>recv.method(a)</code></td></tr>
 <tr><td>Instance</td><td><code>let my-instance = instance();</code> then <code>my-instance.lookup-sku(7)</code> (name is yours)</td></tr>
 <tr><td>For</td><td><code>for x in xs { yield y; }</code></td></tr>
