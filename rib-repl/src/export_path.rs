@@ -111,11 +111,26 @@ fn names_equivalent_wit_abi(a: &str, b: &str) -> bool {
     a == b || a.replace('-', "_") == b.replace('-', "_")
 }
 
+/// Rib call sites use `resource.new` inside braces; WIT export metadata uses `[constructor]resource`
+/// (see [`WitFunction::is_constructor`] in `rib-lang`).
+fn call_leaf_matches_wit_export_name(call_leaf: &str, export_name: &str) -> bool {
+    if names_equivalent_wit_abi(call_leaf, export_name) {
+        return true;
+    }
+    if let Some(resource) = call_leaf.strip_suffix(".new") {
+        if export_name.starts_with("[constructor]") {
+            let res = &export_name["[constructor]".len()..];
+            return names_equivalent_wit_abi(resource, res);
+        }
+    }
+    false
+}
+
 fn path_matches_query(path: &[String], query: &ExportQuery) -> bool {
     let Some(last) = path.last() else {
         return false;
     };
-    if !names_equivalent_wit_abi(last, &query.leaf) {
+    if !call_leaf_matches_wit_export_name(&query.leaf, last) {
         return false;
     }
     let iface = &path[..path.len().saturating_sub(1)];
@@ -212,5 +227,23 @@ mod tests {
         )
         .expect("resolve");
         assert_eq!(p, vec!["inventory", "lookup-sku"]);
+    }
+
+    #[test]
+    fn resource_constructor_cart_new_matches_braced_call() {
+        let exports = vec![WitExport::Interface(WitInterface {
+            name: "component:rib-smoke/shopping".to_string(),
+            functions: vec![WitFunction {
+                name: "[constructor]cart".to_string(),
+                parameters: vec![],
+                result: None,
+            }],
+        })];
+        let p = resolve_wasm_export_path(
+            &exports,
+            "component:rib-smoke/shopping.{cart.new}",
+        )
+        .expect("resolve");
+        assert_eq!(p, vec!["shopping", "[constructor]cart"]);
     }
 }
