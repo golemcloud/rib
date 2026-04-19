@@ -155,7 +155,10 @@ fn path_matches_query(path: &[String], query: &ExportQuery) -> bool {
 }
 
 /// Resolve a call label to the unique Wasm export path for this component's [`WitExport`] list.
-pub fn resolve_wasm_export_path(exports: &[WitExport], function_name: &str) -> Result<Vec<String>, String> {
+pub fn resolve_wasm_export_path(
+    exports: &[WitExport],
+    function_name: &str,
+) -> Result<Vec<String>, String> {
     let paths = wasm_export_paths_from_wit(exports);
     let query = parse_call_label(function_name);
     let matches: Vec<&Vec<String>> = paths
@@ -234,11 +237,8 @@ mod tests {
         let paths = wasm_export_paths_from_wit(&exports);
         assert_eq!(paths, vec![vec!["inventory", "lookup-sku"]]);
 
-        let p = resolve_wasm_export_path(
-            &exports,
-            "component:rib-smoke/inventory.{lookup-sku}",
-        )
-        .expect("resolve");
+        let p = resolve_wasm_export_path(&exports, "component:rib-smoke/inventory.{lookup-sku}")
+            .expect("resolve");
         assert_eq!(p, vec!["inventory", "lookup-sku"]);
     }
 
@@ -252,11 +252,8 @@ mod tests {
                 result: None,
             }],
         })];
-        let p = resolve_wasm_export_path(
-            &exports,
-            "component:rib-smoke/shopping.{cart.new}",
-        )
-        .expect("resolve");
+        let p = resolve_wasm_export_path(&exports, "component:rib-smoke/shopping.{cart.new}")
+            .expect("resolve");
         assert_eq!(p, vec!["shopping", "[constructor]cart"]);
     }
 
@@ -270,11 +267,8 @@ mod tests {
                 result: None,
             }],
         })];
-        let p = resolve_wasm_export_path(
-            &exports,
-            "component:rib-smoke/shopping.{cart.add-line}",
-        )
-        .expect("resolve");
+        let p = resolve_wasm_export_path(&exports, "component:rib-smoke/shopping.{cart.add-line}")
+            .expect("resolve");
         assert_eq!(p, vec!["shopping", "[method]cart.add-line"]);
     }
 }
