@@ -24,9 +24,8 @@ pub use repl_printer::*;
 pub use rib_context::*;
 pub use rib_execution_error::*;
 pub use rib_repl::*;
-pub use runtime_value::{
-    try_runtime_to_value_and_type, try_value_and_type_to_runtime, tuple_element_runtime_types,
-    RuntimeValue,
+pub use rib_val::{
+    try_rib_val_to_value_and_type, try_value_and_type_to_rib_val, tuple_element_type, RibVal,
 };
 
 mod command;
@@ -43,7 +42,7 @@ mod rib_context;
 mod rib_edit;
 mod rib_execution_error;
 mod rib_repl;
-mod runtime_value;
+mod rib_val;
 mod value_generator;
 
 #[cfg(test)]

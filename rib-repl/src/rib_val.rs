@@ -6,9 +6,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use rib::wit_type::{TypeEnum, WitType};
 use rib::{Value, ValueAndType};
 
-/// Subset of component model runtime values, aligned with typical `wasmtime::component::Val`.
+/// Component-shaped values for host calls and embedders (e.g. Wasmtime `Val`), distinct from
+/// Rib's interpreter [`Value`] / [`ValueAndType`].
 #[derive(Debug, Clone, PartialEq)]
-pub enum RuntimeValue {
+pub enum RibVal {
     Bool(bool),
     S8(i8),
     U8(u8),
@@ -22,13 +23,13 @@ pub enum RuntimeValue {
     Float64(f64),
     Char(char),
     String(String),
-    List(Vec<RuntimeValue>),
-    Record(Vec<(String, RuntimeValue)>),
-    Tuple(Vec<RuntimeValue>),
-    Variant(String, Option<Box<RuntimeValue>>),
+    List(Vec<RibVal>),
+    Record(Vec<(String, RibVal)>),
+    Tuple(Vec<RibVal>),
+    Variant(String, Option<Box<RibVal>>),
     Enum(String),
-    Option(Option<Box<RuntimeValue>>),
-    Result(Result<Option<Box<RuntimeValue>>, Option<Box<RuntimeValue>>>),
+    Option(Option<Box<RibVal>>),
+    Result(Result<Option<Box<RibVal>>, Option<Box<RibVal>>>),
     Flags(Vec<String>),
     /// Resource handle (URI + id); embedders map to/from component resources.
     Handle {
@@ -37,14 +38,15 @@ pub enum RuntimeValue {
     },
 }
 
-/// Convert a Rib value + type into a [`RuntimeValue`] for host calls.
-pub fn try_value_and_type_to_runtime(v: &ValueAndType) -> Result<RuntimeValue> {
-    try_value_to_runtime(&v.value, &v.typ)
+/// Convert a Rib value + type into a [`RibVal`] for host calls.
+pub fn try_value_and_type_to_rib_val(v: &ValueAndType) -> Result<RibVal> {
+    try_value_to_rib_val(&v.value, &v.typ)
 }
 
-fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
-    use RuntimeValue as R;
+fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
+    use RibVal as R;
     use WitType as WT;
+
     Ok(match (ty, value) {
         (WT::Bool(_), Value::Bool(b)) => R::Bool(*b),
         (WT::S8(_), Value::S8(x)) => R::S8(*x),
@@ -64,7 +66,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             R::List(
                 items
                     .iter()
-                    .map(|item| try_value_to_runtime(item, inner).with_context(|| "list element"))
+                    .map(|item| try_value_to_rib_val(item, inner).with_context(|| "list element"))
                     .collect::<Result<_>>()?,
             )
         }
@@ -72,14 +74,14 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             if rec.fields.len() != vals.len() {
                 bail!("record field count mismatch");
             }
-            let pairs: Vec<(String, RuntimeValue)> = rec
+            let pairs: Vec<(String, RibVal)> = rec
                 .fields
                 .iter()
                 .zip(vals.iter())
                 .map(|(f, v)| {
                     Ok((
                         f.name.clone(),
-                        try_value_to_runtime(v, &f.typ).with_context(|| f.name.clone())?,
+                        try_value_to_rib_val(v, &f.typ).with_context(|| f.name.clone())?,
                     ))
                 })
                 .collect::<Result<_>>()?;
@@ -95,7 +97,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
                     .zip(items.iter())
                     .enumerate()
                     .map(|(i, (t, v))| {
-                        try_value_to_runtime(v, t).with_context(|| format!("tuple field {i}"))
+                        try_value_to_rib_val(v, t).with_context(|| format!("tuple field {i}"))
                     })
                     .collect::<Result<_>>()?,
             )
@@ -114,7 +116,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             let name = case.name.clone();
             let payload = match (&case.typ, case_value) {
                 (None, None) => None,
-                (Some(inner), Some(b)) => Some(Box::new(try_value_to_runtime(b, inner)?)),
+                (Some(inner), Some(b)) => Some(Box::new(try_value_to_rib_val(b, inner)?)),
                 _ => bail!("variant payload mismatch"),
             };
             R::Variant(name, payload)
@@ -138,7 +140,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
         (WT::Option(ot), Value::Option(inner)) => {
             let mapped = match inner {
                 None => None,
-                Some(b) => Some(Box::new(try_value_to_runtime(b, &ot.inner)?)),
+                Some(b) => Some(Box::new(try_value_to_rib_val(b, &ot.inner)?)),
             };
             R::Option(mapped)
         }
@@ -146,7 +148,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             let mapped = match inner {
                 Ok(v) => Ok(match v {
                     None => None,
-                    Some(b) => Some(Box::new(try_value_to_runtime(
+                    Some(b) => Some(Box::new(try_value_to_rib_val(
                         b,
                         rt.ok
                             .as_deref()
@@ -155,7 +157,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
                 }),
                 Err(v) => Err(match v {
                     None => None,
-                    Some(b) => Some(Box::new(try_value_to_runtime(
+                    Some(b) => Some(Box::new(try_value_to_rib_val(
                         b,
                         rt.err
                             .as_deref()
@@ -170,17 +172,18 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             resource_id: *resource_id,
         },
         _ => bail!(
-            "cannot convert Rib value to RuntimeValue for type {:?}: {:?}",
+            "cannot convert Rib value to RibVal for type {:?}: {:?}",
             ty,
             value
         ),
     })
 }
 
-/// Convert a [`RuntimeValue`] back to Rib using the expected WIT type (from the call signature).
-pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<ValueAndType> {
-    use RuntimeValue as R;
+/// Convert a [`RibVal`] back to Rib using the expected WIT type (from the call signature).
+pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueAndType> {
+    use RibVal as R;
     use WitType as WT;
+
     let value = match (ty, rv) {
         (WT::Bool(_), R::Bool(b)) => Value::Bool(*b),
         (WT::S8(_), R::S8(x)) => Value::S8(*x),
@@ -199,7 +202,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
             let inner = items
                 .iter()
                 .map(|x| {
-                    try_runtime_to_value_and_type(x, &l.inner)
+                    try_rib_val_to_value_and_type(x, &l.inner)
                         .map(|v| v.value)
                         .with_context(|| "list element")
                 })
@@ -218,7 +221,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
                         f.name
                     );
                 }
-                out.push(try_runtime_to_value_and_type(rv, &f.typ)?.value);
+                out.push(try_rib_val_to_value_and_type(rv, &f.typ)?.value);
             }
             Value::Record(out)
         }
@@ -230,7 +233,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
                 .items
                 .iter()
                 .zip(items.iter())
-                .map(|(t, rv)| Ok(try_runtime_to_value_and_type(rv, t)?.value))
+                .map(|(t, rv)| Ok(try_rib_val_to_value_and_type(rv, t)?.value))
                 .collect::<Result<_>>()?;
             Value::Tuple(inner)
         }
@@ -245,7 +248,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
             let case_value = match (case_ty, payload) {
                 (None, None) => None,
                 (Some(inner), Some(p)) => {
-                    Some(Box::new(try_runtime_to_value_and_type(p, inner)?.value))
+                    Some(Box::new(try_rib_val_to_value_and_type(p, inner)?.value))
                 }
                 _ => bail!("variant payload mismatch"),
             };
@@ -265,7 +268,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
         (WT::Option(ot), R::Option(inner)) => {
             let v = match inner {
                 None => None,
-                Some(b) => Some(Box::new(try_runtime_to_value_and_type(b, &ot.inner)?.value)),
+                Some(b) => Some(Box::new(try_rib_val_to_value_and_type(b, &ot.inner)?.value)),
             };
             Value::Option(v)
         }
@@ -274,7 +277,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
                 Ok(x) => Ok(match x {
                     None => None,
                     Some(b) => Some(Box::new(
-                        try_runtime_to_value_and_type(
+                        try_rib_val_to_value_and_type(
                             b,
                             rt.ok.as_deref().ok_or_else(|| anyhow!("ok type"))?,
                         )?
@@ -284,7 +287,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
                 Err(x) => Err(match x {
                     None => None,
                     Some(b) => Some(Box::new(
-                        try_runtime_to_value_and_type(
+                        try_rib_val_to_value_and_type(
                             b,
                             rt.err.as_deref().ok_or_else(|| anyhow!("err type"))?,
                         )?
@@ -311,7 +314,7 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
             resource_id: *resource_id,
         },
         _ => bail!(
-            "cannot convert RuntimeValue to Rib value for type {:?}: {:?}",
+            "cannot convert RibVal to Rib value for type {:?}: {:?}",
             ty,
             rv
         ),
@@ -319,8 +322,8 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
     Ok(ValueAndType::new(value, ty.clone()))
 }
 
-/// When the return type is a WIT tuple with several elements, split `rv` accordingly.
-pub fn tuple_element_runtime_types(tuple_ty: &WitType, i: usize) -> Result<WitType> {
+/// When the return type is a WIT tuple with several elements, take the `i`th element type.
+pub fn tuple_element_type(tuple_ty: &WitType, i: usize) -> Result<WitType> {
     match tuple_ty {
         WitType::Tuple(t) => t
             .items
