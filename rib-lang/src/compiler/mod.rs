@@ -173,14 +173,14 @@ impl RibCompilerConfig {
     }
 }
 
-pub trait GenerateWorkerName {
-    fn generate_worker_name(&self) -> String;
+pub trait GenerateInstanceName {
+    fn generate_instance_name(&self) -> String;
 }
 
 pub struct DefaultWorkerNameGenerator;
 
-impl GenerateWorkerName for DefaultWorkerNameGenerator {
-    fn generate_worker_name(&self) -> String {
+impl GenerateInstanceName for DefaultWorkerNameGenerator {
+    fn generate_instance_name(&self) -> String {
         let uuid = uuid::Uuid::new_v4();
         format!("instance-{uuid}")
     }

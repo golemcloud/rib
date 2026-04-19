@@ -1,5 +1,5 @@
 use crate::repl_state::ReplState;
-use rib::GenerateWorkerName;
+use rib::GenerateInstanceName;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -52,8 +52,8 @@ impl DynamicWorkerGen {
     }
 }
 
-impl GenerateWorkerName for DynamicWorkerGen {
-    fn generate_worker_name(&self) -> String {
+impl GenerateInstanceName for DynamicWorkerGen {
+    fn generate_instance_name(&self) -> String {
         self.repl_state.generate_worker_name()
     }
 }

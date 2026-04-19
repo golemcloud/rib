@@ -20,14 +20,14 @@ mod rib_interpreter;
 mod rib_runtime_error;
 mod stack;
 
-use crate::{DefaultWorkerNameGenerator, GenerateWorkerName, RibByteCode};
+use crate::{DefaultWorkerNameGenerator, GenerateInstanceName, RibByteCode};
 use std::sync::Arc;
 
 pub async fn interpret(
     rib: RibByteCode,
     rib_input: RibInput,
     function_invoke: Arc<dyn RibComponentFunctionInvoke + Sync + Send>,
-    generate_worker_name: Option<Arc<dyn GenerateWorkerName + Sync + Send>>,
+    generate_worker_name: Option<Arc<dyn GenerateInstanceName + Sync + Send>>,
 ) -> Result<RibResult, RibRuntimeError> {
     let mut interpreter = Interpreter::new(
         rib_input,
@@ -43,7 +43,7 @@ pub async fn interpret(
 pub async fn interpret_pure(
     rib: RibByteCode,
     rib_input: RibInput,
-    generate_worker_name: Option<Arc<dyn GenerateWorkerName + Sync + Send>>,
+    generate_worker_name: Option<Arc<dyn GenerateInstanceName + Sync + Send>>,
 ) -> Result<RibResult, RibRuntimeError> {
     let mut interpreter = Interpreter::pure(
         rib_input,

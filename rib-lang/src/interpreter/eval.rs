@@ -1,5 +1,5 @@
 use crate::{
-    DefaultWorkerNameGenerator, Expr, GenerateWorkerName, RibCompilationError, RibCompiler,
+    DefaultWorkerNameGenerator, Expr, GenerateInstanceName, RibCompilationError, RibCompiler,
     RibCompilerConfig, RibComponentFunctionInvoke, RibInput, RibResult, RibRuntimeError,
 };
 use std::sync::Arc;
@@ -8,7 +8,7 @@ pub struct RibEvalConfig {
     compiler_config: RibCompilerConfig,
     rib_input: RibInput,
     function_invoke: Arc<dyn RibComponentFunctionInvoke + Sync + Send>,
-    generate_worker_name: Arc<dyn GenerateWorkerName + Sync + Send>,
+    generate_instance_name: Arc<dyn GenerateInstanceName + Sync + Send>,
 }
 
 impl RibEvalConfig {
@@ -16,13 +16,13 @@ impl RibEvalConfig {
         compiler_config: RibCompilerConfig,
         rib_input: RibInput,
         function_invoke: Arc<dyn RibComponentFunctionInvoke + Sync + Send>,
-        generate_worker_name: Option<Arc<dyn GenerateWorkerName + Sync + Send>>,
+        generate_worker_name: Option<Arc<dyn GenerateInstanceName + Sync + Send>>,
     ) -> Self {
         RibEvalConfig {
             compiler_config,
             rib_input,
             function_invoke,
-            generate_worker_name: generate_worker_name
+            generate_instance_name: generate_worker_name
                 .unwrap_or_else(|| Arc::new(DefaultWorkerNameGenerator)),
         }
     }
@@ -47,7 +47,7 @@ impl RibEvaluator {
             compiled.byte_code,
             self.config.rib_input,
             self.config.function_invoke,
-            Some(self.config.generate_worker_name.clone()),
+            Some(self.config.generate_instance_name.clone()),
         )
         .await?;
 

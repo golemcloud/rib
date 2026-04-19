@@ -188,6 +188,8 @@ pub fn resolve_wasm_export_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_r::test;
+
     use rib::wit_type::{WitFunction, WitInterface};
 
     fn sample_inventory_export() -> Vec<WitExport> {

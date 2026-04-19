@@ -213,11 +213,11 @@ impl fmt::Debug for RibInterpreterStackValue {
                         Value::Handle {
                             uri,
                             resource_id,
-                            worker_name,
+                            instance_name,
                         } => {
                             // wasm-wave don't support resource handles yet
                             format!(
-                                "handle:{{uri:{uri}, resource-id:{resource_id}, worker:{worker_name}}}"
+                                "handle:{{uri:{uri}, resource-id:{resource_id}, instance:{instance_name}}}"
                             )
                         }
 

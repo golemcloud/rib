@@ -21,7 +21,7 @@ pub trait ComponentFunctionInvoke {
         &self,
         component_id: Uuid,
         component_name: &str,
-        worker_name: &str,
+        instance_name: &str,
         function_name: &str,
         args: Vec<RibVal>,
         return_type: Option<WitType>,
