@@ -112,7 +112,8 @@ fn names_equivalent_wit_abi(a: &str, b: &str) -> bool {
 }
 
 /// Rib call sites use `resource.new` inside braces; WIT export metadata uses `[constructor]resource`
-/// (see [`WitFunction::is_constructor`] in `rib-lang`).
+/// (see [`WitFunction::is_constructor`] in `rib-lang`). Method calls use `resource.method` and
+/// metadata uses `[method]resource.method` ([`WitFunction::is_method`]).
 fn call_leaf_matches_wit_export_name(call_leaf: &str, export_name: &str) -> bool {
     if names_equivalent_wit_abi(call_leaf, export_name) {
         return true;
@@ -121,6 +122,18 @@ fn call_leaf_matches_wit_export_name(call_leaf: &str, export_name: &str) -> bool
         if export_name.starts_with("[constructor]") {
             let res = &export_name["[constructor]".len()..];
             return names_equivalent_wit_abi(resource, res);
+        }
+    }
+    if export_name.starts_with("[method]") {
+        let rest = &export_name["[method]".len()..];
+        if names_equivalent_wit_abi(call_leaf, rest) {
+            return true;
+        }
+    }
+    if export_name.starts_with("[static]") {
+        let rest = &export_name["[static]".len()..];
+        if names_equivalent_wit_abi(call_leaf, rest) {
+            return true;
         }
     }
     false
@@ -245,5 +258,23 @@ mod tests {
         )
         .expect("resolve");
         assert_eq!(p, vec!["shopping", "[constructor]cart"]);
+    }
+
+    #[test]
+    fn resource_method_cart_add_line_matches_braced_call() {
+        let exports = vec![WitExport::Interface(WitInterface {
+            name: "component:rib-smoke/shopping".to_string(),
+            functions: vec![WitFunction {
+                name: "[method]cart.add-line".to_string(),
+                parameters: vec![],
+                result: None,
+            }],
+        })];
+        let p = resolve_wasm_export_path(
+            &exports,
+            "component:rib-smoke/shopping.{cart.add-line}",
+        )
+        .expect("resolve");
+        assert_eq!(p, vec!["shopping", "[method]cart.add-line"]);
     }
 }
