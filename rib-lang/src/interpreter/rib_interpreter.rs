@@ -1302,8 +1302,13 @@ mod internal {
                     })?;
 
                 match &handle.value {
-                    Value::Handle { uri, .. } => {
-                        let worker_name = uri.rsplit_once('/').map(|(_, last)| last).unwrap_or(uri);
+                    Value::Handle { .. } => {
+                        let worker_instance = handle
+                            .value
+                            .handle_worker_instance_name()
+                            .ok_or(internal_corrupted_state!(
+                                "resource handle missing worker instance name"
+                            ))?;
 
                         final_args.push(handle.clone());
                         final_args.extend(parameter_values);
@@ -1312,7 +1317,7 @@ mod internal {
                             .invoke_worker_function_async(
                                 component_info,
                                 instruction_id,
-                                worker_name.to_string(),
+                                worker_instance,
                                 function_name_cloned.clone(),
                                 final_args,
                                 expected_result_type.clone(),
@@ -4859,6 +4864,7 @@ mod tests {
                             Value::Handle {
                                 uri,
                                 resource_id: 0,
+                                worker_name: worker_name.clone(),
                             },
                             handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         )
@@ -4908,14 +4914,15 @@ mod tests {
                     }
 
                     "golem:it/api.{[static]cart.create}" => {
+                        let wn = worker_name.0.clone();
                         let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{}",
-                            worker_name.0
+                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}"
                         );
 
                         let value = Value::Handle {
                             uri,
                             resource_id: 0,
+                            worker_name: wn,
                         };
 
                         Ok(Some(ValueAndType::new(
@@ -4925,14 +4932,15 @@ mod tests {
                     }
 
                     "golem:it/api.{[static]cart.create-safe}" => {
+                        let wn = worker_name.0.clone();
                         let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{}",
-                            worker_name.0
+                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}"
                         );
 
                         let resource = Value::Handle {
                             uri,
                             resource_id: 0,
+                            worker_name: wn,
                         };
 
                         let value = Value::Result(Ok(Some(Box::new(resource))));

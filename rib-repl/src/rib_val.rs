@@ -52,10 +52,12 @@ pub enum RibVal {
     Option(Option<Box<RibVal>>),
     Result(Result<Option<Box<RibVal>>, Option<Box<RibVal>>>),
     Flags(Vec<String>),
-    /// Resource handle (URI + id); embedders map to/from component resources.
+    /// Resource handle: `resource_id` is embedder-defined; `worker_name` routes resource methods to
+    /// the correct component instance (see [`rib::Value::Handle`]).
     Handle {
         uri: String,
         resource_id: u64,
+        worker_name: String,
     },
 }
 
@@ -193,9 +195,10 @@ fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
             };
             R::Result(mapped)
         }
-        (WT::Handle(_), Value::Handle { uri, resource_id }) => R::Handle {
+        (WT::Handle(_), Value::Handle { uri, resource_id, worker_name }) => R::Handle {
             uri: uri.clone(),
             resource_id: *resource_id,
+            worker_name: worker_name.clone(),
         },
         _ => bail!(
             "cannot convert Rib value to RibVal for type {:?}: {:?}",
@@ -342,9 +345,10 @@ fn rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueAndType> 
             }
             Value::Flags(bits)
         }
-        (WT::Handle(_), R::Handle { uri, resource_id }) => Value::Handle {
+        (WT::Handle(_), R::Handle { uri, resource_id, worker_name }) => Value::Handle {
             uri: uri.clone(),
             resource_id: *resource_id,
+            worker_name: worker_name.clone(),
         },
         _ => bail!(
             "cannot convert RibVal to Rib value for type {:?}: {:?}",

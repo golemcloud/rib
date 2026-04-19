@@ -210,9 +210,15 @@ impl fmt::Debug for RibInterpreterStackValue {
                 RibInterpreterStackValue::Unit => "unit".to_string(),
                 RibInterpreterStackValue::Val(value) => {
                     match &value.value {
-                        Value::Handle { uri, resource_id } => {
+                        Value::Handle {
+                            uri,
+                            resource_id,
+                            worker_name,
+                        } => {
                             // wasm-wave don't support resource handles yet
-                            format!("handle:{{uri:{uri}, resource-id:{resource_id}}}")
+                            format!(
+                                "handle:{{uri:{uri}, resource-id:{resource_id}, worker:{worker_name}}}"
+                            )
                         }
 
                         _ => value.to_string(),
