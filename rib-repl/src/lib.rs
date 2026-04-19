@@ -24,9 +24,7 @@ pub use repl_printer::*;
 pub use rib_context::*;
 pub use rib_execution_error::*;
 pub use rib_repl::*;
-pub use rib_val::{
-    try_rib_val_to_value_and_type, try_value_and_type_to_rib_val, tuple_element_type, RibVal,
-};
+pub use rib_val::{tuple_element_type, RibVal};
 
 mod command;
 mod compiler;

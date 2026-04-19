@@ -1,5 +1,5 @@
 use crate::repl_state::ReplState;
-use crate::rib_val::{try_rib_val_to_value_and_type, try_value_and_type_to_rib_val, RibVal};
+use crate::rib_val::RibVal;
 use async_trait::async_trait;
 use rib::wit_type::WitType;
 use rib::ValueAndType;
@@ -7,6 +7,7 @@ use rib::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
     RibComponentFunctionInvoke, RibFunctionInvokeResult,
 };
+use std::convert::TryFrom;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -73,7 +74,7 @@ impl RibComponentFunctionInvoke for ReplRibFunctionInvoke {
                 let return_ty = return_type.clone();
                 let mut args_rt = Vec::with_capacity(args.0.len());
                 for a in &args.0 {
-                    args_rt.push(try_value_and_type_to_rib_val(a).map_err(|e| io_other_box(&e))?);
+                    args_rt.push(RibVal::try_from(a).map_err(|e| io_other_box(&e))?);
                 }
 
                 let rib_invocation_result = self
@@ -94,7 +95,7 @@ impl RibComponentFunctionInvoke for ReplRibFunctionInvoke {
                         let mapped: Option<ValueAndType> = match (result, return_ty) {
                             (None, _) => None,
                             (Some(rv), Some(ty)) => Some(
-                                try_rib_val_to_value_and_type(&rv, &ty)
+                                rv.try_to_value_and_type(&ty)
                                     .map_err(|e| io_other_box(&e))?,
                             ),
                             (Some(_), None) => {

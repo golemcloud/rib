@@ -1,13 +1,34 @@
-//! Values shaped like component runtime `Val` (Wasmtime-style), for embedder boundaries.
-//! Rib's interpreter still uses [`rib::ValueAndType`]; this type keeps `wasmtime`-style
-//! integrations thin.
+use std::convert::TryFrom;
 
 use anyhow::{anyhow, bail, Context, Result};
 use rib::wit_type::{TypeEnum, WitType};
 use rib::{Value, ValueAndType};
 
-/// Component-shaped values for host calls and embedders (e.g. Wasmtime `Val`), distinct from
-/// Rib's interpreter [`Value`] / [`ValueAndType`].
+/// A **portable, component-model-shaped** value for host calls and external integrations.
+///
+/// # Role
+///
+/// `RibVal` exists so **embedders** (Wasmtime CLI, custom hosts, tests) and **REPL plumbing**
+/// can pass arguments and results across a small, stable API. Its variants mirror the usual
+/// WebAssembly **component model** runtime shape (the same broad case structure as embedders like
+/// Wasmtime use for component `Val`), so mapping to or from that host representation is mostly
+/// structural recursion—not a parallel type system.
+///
+/// # Versus [`Value`] / [`ValueAndType`]
+///
+/// Inside Rib, execution uses [`Value`] together with [`WitType`] as [`ValueAndType`]. That pair
+/// is the full interpreter representation. `RibVal` is **not** a replacement for that; it is the
+/// **narrow hand-off** when leaving the interpreter to call into a host implementation of an
+/// import. Use [`TryFrom`] from `&`[`ValueAndType`] and [`RibVal::try_to_value_and_type`] at those
+/// edges when you still need full Rib values; use `RibVal` alone when the other side only speaks in
+/// component-shaped values.
+///
+/// # Conversions
+///
+/// - Interpreter → `RibVal`: implement [`TryFrom`] for `&`[`ValueAndType`] (use [`RibVal::try_from`]).
+/// - `RibVal` → interpreter: [`RibVal::try_to_value_and_type`] (needs the result [`WitType`]; we
+///   cannot offer `TryInto<ValueAndType>` here without a second type parameter, and we cannot
+///   implement foreign `TryFrom` targets for orphan-rule reasons).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RibVal {
     Bool(bool),
@@ -38,9 +59,13 @@ pub enum RibVal {
     },
 }
 
-/// Convert a Rib value + type into a [`RibVal`] for host calls.
-pub fn try_value_and_type_to_rib_val(v: &ValueAndType) -> Result<RibVal> {
-    try_value_to_rib_val(&v.value, &v.typ)
+impl TryFrom<&ValueAndType> for RibVal {
+    type Error = anyhow::Error;
+
+    /// Converts a Rib [`ValueAndType`] into a [`RibVal`] (e.g. before [`crate::ComponentFunctionInvoke::invoke`]).
+    fn try_from(v: &ValueAndType) -> Result<Self, Self::Error> {
+        try_value_to_rib_val(&v.value, &v.typ)
+    }
 }
 
 fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
@@ -179,8 +204,15 @@ fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
     })
 }
 
-/// Convert a [`RibVal`] back to Rib using the expected WIT type (from the call signature).
-pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueAndType> {
+impl RibVal {
+    /// Converts this value back into Rib’s [`ValueAndType`], using the call’s result [`WitType`]
+    /// from the signature (e.g. after a host returns a [`RibVal`]).
+    pub fn try_to_value_and_type(&self, ty: &WitType) -> Result<ValueAndType> {
+        rib_val_to_value_and_type(self, ty)
+    }
+}
+
+fn rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueAndType> {
     use RibVal as R;
     use WitType as WT;
 
@@ -202,7 +234,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
             let inner = items
                 .iter()
                 .map(|x| {
-                    try_rib_val_to_value_and_type(x, &l.inner)
+                    rib_val_to_value_and_type(x, &l.inner)
                         .map(|v| v.value)
                         .with_context(|| "list element")
                 })
@@ -221,7 +253,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
                         f.name
                     );
                 }
-                out.push(try_rib_val_to_value_and_type(rv, &f.typ)?.value);
+                out.push(rib_val_to_value_and_type(rv, &f.typ)?.value);
             }
             Value::Record(out)
         }
@@ -233,7 +265,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
                 .items
                 .iter()
                 .zip(items.iter())
-                .map(|(t, rv)| Ok(try_rib_val_to_value_and_type(rv, t)?.value))
+                .map(|(t, rv)| Ok(rib_val_to_value_and_type(rv, t)?.value))
                 .collect::<Result<_>>()?;
             Value::Tuple(inner)
         }
@@ -248,7 +280,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
             let case_value = match (case_ty, payload) {
                 (None, None) => None,
                 (Some(inner), Some(p)) => {
-                    Some(Box::new(try_rib_val_to_value_and_type(p, inner)?.value))
+                    Some(Box::new(rib_val_to_value_and_type(p, inner)?.value))
                 }
                 _ => bail!("variant payload mismatch"),
             };
@@ -268,7 +300,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
         (WT::Option(ot), R::Option(inner)) => {
             let v = match inner {
                 None => None,
-                Some(b) => Some(Box::new(try_rib_val_to_value_and_type(b, &ot.inner)?.value)),
+                Some(b) => Some(Box::new(rib_val_to_value_and_type(b, &ot.inner)?.value)),
             };
             Value::Option(v)
         }
@@ -277,7 +309,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
                 Ok(x) => Ok(match x {
                     None => None,
                     Some(b) => Some(Box::new(
-                        try_rib_val_to_value_and_type(
+                        rib_val_to_value_and_type(
                             b,
                             rt.ok.as_deref().ok_or_else(|| anyhow!("ok type"))?,
                         )?
@@ -287,7 +319,7 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
                 Err(x) => Err(match x {
                     None => None,
                     Some(b) => Some(Box::new(
-                        try_rib_val_to_value_and_type(
+                        rib_val_to_value_and_type(
                             b,
                             rt.err.as_deref().ok_or_else(|| anyhow!("err type"))?,
                         )?
@@ -322,7 +354,8 @@ pub fn try_rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueA
     Ok(ValueAndType::new(value, ty.clone()))
 }
 
-/// When the return type is a WIT tuple with several elements, take the `i`th element type.
+/// Returns the `i`th element [`WitType`] when the return type is a WIT tuple with multiple
+/// results (helpers for splitting multi-return handling).
 pub fn tuple_element_type(tuple_ty: &WitType, i: usize) -> Result<WitType> {
     match tuple_ty {
         WitType::Tuple(t) => t
