@@ -119,19 +119,16 @@ fn call_leaf_matches_wit_export_name(call_leaf: &str, export_name: &str) -> bool
         return true;
     }
     if let Some(resource) = call_leaf.strip_suffix(".new") {
-        if export_name.starts_with("[constructor]") {
-            let res = &export_name["[constructor]".len()..];
+        if let Some(res) = export_name.strip_prefix("[constructor]") {
             return names_equivalent_wit_abi(resource, res);
         }
     }
-    if export_name.starts_with("[method]") {
-        let rest = &export_name["[method]".len()..];
+    if let Some(rest) = export_name.strip_prefix("[method]") {
         if names_equivalent_wit_abi(call_leaf, rest) {
             return true;
         }
     }
-    if export_name.starts_with("[static]") {
-        let rest = &export_name["[static]".len()..];
+    if let Some(rest) = export_name.strip_prefix("[static]") {
         if names_equivalent_wit_abi(call_leaf, rest) {
             return true;
         }
