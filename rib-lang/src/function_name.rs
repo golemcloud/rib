@@ -384,6 +384,55 @@ impl ParsedFunctionName {
             function: self.function.clone(),
         }
     }
+
+    /// Segments for resolving a WebAssembly component export via nested instance names, then the
+    /// function export name.
+    ///
+    /// Packaged WIT paths like `component:pkg/iface.{fn}` identify the interface in metadata, but
+    /// component worlds usually export the interface **instance at the root** as `iface`, not as a
+    /// nested export named `component:pkg`. Runtimes should walk `Component::get_export_index` with
+    /// these segments (for example `["inventory", "lookup-sku"]`), not a path derived from splitting
+    /// the full [`ParsedFunctionSite::interface_name`] string.
+    pub fn wasm_component_export_path(&self) -> Vec<String> {
+        let mut segments: Vec<String> = match &self.site {
+            ParsedFunctionSite::Global => Vec::new(),
+            ParsedFunctionSite::Interface { name } => name
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect(),
+            ParsedFunctionSite::PackagedInterface { interface, .. } => vec![interface.clone()],
+        };
+        let leaf = match &self.function {
+            ParsedFunctionReference::Function { function } => function.clone(),
+            _ => self.function.function_name(),
+        };
+        segments.push(leaf);
+        segments
+    }
+
+    /// Like [`wasm_component_export_path`](Self::wasm_component_export_path), but includes common
+    /// alternate spellings for the **last** segment (WIT kebab-case vs snake_case in lowered names).
+    pub fn wasm_component_export_path_candidates(&self) -> Vec<Vec<String>> {
+        let primary = self.wasm_component_export_path();
+        let mut out: Vec<Vec<String>> = Vec::new();
+        let mut push = |p: Vec<String>| {
+            if !out.iter().any(|e| e == &p) {
+                out.push(p);
+            }
+        };
+        push(primary.clone());
+        if let Some(last) = primary.last() {
+            let snake = last.replace('-', "_");
+            if snake != *last {
+                let mut alt = primary.clone();
+                alt.pop();
+                alt.push(snake);
+                push(alt);
+            }
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -432,6 +481,19 @@ mod function_name_tests {
                 },
             }
         );
+    }
+
+    #[test]
+    fn wasm_component_export_path_packaged_matches_world_root() {
+        let parsed =
+            ParsedFunctionName::parse("component:rib-smoke/inventory.{lookup-sku}").expect("parse");
+        assert_eq!(
+            parsed.wasm_component_export_path(),
+            vec!["inventory", "lookup-sku"]
+        );
+        let cands = parsed.wasm_component_export_path_candidates();
+        assert!(cands.iter().any(|p| p == &vec!["inventory", "lookup-sku"]));
+        assert!(cands.iter().any(|p| p == &vec!["inventory", "lookup_sku"]));
     }
 
     #[test]

@@ -17,6 +17,7 @@ pub use rib::{
 
 pub use command::*;
 pub use dependency_manager::*;
+pub use export_path::{resolve_wasm_export_path, wasm_export_paths_from_wit};
 pub use invoke::*;
 pub use raw::*;
 pub use repl_bootstrap_error::*;
@@ -29,6 +30,7 @@ pub use rib_val::{tuple_element_type, RibVal};
 mod command;
 mod compiler;
 mod dependency_manager;
+mod export_path;
 mod eval;
 mod instance_name_gen;
 mod invoke;
