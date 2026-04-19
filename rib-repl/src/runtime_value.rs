@@ -31,7 +31,10 @@ pub enum RuntimeValue {
     Result(Result<Option<Box<RuntimeValue>>, Option<Box<RuntimeValue>>>),
     Flags(Vec<String>),
     /// Resource handle (URI + id); embedders map to/from component resources.
-    Handle { uri: String, resource_id: u64 },
+    Handle {
+        uri: String,
+        resource_id: u64,
+    },
 }
 
 /// Convert a Rib value + type into a [`RuntimeValue`] for host calls.
@@ -61,9 +64,7 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
             R::List(
                 items
                     .iter()
-                    .map(|item| {
-                        try_value_to_runtime(item, inner).with_context(|| "list element")
-                    })
+                    .map(|item| try_value_to_runtime(item, inner).with_context(|| "list element"))
                     .collect::<Result<_>>()?,
             )
         }
@@ -147,14 +148,18 @@ fn try_value_to_runtime(value: &Value, ty: &WitType) -> Result<RuntimeValue> {
                     None => None,
                     Some(b) => Some(Box::new(try_value_to_runtime(
                         b,
-                        rt.ok.as_deref().ok_or_else(|| anyhow!("result ok type missing"))?,
+                        rt.ok
+                            .as_deref()
+                            .ok_or_else(|| anyhow!("result ok type missing"))?,
                     )?)),
                 }),
                 Err(v) => Err(match v {
                     None => None,
                     Some(b) => Some(Box::new(try_value_to_runtime(
                         b,
-                        rt.err.as_deref().ok_or_else(|| anyhow!("result err type missing"))?,
+                        rt.err
+                            .as_deref()
+                            .ok_or_else(|| anyhow!("result err type missing"))?,
                     )?)),
                 }),
             };
@@ -208,7 +213,10 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
             let mut out = Vec::with_capacity(pairs.len());
             for (f, (n, rv)) in rec_ty.fields.iter().zip(pairs.iter()) {
                 if f.name != *n {
-                    bail!("record field name mismatch: expected `{}`, got `{n}`", f.name);
+                    bail!(
+                        "record field name mismatch: expected `{}`, got `{n}`",
+                        f.name
+                    );
                 }
                 out.push(try_runtime_to_value_and_type(rv, &f.typ)?.value);
             }
@@ -236,7 +244,9 @@ pub fn try_runtime_to_value_and_type(rv: &RuntimeValue, ty: &WitType) -> Result<
                 .ok_or_else(|| anyhow!("unknown variant case `{name}`"))?;
             let case_value = match (case_ty, payload) {
                 (None, None) => None,
-                (Some(inner), Some(p)) => Some(Box::new(try_runtime_to_value_and_type(p, inner)?.value)),
+                (Some(inner), Some(p)) => {
+                    Some(Box::new(try_runtime_to_value_and_type(p, inner)?.value))
+                }
                 _ => bail!("variant payload mismatch"),
             };
             Value::Variant {

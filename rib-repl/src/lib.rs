@@ -18,16 +18,16 @@ pub use rib::{
 pub use command::*;
 pub use dependency_manager::*;
 pub use invoke::*;
-pub use runtime_value::{
-    try_runtime_to_value_and_type, try_value_and_type_to_runtime, tuple_element_runtime_types,
-    RuntimeValue,
-};
 pub use raw::*;
 pub use repl_bootstrap_error::*;
 pub use repl_printer::*;
 pub use rib_context::*;
 pub use rib_execution_error::*;
 pub use rib_repl::*;
+pub use runtime_value::{
+    try_runtime_to_value_and_type, try_value_and_type_to_runtime, tuple_element_runtime_types,
+    RuntimeValue,
+};
 
 mod command;
 mod compiler;
@@ -35,7 +35,6 @@ mod dependency_manager;
 mod eval;
 mod instance_name_gen;
 mod invoke;
-mod runtime_value;
 mod raw;
 mod repl_bootstrap_error;
 mod repl_printer;
@@ -44,6 +43,7 @@ mod rib_context;
 mod rib_edit;
 mod rib_execution_error;
 mod rib_repl;
+mod runtime_value;
 mod value_generator;
 
 #[cfg(test)]
