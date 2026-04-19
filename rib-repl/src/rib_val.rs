@@ -158,7 +158,8 @@ fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
                 .names
                 .iter()
                 .enumerate()
-                .filter_map(|(i, n)| bits.get(i).copied().unwrap_or(false).then(|| n.clone()))
+                .filter(|&(i, _n)| bits.get(i).copied().unwrap_or(false))
+                .map(|(_i, n)| n.clone())
                 .collect();
             R::Flags(names)
         }

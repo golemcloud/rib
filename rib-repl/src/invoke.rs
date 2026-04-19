@@ -12,10 +12,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 fn io_other_box(err: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
-    Box::new(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        err.to_string(),
-    ))
+    Box::new(std::io::Error::other(err.to_string()))
 }
 
 #[async_trait]
