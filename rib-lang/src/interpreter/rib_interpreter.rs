@@ -1303,12 +1303,11 @@ mod internal {
 
                 match &handle.value {
                     Value::Handle { .. } => {
-                        let worker_instance = handle
-                            .value
-                            .handle_worker_instance_name()
-                            .ok_or(internal_corrupted_state!(
+                        let worker_instance = handle.value.handle_worker_instance_name().ok_or(
+                            internal_corrupted_state!(
                                 "resource handle missing worker instance name"
-                            ))?;
+                            ),
+                        )?;
 
                         final_args.push(handle.clone());
                         final_args.extend(parameter_values);
@@ -4915,9 +4914,7 @@ mod tests {
 
                     "golem:it/api.{[static]cart.create}" => {
                         let wn = worker_name.0.clone();
-                        let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}"
-                        );
+                        let uri = format!("urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}");
 
                         let value = Value::Handle {
                             uri,
@@ -4933,9 +4930,7 @@ mod tests {
 
                     "golem:it/api.{[static]cart.create-safe}" => {
                         let wn = worker_name.0.clone();
-                        let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}"
-                        );
+                        let uri = format!("urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}");
 
                         let resource = Value::Handle {
                             uri,

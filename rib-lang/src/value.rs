@@ -144,10 +144,7 @@ impl std::fmt::Display for Value {
                 uri,
                 resource_id,
                 worker_name,
-            } => write!(
-                f,
-                "handle({uri}#{resource_id} @ {worker_name})",
-            ),
+            } => write!(f, "handle({uri}#{resource_id} @ {worker_name})",),
         }
     }
 }

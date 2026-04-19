@@ -195,7 +195,14 @@ fn try_value_to_rib_val(value: &Value, ty: &WitType) -> Result<RibVal> {
             };
             R::Result(mapped)
         }
-        (WT::Handle(_), Value::Handle { uri, resource_id, worker_name }) => R::Handle {
+        (
+            WT::Handle(_),
+            Value::Handle {
+                uri,
+                resource_id,
+                worker_name,
+            },
+        ) => R::Handle {
             uri: uri.clone(),
             resource_id: *resource_id,
             worker_name: worker_name.clone(),
@@ -345,7 +352,14 @@ fn rib_val_to_value_and_type(rv: &RibVal, ty: &WitType) -> Result<ValueAndType> 
             }
             Value::Flags(bits)
         }
-        (WT::Handle(_), R::Handle { uri, resource_id, worker_name }) => Value::Handle {
+        (
+            WT::Handle(_),
+            R::Handle {
+                uri,
+                resource_id,
+                worker_name,
+            },
+        ) => Value::Handle {
             uri: uri.clone(),
             resource_id: *resource_id,
             worker_name: worker_name.clone(),
