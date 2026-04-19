@@ -114,15 +114,11 @@ pub fn get_identifiers(inferred_expr: &InferredExpr) -> Vec<VariableId> {
     let mut identifiers = Vec::new();
 
     visit_post_order_rev_mut(&mut expr, &mut |expr| match expr {
-        Expr::Let { variable_id, .. } => {
-            if !identifiers.contains(variable_id) {
-                identifiers.push(variable_id.clone());
-            }
+        Expr::Let { variable_id, .. } if !identifiers.contains(variable_id) => {
+            identifiers.push(variable_id.clone());
         }
-        Expr::Identifier { variable_id, .. } => {
-            if !identifiers.contains(variable_id) {
-                identifiers.push(variable_id.clone());
-            }
+        Expr::Identifier { variable_id, .. } if !identifiers.contains(variable_id) => {
+            identifiers.push(variable_id.clone());
         }
         _ => {}
     });

@@ -84,20 +84,19 @@ fn override_type_arena(
     for id in order {
         let node = arena.expr(id);
         match &node.kind {
-            ExprKind::Identifier { variable_id } => {
-                if variable_id == &spec.variable_id {
-                    current_path.progress();
-                    if spec.path.is_empty() {
-                        types.set(id, spec.inferred_type.clone());
-                        previous_id = None;
-                        current_path = full_path.clone();
-                    } else {
-                        previous_id = Some(id);
-                    }
-                } else {
+            ExprKind::Identifier { variable_id } if variable_id == &spec.variable_id => {
+                current_path.progress();
+                if spec.path.is_empty() {
+                    types.set(id, spec.inferred_type.clone());
                     previous_id = None;
                     current_path = full_path.clone();
+                } else {
+                    previous_id = Some(id);
                 }
+            }
+            ExprKind::Identifier { .. } => {
+                previous_id = None;
+                current_path = full_path.clone();
             }
             ExprKind::SelectField {
                 expr: inner_id,

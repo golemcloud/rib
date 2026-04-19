@@ -11,6 +11,7 @@
 // duplicate nested work (aggregate timers) are omitted from the table.
 
 use std::cell::{Cell, RefCell};
+use std::cmp::Reverse;
 use std::io::{stderr, IsTerminal};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
@@ -188,7 +189,7 @@ fn print_summary_table(wall: Duration, title: &str) {
         return;
     }
 
-    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows.sort_by_key(|row| Reverse(row.1));
 
     let s = Styles::detect();
     let prefix = format!("{}[rib-profile]{} ", s.tag(), s.r());
