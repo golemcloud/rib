@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-1d3f980a.js";
+            window.path_to_searchindex_js = "searchindex-a85a8089.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-5b89b1a8.js"></script>
@@ -233,7 +233,7 @@
 <h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of contents</a></h2>
 <ol start="0">
 <li><a href="#0-example-wit-examplewit">Example WIT (<code>example.wit</code>)</a></li>
-<li><a href="#1-instance-and-calling-exports"><code>instance()</code> and calling exports</a></li>
+<li><a href="#1-instance-and-calling-exports"><code>instance()</code> and calling exports</a> (including <a href="#multiple-instance-calls-and-worker-identity">multiple calls and worker identity</a>)</li>
 <li><a href="#2-programs-blocks-and-semicolons">Programs, blocks, and semicolons</a></li>
 <li><a href="#3-comments">Comments</a></li>
 <li><a href="#4-literals-and-wave-shaped-values">Literals and Wave-shaped values</a></li>
@@ -282,6 +282,25 @@
 my-instance.lookup-sku(7)
 <span class="boring">}</span></code></pre>
 <p>That’s the whole pattern: one binding from <code>instance()</code>, then <code>that-name.export-name(…)</code>. Export names come from WIT and are usually kebab-case (<code>lookup-sku</code>, <code>format-stage</code>, …). Hyphens in <code>let</code> names are fine too (<code>store-main</code>, <code>lane-a</code>, …) if you prefer that style.</p>
+<p><a id="multiple-instance-calls-and-worker-identity"></a></p>
+<h3 id="multiple-instance-calls-and-instance-identity"><a class="header" href="#multiple-instance-calls-and-instance-identity">Multiple instance() calls and instance identity</a></h3>
+<p>Each bare <strong><code>instance()</code></strong> (no argument) introduces a <strong>new logical instance</strong>: its own identity in the host, so <strong>guest state is not shared</strong> between different call sites. If a component keeps internal state behind an export (for example a counter), separate bindings behave like separate instances:</p>
+<pre><code class="language-console">&gt;&gt;&gt; let x = instance()
+()
+&gt;&gt;&gt; x.increment-and-get()
+1
+&gt;&gt;&gt; x.increment-and-get()
+2
+&gt;&gt;&gt; let y = instance()
+()
+&gt;&gt;&gt; y.increment-and-get()
+1
+&gt;&gt;&gt; y.increment-and-get()
+2
+</code></pre>
+<p>Here <code>x</code> and <code>y</code> are independent: <code>y</code>’s counter starts again at <code>1</code>.</p>
+<p>To <strong>share</strong> state across more than one Rib binding, give the <strong>same worker name</strong> as a string argument, e.g. <code>instance("my-worker")</code> for both bindings. The host maps that name to <strong>one</strong> live component instance for the session, so all calls using that name see the same state.</p>
+<p><strong>Embedder contract</strong> — Runtimes that integrate Rib (Wasmtime, Golem, tests, …) must follow that meaning: <strong>worker name is the identity key.</strong> For each distinct name, keep one guest <code>Instance</code> (or equivalent) for the session (unless you explicitly reload). Two different names ⇒ two isolated instances; the <strong>same</strong> string passed to <code>instance("…")</code> ⇒ <strong>one</strong> underlying instance. Each anonymous <code>instance()</code> must receive a <strong>unique</strong> generated name so their state never collides.</p>
 <p>More calls against <a href="example-wit.html"><code>example.wit</code></a> → <code>inventory</code>:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
