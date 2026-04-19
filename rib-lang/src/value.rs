@@ -24,10 +24,43 @@ pub enum Value {
     Flags(Vec<bool>),
     Option(Option<Box<Value>>),
     Result(Result<Option<Box<Value>>, Option<Box<Value>>>),
+    /// Guest resource handle at the interpreter boundary.
+    ///
+    /// - `resource_id` — embedder-defined id (for example a table slot in Wasmtime).
+    /// - `instance_name` — component **instance** key (`instance()` / `instance("x")`) used to route
+    ///   host calls for resource methods. When empty, [`handle_instance_name`](Value::handle_instance_name)
+    ///   falls back to the last `/` segment of `uri` for older embedders.
     Handle {
         uri: String,
         resource_id: u64,
+        instance_name: String,
     },
+}
+
+impl Value {
+    /// Instance key for routing resource method invocations to the correct host-side component
+    /// instance. Prefers [`Handle::instance_name`]; if empty, uses the last `/`-separated segment of
+    /// [`Handle::uri`].
+    pub fn handle_instance_name(&self) -> Option<String> {
+        match self {
+            Value::Handle {
+                uri,
+                instance_name,
+                resource_id: _,
+            } => {
+                if !instance_name.is_empty() {
+                    Some(instance_name.clone())
+                } else {
+                    Some(
+                        uri.rsplit_once('/')
+                            .map(|(_, last)| last.to_string())
+                            .unwrap_or_else(|| uri.clone()),
+                    )
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -107,7 +140,11 @@ impl std::fmt::Display for Value {
             Value::Result(Ok(None)) => write!(f, "ok"),
             Value::Result(Err(Some(v))) => write!(f, "err({v})"),
             Value::Result(Err(None)) => write!(f, "err"),
-            Value::Handle { uri, resource_id } => write!(f, "handle({uri}#{resource_id})"),
+            Value::Handle {
+                uri,
+                resource_id,
+                instance_name,
+            } => write!(f, "handle({uri}#{resource_id} @ {instance_name})",),
         }
     }
 }

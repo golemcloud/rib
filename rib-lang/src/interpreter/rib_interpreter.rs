@@ -6,7 +6,7 @@ use crate::interpreter::rib_runtime_error::{
 };
 use crate::interpreter::stack::InterpreterStack;
 use crate::{
-    internal_corrupted_state, DefaultWorkerNameGenerator, GenerateWorkerName, RibByteCode,
+    internal_corrupted_state, DefaultWorkerNameGenerator, GenerateInstanceName, RibByteCode,
     RibComponentFunctionInvoke, RibIR, RibInput, RibResult,
 };
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 pub struct Interpreter {
     pub input: RibInput,
     pub invoke: Arc<dyn RibComponentFunctionInvoke + Sync + Send>,
-    pub generate_worker_name: Arc<dyn GenerateWorkerName + Sync + Send>,
+    pub generate_worker_name: Arc<dyn GenerateInstanceName + Sync + Send>,
 }
 
 impl Default for Interpreter {
@@ -33,7 +33,7 @@ impl Interpreter {
     pub fn new(
         input: RibInput,
         invoke: Arc<dyn RibComponentFunctionInvoke + Sync + Send>,
-        generate_worker_name: Arc<dyn GenerateWorkerName + Sync + Send>,
+        generate_worker_name: Arc<dyn GenerateInstanceName + Sync + Send>,
     ) -> Self {
         Interpreter {
             input: input.clone(),
@@ -46,7 +46,7 @@ impl Interpreter {
     // All it needs is environment with the required variables to evaluate the Rib script
     pub fn pure(
         input: RibInput,
-        generate_worker_name: Arc<dyn GenerateWorkerName + Sync + Send>,
+        generate_worker_name: Arc<dyn GenerateInstanceName + Sync + Send>,
     ) -> Self {
         Interpreter {
             input,
@@ -716,7 +716,7 @@ mod internal {
     ) -> RibInterpreterResult<()> {
         match variable_id {
             None => {
-                let worker_name = interpreter.generate_worker_name.generate_worker_name();
+                let worker_name = interpreter.generate_worker_name.generate_instance_name();
 
                 interpreter_stack
                     .push_val(ValueAndType::new(Value::String(worker_name.clone()), str()));
@@ -741,7 +741,7 @@ mod internal {
                     }
 
                     None => {
-                        let worker_name = interpreter.generate_worker_name.generate_worker_name();
+                        let worker_name = interpreter.generate_worker_name.generate_instance_name();
 
                         interpreter_stack
                             .push_val(ValueAndType::new(Value::String(worker_name.clone()), str()));
@@ -1302,8 +1302,10 @@ mod internal {
                     })?;
 
                 match &handle.value {
-                    Value::Handle { uri, .. } => {
-                        let worker_name = uri.rsplit_once('/').map(|(_, last)| last).unwrap_or(uri);
+                    Value::Handle { .. } => {
+                        let instance_name = handle.value.handle_instance_name().ok_or(
+                            internal_corrupted_state!("resource handle missing instance name"),
+                        )?;
 
                         final_args.push(handle.clone());
                         final_args.extend(parameter_values);
@@ -1312,7 +1314,7 @@ mod internal {
                             .invoke_worker_function_async(
                                 component_info,
                                 instruction_id,
-                                worker_name.to_string(),
+                                instance_name,
                                 function_name_cloned.clone(),
                                 final_args,
                                 expected_result_type.clone(),
@@ -4257,7 +4259,7 @@ mod tests {
         use crate::{print_value_and_type, IntoValueAndType, Value, ValueAndType};
         use crate::{
             ComponentDependency, ComponentDependencyKey, DefaultWorkerNameGenerator,
-            EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, GenerateWorkerName,
+            EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, GenerateInstanceName,
             GetLiteralValue, InstructionId, RibComponentFunctionInvoke, RibFunctionInvokeResult,
             RibInput,
         };
@@ -4859,6 +4861,7 @@ mod tests {
                             Value::Handle {
                                 uri,
                                 resource_id: 0,
+                                instance_name: worker_name.clone(),
                             },
                             handle(AnalysedResourceId(0), AnalysedResourceMode::Owned),
                         )
@@ -4908,14 +4911,13 @@ mod tests {
                     }
 
                     "golem:it/api.{[static]cart.create}" => {
-                        let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{}",
-                            worker_name.0
-                        );
+                        let wn = worker_name.0.clone();
+                        let uri = format!("urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}");
 
                         let value = Value::Handle {
                             uri,
                             resource_id: 0,
+                            instance_name: wn,
                         };
 
                         Ok(Some(ValueAndType::new(
@@ -4925,14 +4927,13 @@ mod tests {
                     }
 
                     "golem:it/api.{[static]cart.create-safe}" => {
-                        let uri = format!(
-                            "urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{}",
-                            worker_name.0
-                        );
+                        let wn = worker_name.0.clone();
+                        let uri = format!("urn:worker:99738bab-a3bf-4a12-8830-b6fd783d1ef2/{wn}");
 
                         let resource = Value::Handle {
                             uri,
                             resource_id: 0,
+                            instance_name: wn,
                         };
 
                         let value = Value::Result(Ok(Some(Box::new(resource))));
@@ -5118,8 +5119,8 @@ mod tests {
 
         pub(crate) struct StaticWorkerNameGenerator;
 
-        impl GenerateWorkerName for StaticWorkerNameGenerator {
-            fn generate_worker_name(&self) -> String {
+        impl GenerateInstanceName for StaticWorkerNameGenerator {
+            fn generate_instance_name(&self) -> String {
                 "test-worker".to_string()
             }
         }

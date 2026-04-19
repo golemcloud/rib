@@ -710,14 +710,19 @@ fn display_for_value_and_type(value_and_type: &ValueAndType) -> String {
                 Err(None) => "err".to_string(),
             }
         }
-        Value::Handle { uri, resource_id } => display_for_resource_handle(uri, resource_id),
+        Value::Handle {
+            uri,
+            resource_id,
+            instance_name,
+        } => display_for_resource_handle(uri, resource_id, instance_name),
     }
 }
 
-fn display_for_resource_handle(uri: &str, resource_id: &u64) -> String {
+fn display_for_resource_handle(uri: &str, resource_id: &u64, instance_name: &str) -> String {
     let resource = Value::Record(vec![
         Value::String(uri.to_string()),
         Value::U64(*resource_id),
+        Value::String(instance_name.to_string()),
     ]);
 
     let analysed_type = record(vec![
@@ -728,6 +733,10 @@ fn display_for_resource_handle(uri: &str, resource_id: &u64) -> String {
         NameTypePair {
             name: "resource-id".to_string(),
             typ: u64(),
+        },
+        NameTypePair {
+            name: "instance-name".to_string(),
+            typ: str(),
         },
     ]);
 

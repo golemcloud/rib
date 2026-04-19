@@ -110,6 +110,7 @@ pub fn generate_value(analysed_tpe: &WitType) -> Value {
         WitType::Handle(_) => Value::Handle {
             uri: "".to_string(),
             resource_id: 0,
+            instance_name: String::new(),
         },
     }
 }
