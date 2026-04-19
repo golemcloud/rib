@@ -38,26 +38,24 @@ fn search_for_invalid_instance_declarations_arena(
         let node = arena.expr(id);
         let span = node.source_span.clone();
         match &node.kind.clone() {
-            ExprKind::Let { variable_id, .. } => {
-                if variable_id.name() == "instance" {
-                    return Err(CustomError::new(
-                        span,
-                        "`instance` is a reserved keyword and cannot be used as a variable.",
+            ExprKind::Let { variable_id, .. } if variable_id.name() == "instance" => {
+                return Err(CustomError::new(
+                    span,
+                    "`instance` is a reserved keyword and cannot be used as a variable.",
+                )
+                .into());
+            }
+            ExprKind::Identifier { variable_id }
+                if variable_id.name() == "instance" && variable_id.is_global() =>
+            {
+                return Err(CustomError::new(span, "`instance` is a reserved keyword")
+                    .with_help_message(
+                        "use `instance()` instead of `instance` to create an ephemeral instance.",
+                    )
+                    .with_help_message(
+                        "for a named instance, use `instance(\"foo\")` where `\"foo\"` is the instance name",
                     )
                     .into());
-                }
-            }
-            ExprKind::Identifier { variable_id } => {
-                if variable_id.name() == "instance" && variable_id.is_global() {
-                    return Err(CustomError::new(span, "`instance` is a reserved keyword")
-                        .with_help_message(
-                            "use `instance()` instead of `instance` to create an ephemeral instance.",
-                        )
-                        .with_help_message(
-                            "for a named instance, use `instance(\"foo\")` where `\"foo\"` is the instance name",
-                        )
-                        .into());
-                }
             }
             _ => {}
         }

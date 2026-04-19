@@ -41,6 +41,8 @@ a + b
 
 **Execution context** — Rib source is **not** compiled into the guest component. In a REPL integration, Rib text is entered at an interactive prompt; it is parsed and interpreted **in the host process** (the binary that embeds the runtime, e.g. the Wasmtime CLI). That host then performs the actual **component calls** according to the embedder’s `invoke` implementation.
 
+**Instance identity** — Each bare `instance()` in Rib is a **new logical worker** (independent guest state). Passing the same string to `instance("…")` aliases the **same** worker. Integrators must map each worker name to **one** guest component instance for the session (see the [language guide](docs/language-guide.md#multiple-instance-calls-and-worker-identity) and [`rib-repl` README](rib-repl/README.md)).
+
 ---
 
 ## Repository layout

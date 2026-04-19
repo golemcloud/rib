@@ -1,4 +1,5 @@
 use crate::repl_state::ReplState;
+use crate::rib_val::RibVal;
 use async_trait::async_trait;
 use rib::wit_type::WitType;
 use rib::ValueAndType;
@@ -6,8 +7,13 @@ use rib::{
     ComponentDependencyKey, EvaluatedFnArgs, EvaluatedFqFn, EvaluatedWorkerName, InstructionId,
     RibComponentFunctionInvoke, RibFunctionInvokeResult,
 };
+use std::convert::TryFrom;
 use std::sync::Arc;
 use uuid::Uuid;
+
+fn io_other_box(err: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
+    Box::new(std::io::Error::other(err.to_string()))
+}
 
 #[async_trait]
 pub trait ComponentFunctionInvoke {
@@ -17,9 +23,9 @@ pub trait ComponentFunctionInvoke {
         component_name: &str,
         worker_name: &str,
         function_name: &str,
-        args: Vec<ValueAndType>,
+        args: Vec<RibVal>,
         return_type: Option<WitType>,
-    ) -> anyhow::Result<Option<ValueAndType>>;
+    ) -> anyhow::Result<Option<RibVal>>;
 }
 
 // Note: Currently, the Rib interpreter supports only one component, so the
@@ -62,6 +68,12 @@ impl RibComponentFunctionInvoke for ReplRibFunctionInvoke {
         match self.get_cached_result(instruction_id) {
             Some(result) => Ok(result),
             None => {
+                let return_ty = return_type.clone();
+                let mut args_rt = Vec::with_capacity(args.0.len());
+                for a in &args.0 {
+                    args_rt.push(RibVal::try_from(a).map_err(|e| io_other_box(&e))?);
+                }
+
                 let rib_invocation_result = self
                     .repl_state
                     .worker_function_invoke()
@@ -70,17 +82,30 @@ impl RibComponentFunctionInvoke for ReplRibFunctionInvoke {
                         &component_dependency.component_name,
                         &worker_name.0,
                         &function_name.0,
-                        args.0,
+                        args_rt,
                         return_type,
                     )
                     .await;
 
                 match rib_invocation_result {
                     Ok(result) => {
-                        self.repl_state
-                            .update_cache(instruction_id.clone(), result.clone());
+                        let mapped: Option<ValueAndType> = match (result, return_ty) {
+                            (None, _) => None,
+                            (Some(rv), Some(ty)) => Some(
+                                rv.try_to_value_and_type(&ty)
+                                    .map_err(|e| io_other_box(&e))?,
+                            ),
+                            (Some(_), None) => {
+                                return Err(io_other_box(
+                                    "host returned a value but call has no return type",
+                                ));
+                            }
+                        };
 
-                        Ok(result)
+                        self.repl_state
+                            .update_cache(instruction_id.clone(), mapped.clone());
+
+                        Ok(mapped)
                     }
                     Err(err) => Err(err.into()),
                 }

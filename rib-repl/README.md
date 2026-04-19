@@ -29,9 +29,11 @@ Example: Once the component is loaded, the following will result in `3`, if the 
 
 ## Session semantics
 
-**Single component instance** — The embedding keeps **one** guest `Instance` (or equivalent) alive for the session unless it explicitly reloads. Each evaluated line runs against **that** instance, so guest state, linear memory where applicable, and **resource handles** tied to the instance remain coherent across prompts. This matches common REPL expectations: stateful APIs can be exercised incrementally without reinstantiating on every line.
+**One guest instance per Rib instance name** — Rib identifies a logical component instance by a **instance name**. A bare **`instance()`** in source gets a **fresh unique name** each time, so two bindings like `let x = instance(); let y = instance();` refer to **two independent** guest instances (separate state). To share state, use the same string for **`instance("name")`** on each binding that should alias the same guest.
 
-**Names from `let` carry across lines** — If you type `let x = …`, later lines can use **`x`** again, the same way variables work in any REPL. That is ordinary **`let`** behaviour, not a separate concept: the session keeps the values you already defined so you do not repeat large literals or constructor calls on every line.
+**Embedder responsibility** — Your `ComponentFunctionInvoke` (or equivalent) implementation must treat that worker name as the key: **one** Wasm `Instance` (or your runtime’s equivalent) per distinct name for the lifetime of the REPL session, unless you deliberately reload. Anonymous `instance()` calls must each map to a **unique** instance. This is how Wasmtime and other hosts preserve the semantics above.
+
+**Names from `let` carry across lines** — If you type `let x = …`, later lines can use **`x`** again, the same way variables work in any REPL. That is ordinary **`let`** behaviour: the session keeps the values you already defined so you do not repeat large literals or constructor calls on every line.
 
 **Static checking** — `rib-lang` type-checks input against the component metadata registered for the session. Many errors surface as **Rib diagnostics** prior to any Wasm export call, reducing noisy trap-driven failures during exploration.
 
@@ -42,7 +44,7 @@ Example: Once the component is loaded, the following will result in `3`, if the 
 After load, component authors and runtime integrators routinely need to:
 
 - Exercise exports with **realistic** `record`, `variant`, `list`, and `result` values without a new Rust `main` per experiment.
-- Retain **one instance** while calling constructors, methods, or other stateful exports in sequence.
+- Retain **one guest instance per worker name** while calling constructors, methods, or other stateful exports in sequence (several anonymous `instance()` calls ⇒ several independent instances).
 - Reuse **[Wasm Wave](https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave)**-compatible value text where possible instead of bespoke string formats.
 
 `rib-repl` packages those requirements behind **`RibRepl::bootstrap`** / **`RibReplConfig`**: link the crate, implement **`ComponentFunctionInvoke`**, supply dependency loading, and obtain a `rustyline`-driven loop on top of the same **`rib`** pipeline tests may invoke directly.
@@ -60,7 +62,7 @@ After load, component authors and runtime integrators routinely need to:
 - Syntax-highlighted input (`rustyline` and crate-local `RibEdit`).
 - Tab completion for exports, variants, enums, and related symbols; **call completion** can insert **Wave-formatted argument lists** generated from each parameter’s **`WitType`** (see `value_generator.rs` and `rib_edit.rs`).
 - Static typing of Rib source against the session’s component view.
-- Stateful sessions: one guest instance for the session. Example: `let x = instance(); let a = x.increment_and_get(); let b = x.increment_and_get(); a + b` will result in `3` if the component exports a stateful `increment_and_get` method.
+- Stateful exports on **one** binding: e.g. `let x = instance(); let a = x.increment-and-get(); let b = x.increment-and-get(); a + b` yields `3` if the component is stateful—because **`x`** is a single worker. A **second** `let y = instance();` is a **different** worker (fresh state); use `instance("same-name")` when you need two Rib variables to share one guest.
 - Narrow embedding surface with **`rib`** and common error types **re-exported** from `rib-repl` so many projects only add one dependency.
 
 ---

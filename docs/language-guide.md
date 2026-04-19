@@ -71,7 +71,7 @@ Companion WIT — [`example.wit`](example.wit) exports `inventory` (records, enu
 ## Table of contents
 
 0. [Example WIT (`example.wit`)](#0-example-wit-examplewit)  
-1. [`instance()` and calling exports](#1-instance-and-calling-exports)  
+1. [`instance()` and calling exports](#1-instance-and-calling-exports) (including [multiple calls and worker identity](#multiple-instance-calls-and-worker-identity))  
 2. [Programs, blocks, and semicolons](#2-programs-blocks-and-semicolons)  
 3. [Comments](#3-comments)  
 4. [Literals and Wave-shaped values](#4-literals-and-wave-shaped-values)  
@@ -120,6 +120,33 @@ my-instance.lookup-sku(7)
 ```
 
 That’s the whole pattern: one binding from `instance()`, then `that-name.export-name(…)`. Export names come from WIT and are usually kebab-case (`lookup-sku`, `format-stage`, …). Hyphens in `let` names are fine too (`store-main`, `lane-a`, …) if you prefer that style.
+
+<a id="multiple-instance-calls-and-worker-identity"></a>
+
+### Multiple instance() calls and instance identity
+
+Each bare **`instance()`** (no argument) introduces a **new logical instance**: its own identity in the host, so **guest state is not shared** between different call sites. If a component keeps internal state behind an export (for example a counter), separate bindings behave like separate instances:
+
+```console
+>>> let x = instance()
+()
+>>> x.increment-and-get()
+1
+>>> x.increment-and-get()
+2
+>>> let y = instance()
+()
+>>> y.increment-and-get()
+1
+>>> y.increment-and-get()
+2
+```
+
+Here `x` and `y` are independent: `y`’s counter starts again at `1`.
+
+To **share** state across more than one Rib binding, give the **same worker name** as a string argument, e.g. `instance("my-worker")` for both bindings. The host maps that name to **one** live component instance for the session, so all calls using that name see the same state.
+
+**Embedder contract** — Runtimes that integrate Rib (Wasmtime, Golem, tests, …) must follow that meaning: **worker name is the identity key.** For each distinct name, keep one guest `Instance` (or equivalent) for the session (unless you explicitly reload). Two different names ⇒ two isolated instances; the **same** string passed to `instance("…")` ⇒ **one** underlying instance. Each anonymous `instance()` must receive a **unique** generated name so their state never collides.
 
 More calls against [`example.wit`](example.wit) → `inventory`:
 

@@ -5,8 +5,15 @@
 pub use anyhow;
 pub use uuid;
 
-/// Core Rib compiler and value types; pulled in transitively so embedders only add `rib-repl`.
+/// Core Rib compiler crate (`rib-lang`); pulled in transitively so embedders only add `rib-repl`.
 pub use rib;
+
+/// [`rib::wit_type`] at the crate root so embedders avoid a direct `rib` / `rib-lang` dependency path.
+pub use rib::wit_type;
+
+pub use rib::{
+    ComponentDependency, ComponentDependencyKey, ParsedFunctionName, ParsedFunctionSite,
+};
 
 pub use command::*;
 pub use dependency_manager::*;
@@ -17,6 +24,7 @@ pub use repl_printer::*;
 pub use rib_context::*;
 pub use rib_execution_error::*;
 pub use rib_repl::*;
+pub use rib_val::{tuple_element_type, RibVal};
 
 mod command;
 mod compiler;
@@ -32,6 +40,7 @@ mod rib_context;
 mod rib_edit;
 mod rib_execution_error;
 mod rib_repl;
+mod rib_val;
 mod value_generator;
 
 #[cfg(test)]
